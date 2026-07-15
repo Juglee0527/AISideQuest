@@ -294,6 +294,13 @@ Frontend
 - Vite
 - TailwindCSS
 
+Test
+
+- Vitest
+- React Testing Library
+
+자동 테스트는 시간 포맷, 기간별 통계, LocalStorage 검증과 `작업 시작 → 타이머 → 퀘스트 완료 → 새로고침 복구 → 작업 종료` 사용자 흐름을 검증한다.
+
 Backend
 
 - NestJS
@@ -319,7 +326,7 @@ Backend
 
 7. [x] 오늘·이번 주·이번 달 통계 계산 (2026-07-15)
 
-8. [ ] 테스트·빌드 검증
+8. [x] 테스트·빌드 검증 (2026-07-15)
 
 9. [ ] 실제 구현 내용에 맞춰 PROJECT_SPEC.md 최종 점검
 
