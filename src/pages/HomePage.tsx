@@ -3,8 +3,20 @@ import { Link } from 'react-router-dom'
 
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
+import { useSession } from '../contexts/SessionContext'
+import useElapsedTime from '../hooks/useElapsedTime'
+import { formatDuration } from '../utils/time'
 
 function HomePage() {
+  const { activeSession, completedSessions, startSession, endSession } = useSession()
+  const activeStartedAt = activeSession?.startedAt ?? null
+  const elapsedMilliseconds = useElapsedTime(activeStartedAt)
+  const lastCompletedSession = completedSessions[0]
+  const isRunning = activeSession !== null
+  const displayedDuration = isRunning
+    ? elapsedMilliseconds
+    : (lastCompletedSession?.duration ?? 0)
+
   return (
     <div className="space-y-10">
       <PageHeader
@@ -21,40 +33,69 @@ function HomePage() {
               <div>
                 <p className="text-sm font-medium text-slate-400">현재 AI 상태</p>
                 <div className="mt-2 flex items-center gap-2 text-lg font-bold text-white">
-                  <span className="size-2.5 rounded-full bg-slate-600" aria-hidden="true" />
-                  작업 대기 중
+                  <span
+                    className={`size-2.5 rounded-full ${isRunning ? 'animate-pulse bg-emerald-400' : 'bg-slate-600'}`}
+                    aria-hidden="true"
+                  />
+                  {isRunning ? 'AI 작업 진행 중' : '작업 대기 중'}
                 </div>
               </div>
-              <span className="rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs font-semibold text-slate-400">
-                준비됨
+              <span
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  isRunning
+                    ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300'
+                    : 'border-slate-700 bg-slate-800/80 text-slate-400'
+                }`}
+              >
+                {isRunning ? '측정 중' : '준비됨'}
               </span>
             </div>
 
             <div className="py-10 text-center sm:py-12">
-              <p className="text-xs font-bold tracking-[0.2em] text-slate-500 uppercase">Elapsed time</p>
-              <p className="mt-3 font-mono text-5xl font-bold tracking-tight text-white sm:text-7xl">00:00</p>
-              <p className="mt-3 text-sm text-slate-500">작업을 시작하면 시간이 표시됩니다.</p>
+              <p className="text-xs font-bold tracking-[0.2em] text-slate-500 uppercase">
+                {isRunning ? 'Elapsed time' : lastCompletedSession ? 'Last session' : 'Elapsed time'}
+              </p>
+              <p
+                className="mt-3 font-mono text-5xl font-bold tracking-tight text-white tabular-nums sm:text-7xl"
+                role="timer"
+                aria-label={`${Math.floor(displayedDuration / 1_000)}초`}
+              >
+                {formatDuration(displayedDuration)}
+              </p>
+              <p id="timer-description" className="mt-3 text-sm text-slate-500">
+                {isRunning
+                  ? '실제 시작 시각을 기준으로 경과 시간을 계산하고 있습니다.'
+                  : lastCompletedSession
+                    ? '최근 종료한 AI 작업 시간입니다.'
+                    : 'AI 작업을 시작하면 시간이 표시됩니다.'}
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                disabled
-                className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3.5 font-bold text-slate-950 opacity-60"
+                onClick={startSession}
+                disabled={isRunning}
+                aria-describedby="timer-description"
+                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3.5 font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-400"
               >
                 <Play size={18} fill="currentColor" aria-hidden="true" />
                 AI 작업 시작
               </button>
               <button
                 type="button"
-                disabled
-                className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-5 py-3.5 font-bold text-slate-500"
+                onClick={endSession}
+                disabled={!isRunning}
+                aria-describedby="timer-description"
+                className="flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-5 py-3.5 font-bold text-rose-200 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500"
               >
                 <Square size={17} fill="currentColor" aria-hidden="true" />
                 AI 작업 종료
               </button>
             </div>
-            <p className="mt-3 text-center text-xs text-slate-600">타이머 기능은 다음 개발 단계에서 연결됩니다.</p>
+            <p className="mt-3 text-center text-xs text-slate-600">
+              {isRunning ? '다른 화면으로 이동해도 타이머는 계속 실행됩니다.' : '동시에 하나의 AI 작업만 측정할 수 있습니다.'}
+            </p>
           </div>
         </article>
 

@@ -1,6 +1,8 @@
 import { BarChart3, Compass, House, Sparkles } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { useSession } from '../contexts/SessionContext'
+
 const navigationItems = [
   { to: '/', label: 'Home', icon: House },
   { to: '/quests', label: 'Side Quest', icon: Compass },
@@ -16,6 +18,8 @@ const getNavLinkClassName = ({ isActive }: { isActive: boolean }) =>
   ].join(' ')
 
 function AppLayout() {
+  const { activeSession } = useSession()
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <a
@@ -46,9 +50,16 @@ function AppLayout() {
             ))}
           </nav>
 
-          <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-400">
-            MVP
-          </span>
+          {activeSession === null ? (
+            <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-400">
+              MVP
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+              <span className="size-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
+              AI 작업 중
+            </span>
+          )}
         </div>
       </header>
 

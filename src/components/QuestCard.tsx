@@ -5,9 +5,10 @@ import type { Quest } from '../types/quest'
 interface QuestCardProps {
   quest: Quest
   sequence: number
+  isSessionActive: boolean
 }
 
-function QuestCard({ quest, sequence }: QuestCardProps) {
+function QuestCard({ quest, sequence, isSessionActive }: QuestCardProps) {
   return (
     <article className="group flex min-h-72 flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-lg shadow-black/10 transition hover:-translate-y-1 hover:border-emerald-400/30 hover:shadow-emerald-950/20">
       <div className="flex items-center justify-between gap-4">
@@ -44,7 +45,7 @@ function QuestCard({ quest, sequence }: QuestCardProps) {
         className="mt-5 flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-500"
       >
         <Check size={17} aria-hidden="true" />
-        세션 시작 후 완료 가능
+        {isSessionActive ? '완료 기능 준비 중' : '세션 시작 후 완료 가능'}
       </button>
     </article>
   )

@@ -2,9 +2,12 @@ import { CircleDollarSign, ListTodo } from 'lucide-react'
 
 import PageHeader from '../components/PageHeader'
 import QuestCard from '../components/QuestCard'
+import { useSession } from '../contexts/SessionContext'
 import { mockQuests } from '../data/mockQuests'
 
 function SideQuestPage() {
+  const { activeSession } = useSession()
+
   return (
     <div className="space-y-10">
       <PageHeader
@@ -26,7 +29,12 @@ function SideQuestPage() {
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="사이드 퀘스트 목록">
         {mockQuests.map((quest, index) => (
-          <QuestCard key={quest.id} quest={quest} sequence={index + 1} />
+          <QuestCard
+            key={quest.id}
+            quest={quest}
+            sequence={index + 1}
+            isSessionActive={activeSession !== null}
+          />
         ))}
       </section>
     </div>
