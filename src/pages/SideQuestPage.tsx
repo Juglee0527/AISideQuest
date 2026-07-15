@@ -2,11 +2,20 @@ import { CircleDollarSign, ListTodo } from 'lucide-react'
 
 import PageHeader from '../components/PageHeader'
 import QuestCard from '../components/QuestCard'
+import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useSession } from '../contexts/SessionContext'
 import { mockQuests } from '../data/mockQuests'
 
 function SideQuestPage() {
   const { activeSession } = useSession()
+  const { questHistories, completeQuest } = useQuestHistory()
+  const completedQuestIds = new Set(
+    activeSession === null
+      ? []
+      : questHistories
+          .filter((history) => history.sessionId === activeSession.id && history.completed)
+          .map((history) => history.questId),
+  )
 
   return (
     <div className="space-y-10">
@@ -15,9 +24,14 @@ function SideQuestPage() {
         title="짧은 시간도 의미 있게 사용하세요."
         description="AI 작업이 끝나기 전 완료할 수 있는 가벼운 활동을 선택할 수 있습니다."
         action={
-          <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-400">
+          <div
+            className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-400"
+            aria-live="polite"
+          >
             <ListTodo size={17} aria-hidden="true" />
-            이용 가능한 퀘스트 {mockQuests.length}개
+            {activeSession === null
+              ? `이용 가능한 퀘스트 ${mockQuests.length}개`
+              : `현재 세션 ${completedQuestIds.size}/${mockQuests.length} 완료`}
           </div>
         }
       />
@@ -34,6 +48,8 @@ function SideQuestPage() {
             quest={quest}
             sequence={index + 1}
             isSessionActive={activeSession !== null}
+            isCompleted={completedQuestIds.has(quest.id)}
+            onComplete={() => completeQuest(quest.id)}
           />
         ))}
       </section>

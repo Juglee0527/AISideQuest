@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 
 import App from './App'
+import { QuestHistoryProvider } from './contexts/QuestHistoryContext'
 import { SessionProvider } from './contexts/SessionContext'
 import './index.css'
 
@@ -16,7 +17,9 @@ createRoot(rootElement).render(
   <StrictMode>
     <BrowserRouter>
       <SessionProvider>
-        <App />
+        <QuestHistoryProvider>
+          <App />
+        </QuestHistoryProvider>
       </SessionProvider>
     </BrowserRouter>
   </StrictMode>,
