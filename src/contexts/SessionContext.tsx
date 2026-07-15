@@ -2,18 +2,21 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
 } from 'react'
 
 import type { Session } from '../types/session'
+import {
+  loadSessionState,
+  saveSessionState,
+  type PersistedSessionState,
+} from '../storage/appStorage'
 import { getElapsedMilliseconds } from '../utils/time'
 
-interface SessionState {
-  activeSession: Session | null
-  completedSessions: Session[]
-}
+type SessionState = PersistedSessionState
 
 type SessionAction =
   | { type: 'start'; id: string; startedAt: string }
@@ -69,7 +72,15 @@ function sessionReducer(state: SessionState, action: SessionAction): SessionStat
 }
 
 export function SessionProvider({ children }: SessionProviderProps) {
-  const [state, dispatch] = useReducer(sessionReducer, initialSessionState)
+  const [state, dispatch] = useReducer(
+    sessionReducer,
+    initialSessionState,
+    () => loadSessionState() ?? initialSessionState,
+  )
+
+  useEffect(() => {
+    saveSessionState(state)
+  }, [state])
 
   const startSession = useCallback(() => {
     dispatch({

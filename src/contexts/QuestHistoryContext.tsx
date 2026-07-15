@@ -2,17 +2,21 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useReducer,
   type ReactNode,
 } from 'react'
 
 import type { QuestHistory } from '../types/questHistory'
+import {
+  loadQuestHistoryState,
+  saveQuestHistoryState,
+  type PersistedQuestHistoryState,
+} from '../storage/appStorage'
 import { useSession } from './SessionContext'
 
-interface QuestHistoryState {
-  questHistories: QuestHistory[]
-}
+type QuestHistoryState = PersistedQuestHistoryState
 
 type QuestHistoryAction = {
   type: 'complete'
@@ -55,7 +59,15 @@ function questHistoryReducer(
 
 export function QuestHistoryProvider({ children }: QuestHistoryProviderProps) {
   const { activeSession } = useSession()
-  const [state, dispatch] = useReducer(questHistoryReducer, initialQuestHistoryState)
+  const [state, dispatch] = useReducer(
+    questHistoryReducer,
+    initialQuestHistoryState,
+    () => loadQuestHistoryState() ?? initialQuestHistoryState,
+  )
+
+  useEffect(() => {
+    saveQuestHistoryState(state)
+  }, [state])
 
   const completeQuest = useCallback(
     (questId: string) => {

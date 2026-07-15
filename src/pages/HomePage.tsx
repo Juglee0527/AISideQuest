@@ -94,7 +94,9 @@ function HomePage() {
               </button>
             </div>
             <p className="mt-3 text-center text-xs text-slate-600">
-              {isRunning ? '다른 화면으로 이동해도 타이머는 계속 실행됩니다.' : '동시에 하나의 AI 작업만 측정할 수 있습니다.'}
+              {isRunning
+                ? '자동 저장되며 새로고침 후에도 시작 시각부터 이어집니다.'
+                : '작업 기록은 이 브라우저에 자동 저장됩니다.'}
             </p>
           </div>
         </article>
