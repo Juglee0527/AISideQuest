@@ -3,17 +3,41 @@ import { useState } from 'react'
 
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
+import { useQuestHistory } from '../contexts/QuestHistoryContext'
+import { useSession } from '../contexts/SessionContext'
+import { mockQuests } from '../data/mockQuests'
+import useElapsedTime from '../hooks/useElapsedTime'
+import {
+  calculateActivityStatistics,
+  type StatisticsPeriod,
+} from '../utils/statistics'
+import { formatSummaryDuration } from '../utils/time'
 
-const periods = [
+const periods: readonly { id: StatisticsPeriod; label: string }[] = [
   { id: 'today', label: '오늘' },
   { id: 'week', label: '이번 주' },
   { id: 'month', label: '이번 달' },
-] as const
-
-type PeriodId = (typeof periods)[number]['id']
+]
 
 function DashboardPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodId>('today')
+  const [selectedPeriod, setSelectedPeriod] = useState<StatisticsPeriod>('today')
+  const { activeSession, completedSessions } = useSession()
+  const { questHistories } = useQuestHistory()
+  const activeStartedAt = activeSession?.startedAt ?? null
+  const elapsedMilliseconds = useElapsedTime(activeStartedAt)
+  const currentTime = activeStartedAt === null
+    ? Date.now()
+    : Date.parse(activeStartedAt) + elapsedMilliseconds
+  const statistics = calculateActivityStatistics({
+    period: selectedPeriod,
+    currentTime,
+    activeSession,
+    completedSessions,
+    questHistories,
+    quests: mockQuests,
+  })
+  const selectedPeriodLabel = periods.find((period) => period.id === selectedPeriod)?.label ?? ''
+  const hasActivity = statistics.waitDuration > 0 || statistics.completedQuestCount > 0
 
   return (
     <div className="space-y-10">
@@ -45,24 +69,28 @@ function DashboardPage() {
         ))}
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="기간별 주요 통계">
+      <section
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label={`${selectedPeriodLabel} 주요 통계`}
+        aria-live="polite"
+      >
         <StatCard
           label="총 AI 대기 시간"
-          value="0분"
-          helper="완료된 AI 작업 기준"
+          value={formatSummaryDuration(statistics.waitDuration)}
+          helper="진행 중인 AI 작업을 포함"
           icon={Clock3}
           accent="sky"
         />
         <StatCard
           label="완료한 퀘스트"
-          value="0개"
-          helper="완료 처리된 퀘스트 기준"
+          value={`${statistics.completedQuestCount}개`}
+          helper="완료 시각 기준"
           icon={Trophy}
           accent="violet"
         />
         <StatCard
           label="누적 포인트"
-          value="0P"
+          value={`${statistics.rewardPoints.toLocaleString('ko-KR')}P`}
           helper="실제 지급이 아닌 예상 포인트"
           icon={Coins}
           accent="amber"
@@ -81,7 +109,7 @@ function DashboardPage() {
           <div>
             <p className="text-sm font-semibold text-emerald-400">ACTIVITY</p>
             <h2 id="activity-title" className="mt-2 text-xl font-bold text-white">
-              대기 시간 활동
+              {selectedPeriodLabel} 활동 요약
             </h2>
           </div>
           <span className="grid size-11 place-items-center rounded-xl bg-slate-800 text-slate-400">
@@ -90,10 +118,22 @@ function DashboardPage() {
         </div>
 
         <div className="mt-8 grid min-h-64 place-items-center rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-8 text-center">
-          <div>
-            <p className="font-semibold text-slate-300">아직 표시할 활동이 없습니다.</p>
-            <p className="mt-2 text-sm text-slate-500">AI 작업을 완료하면 기간별 활동이 이곳에 표시됩니다.</p>
-          </div>
+          {hasActivity ? (
+            <div className="max-w-xl">
+              <p className="text-lg font-bold text-white">
+                {formatSummaryDuration(statistics.waitDuration)}의 대기 시간을 기록했습니다.
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-400">
+                {selectedPeriodLabel} 동안 사이드 퀘스트 {statistics.completedQuestCount}개를 완료하고 예상 포인트{' '}
+                {statistics.rewardPoints.toLocaleString('ko-KR')}P를 만들었습니다.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="font-semibold text-slate-300">아직 표시할 활동이 없습니다.</p>
+              <p className="mt-2 text-sm text-slate-500">AI 작업을 시작하면 기간별 활동이 이곳에 표시됩니다.</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

@@ -25,3 +25,31 @@ export function formatDuration(durationMilliseconds: number) {
 
   return `${String(hours).padStart(2, '0')}:${paddedMinutes}:${paddedSeconds}`
 }
+
+export function formatSummaryDuration(durationMilliseconds: number) {
+  const safeDuration = Number.isFinite(durationMilliseconds)
+    ? Math.max(0, durationMilliseconds)
+    : 0
+
+  if (safeDuration === 0) {
+    return '0분'
+  }
+
+  if (safeDuration < 60_000) {
+    return '1분 미만'
+  }
+
+  const totalMinutes = Math.floor(safeDuration / 60_000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours === 0) {
+    return `${minutes}분`
+  }
+
+  if (minutes === 0) {
+    return `${hours}시간`
+  }
+
+  return `${hours}시간 ${minutes}분`
+}

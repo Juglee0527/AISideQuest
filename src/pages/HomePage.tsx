@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom'
 
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
+import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useSession } from '../contexts/SessionContext'
+import { mockQuests } from '../data/mockQuests'
 import useElapsedTime from '../hooks/useElapsedTime'
-import { formatDuration } from '../utils/time'
+import { calculateActivityStatistics } from '../utils/statistics'
+import { formatDuration, formatSummaryDuration } from '../utils/time'
 
 function HomePage() {
   const { activeSession, completedSessions, startSession, endSession } = useSession()
+  const { questHistories } = useQuestHistory()
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt)
   const lastCompletedSession = completedSessions[0]
@@ -16,6 +20,17 @@ function HomePage() {
   const displayedDuration = isRunning
     ? elapsedMilliseconds
     : (lastCompletedSession?.duration ?? 0)
+  const currentTime = activeStartedAt === null
+    ? Date.now()
+    : Date.parse(activeStartedAt) + elapsedMilliseconds
+  const todayStatistics = calculateActivityStatistics({
+    period: 'today',
+    currentTime,
+    activeSession,
+    completedSessions,
+    questHistories,
+    quests: mockQuests,
+  })
 
   return (
     <div className="space-y-10">
@@ -104,21 +119,21 @@ function HomePage() {
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
           <StatCard
             label="오늘 대기 시간"
-            value="0분"
-            helper="완료된 AI 작업이 없습니다."
+            value={formatSummaryDuration(todayStatistics.waitDuration)}
+            helper="진행 중인 AI 작업을 포함합니다."
             icon={Clock3}
             accent="sky"
           />
           <StatCard
             label="오늘 완료한 퀘스트"
-            value="0개"
-            helper="첫 사이드 퀘스트를 시작해 보세요."
+            value={`${todayStatistics.completedQuestCount}개`}
+            helper="퀘스트 완료 시각을 기준으로 계산합니다."
             icon={Trophy}
             accent="violet"
           />
           <StatCard
             label="예상 리워드"
-            value="0P"
+            value={`${todayStatistics.rewardPoints.toLocaleString('ko-KR')}P`}
             helper="실제 지급이 아닌 예상 포인트입니다."
             icon={Coins}
             accent="amber"
