@@ -407,16 +407,24 @@ npm run build
 
 # 15. 다음 개발 단계
 
-MVP 검증 후 다음 기능을 우선순위에 따라 진행한다.
+MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md)를 기준으로 20개 작업을 순서대로 진행한다.
 
-1. 로그인과 사용자 모델
-2. NestJS API
-3. PostgreSQL 영구 저장
-4. LocalStorage 데이터의 서버 이전 전략
-5. 실제 퀘스트 콘텐츠
-6. 리워드 정책 및 실제 지급 연동
-7. 예상 절약 시간 계산 기준 확정
-8. AI 작업 자동 감지
+2026-07-15 기준 진행 상태
+
+1. [x] 실사용 베타 범위 확정
+2. [ ] AI 작업 자동 감지 기술 검증
+3. [ ] 세션 상태와 데이터 흐름 설계
+4. [ ] 이후 작업은 구현 계획 문서 참조
+
+확정된 최초 베타 범위
+
+- 최초 지원 도구: Windows ChatGPT 데스크톱 앱의 Codex 작업
+- 최초 지원 환경: Windows 11, Windows native agent 및 PowerShell
+- 로그인: GitHub OAuth
+- 최초 퀘스트: 객관식 개발 퀴즈
+- 포인트: 현금 가치가 없는 서비스 포인트
+- 파일럿: 초대 기반 폐쇄형 베타
+- 개인정보 원칙: 프롬프트, Codex 응답, 소스 코드, 파일 경로를 수집하지 않음
 
 ---
 
