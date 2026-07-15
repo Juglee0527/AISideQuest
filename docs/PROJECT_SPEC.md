@@ -139,7 +139,7 @@ AI 작업 종료
 
 # 5. 화면 구성
 
-## Home
+## Home (`/`)
 
 표시 정보
 
@@ -156,7 +156,7 @@ AI 작업 종료
 
 ---
 
-## Side Quest
+## Side Quest (`/quests`)
 
 카드 형태
 
@@ -198,7 +198,7 @@ AI 작업 종료
 
 ---
 
-## Dashboard
+## Dashboard (`/dashboard`)
 
 오늘
 
@@ -278,7 +278,7 @@ Backend
 
 1. [x] React + TypeScript + Vite + TailwindCSS 구성 (2026-07-15)
 
-2. [ ] Home, Side Quest, Dashboard 화면 생성
+2. [x] Home, Side Quest, Dashboard 화면 생성 (2026-07-15)
 
 3. [ ] 더미 퀘스트 데이터 작성
 

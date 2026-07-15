@@ -7,12 +7,23 @@
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  background: #020617;
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+}
+
+::selection {
+  color: #020617;
+  background: #34d399;
+}
+
+:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 3px;
 }
 
 button,
