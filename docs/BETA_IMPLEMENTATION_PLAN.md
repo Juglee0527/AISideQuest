@@ -4,8 +4,8 @@
 
 - 작성일: 2026-07-15
 - 전체 작업: 20개
-- 현재 완료: 1개
-- 다음 작업: 2. AI 작업 자동 감지 기술 검증
+- 현재 완료: 2개
+- 다음 작업: 3. 세션 상태와 데이터 흐름 설계
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -15,8 +15,8 @@
 | 번호 | 작업 | 상태 |
 |---:|---|---|
 | 1 | 실사용 베타 범위 확정 | 완료 (2026-07-15) |
-| 2 | AI 작업 자동 감지 기술 검증 | 다음 작업 |
-| 3 | 세션 상태와 데이터 흐름 설계 | 대기 |
+| 2 | AI 작업 자동 감지 기술 검증 | 완료 (2026-07-15) |
+| 3 | 세션 상태와 데이터 흐름 설계 | 다음 작업 |
 | 4 | NestJS 백엔드 기본 구성 | 대기 |
 | 5 | PostgreSQL 데이터베이스 구성 | 대기 |
 | 6 | 사용자 로그인 구현 | 대기 |
@@ -55,7 +55,11 @@
 - 프롬프트와 소스 코드 없이 감지 가능한지 검증
 - 완료 기준: 자동 감지 가능 여부와 수동 모드 전환 기준 확정
 
-상태: **다음 작업**
+상태: **완료**
+
+검증 결과: 정상 Codex turn에서 `UserPromptSubmit`과 `Stop`으로 시작·종료를 자동 감지했다. hook 미수신과 비정상 종료는 heartbeat 만료 및 수동 모드로 처리한다.
+
+상세 검증 기록: [`AUTO_DETECTION_POC.md`](./AUTO_DETECTION_POC.md)
 
 ## 3. 세션 상태와 데이터 흐름 설계
 
@@ -340,20 +344,16 @@ Codex hook이 여러 정보를 제공하더라도 AISideQuest 플러그인은 �
 
 ---
 
-# 4. 2번 작업 입력
+# 4. 3번 작업 입력
 
-다음 작업에서는 범위를 다시 논의하지 않고 아래 항목을 실제 환경에서 검증한다.
+다음 작업에서는 2번 검증 결과를 기준으로 세션 상태와 데이터 흐름을 설계한다.
 
-1. 현재 안정 버전 Windows ChatGPT 데스크톱 앱에서 `UserPromptSubmit`, `Stop`, `PermissionRequest`, `SessionStart` hook의 실제 호출 시점 확인
-2. Windows 11과 PowerShell에서 개인 플러그인 설치, 활성화, hook 신뢰 승인, 명령 실행 방식 확인
-3. 각 hook 입력값 중 허용 필드만 추출하고 금지 필드를 폐기하는 PoC 작성
-4. 정상 완료, 실패, 사용자 취소, 권한 승인 대기, 세션 재개, 강제 종료 시나리오 검증
-5. 동일 이벤트 중복 수신과 이벤트 누락 가능성 확인
-6. 자동 감지 성공률과 웹 반영 지연 측정
-7. 목표 미달 시 수동 fallback 범위 확정
+1. `RUNNING`, `WAITING_FOR_USER`, `COMPLETED`, `FAILED`, `ABANDONED`의 진입·종료 조건 정의
+2. `UserPromptSubmit`, `PermissionRequest`, `PostToolUse`, `Stop`과 세션 상태의 명시적 매핑
+3. hook 미수신, 중복·역순 event, 앱 강제 종료, 네트워크 단절의 처리 규칙 정의
+4. 자동 감지와 사용자의 수동 시작·종료가 충돌할 때의 우선순위 정의
+5. Codex 플러그인, API 서버, 웹 화면의 책임과 신뢰할 시각 구분
+6. heartbeat 만료 시간과 `ABANDONED` 전환 및 복구 규칙 정의
+7. 세션 API 계약, 멱등성 키, 오류 응답 문서화
 
-공식 문서 기준:
-
-- [ChatGPT desktop app for Windows](https://learn.chatgpt.com/docs/windows/windows-app)
-- [Build Codex plugins](https://learn.chatgpt.com/docs/build-plugins)
-- [Codex hooks](https://learn.chatgpt.com/docs/hooks)
+완료 결과는 상태 전이표, 예외 규칙, 구성 요소별 책임, API 계약을 한 문서에 기록한다.

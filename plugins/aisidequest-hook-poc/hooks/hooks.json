@@ -1,0 +1,76 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$env:AISIDEQUEST_POC_DATA_DIR = Join-Path $env:LOCALAPPDATA 'AISideQuest\\hook-poc'; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

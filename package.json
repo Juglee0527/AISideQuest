@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:hooks",
+    "test:hooks": "node --test plugins/aisidequest-hook-poc/tests/event-recorder.test.mjs",
     "test:watch": "vitest",
     "preview": "vite preview"
   },

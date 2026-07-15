@@ -1,0 +1,19 @@
+{
+  "name": "aisidequest-hook-poc",
+  "version": "0.1.0",
+  "description": "Safely records Codex lifecycle event timing for the AISideQuest detection PoC.",
+  "author": {
+    "name": "AISideQuest"
+  },
+  "license": "MIT",
+  "keywords": ["aisidequest", "codex", "hooks", "poc"],
+  "interface": {
+    "displayName": "AISideQuest Hook PoC",
+    "shortDescription": "Validate Codex task start and stop detection.",
+    "longDescription": "Records privacy-filtered Codex lifecycle event timing locally to validate AISideQuest automatic task detection.",
+    "developerName": "AISideQuest",
+    "category": "Productivity",
+    "capabilities": ["Lifecycle hooks"],
+    "defaultPrompt": "Show the AISideQuest hook PoC status and local event log location."
+  }
+}
