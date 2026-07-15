@@ -74,7 +74,7 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 
 ---
 
-# 🛠 기술 스택 (예정)
+# 🛠 기술 스택
 
 ## Frontend
 
@@ -83,17 +83,91 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 - Vite
 - Tailwind CSS
 
-## Backend
+## Backend (예정)
 
 - Node.js
-- NestJS (예정)
+- NestJS
 - PostgreSQL
 - Redis
 
-## Extension
+## Extension (예정)
 
 - Chrome Extension
 - VS Code Extension
+
+---
+
+# 💻 로컬 실행
+
+## 준비 사항
+
+- Node.js
+- npm
+
+## 의존성 설치
+
+```powershell
+npm.cmd install
+```
+
+## 개발 서버 실행
+
+```powershell
+npm.cmd run dev
+```
+
+터미널에 표시된 주소(기본 `http://localhost:5173`)로 접속합니다.
+
+---
+
+# 🧪 테스트
+
+## 자동 테스트
+
+```powershell
+npm.cmd test
+```
+
+개발 중 파일 변경을 감지하여 테스트를 반복 실행하려면 다음 명령을 사용합니다.
+
+```powershell
+npm.cmd run test:watch
+```
+
+현재 자동 테스트는 다음 영역을 검증합니다.
+
+- AI 작업 세션 시작, 복구, 종료
+- 사이드 퀘스트 완료 및 중복 완료 방지
+- LocalStorage 저장, 오류 데이터, 스키마 버전 처리
+- 일간, 주간, 월간 활동 통계
+- 경과 시간의 정상·경계·잘못된 입력
+
+## 타입 검사
+
+```powershell
+npm.cmd run typecheck
+```
+
+## 프로덕션 빌드
+
+```powershell
+npm.cmd run build
+```
+
+빌드 결과는 `dist` 디렉터리에 생성됩니다. 생성된 결과물을 로컬에서 확인하려면 다음 명령을 실행합니다.
+
+```powershell
+npm.cmd run preview
+```
+
+## 수동 검증 체크리스트
+
+1. `AI 작업 시작`을 누른 후 타이머가 증가하는지 확인합니다.
+2. 새로고침 후에도 세션과 타이머가 유지되는지 확인합니다.
+3. 사이드 퀘스트를 완료하고 같은 퀘스트를 중복 완료할 수 없는지 확인합니다.
+4. 대시보드의 오늘·주간·월간 통계에 결과가 반영되는지 확인합니다.
+5. `AI 작업 종료` 후 완료된 세션 시간이 보존되는지 확인합니다.
+6. 모바일 화면 크기에서 레이아웃과 주요 버튼이 정상적으로 표시되는지 확인합니다.
 
 ---
 
