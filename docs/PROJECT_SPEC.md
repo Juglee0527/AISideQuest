@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 플랫폼
 
-- 현재 상태: 브라우저 LocalStorage 기반 MVP 구현 완료
+- 현재 상태: 브라우저 LocalStorage 기반 MVP 및 NestJS API 기본 구성 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-15
 
@@ -312,6 +312,11 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 - TailwindCSS 4
 - React Router 7
 - Lucide React
+- Node.js 22
+- NestJS 11
+- NestJS Config 4
+- class-validator
+- class-transformer
 
 ## 11.2 테스트
 
@@ -320,13 +325,14 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 - Testing Library DOM
 - Testing Library Jest DOM
 - jsdom 29
+- Node.js test runner
+- Supertest 7
 
-## 11.3 향후 백엔드
+## 11.3 향후 백엔드 구성
 
-- NestJS
 - PostgreSQL
 
-현재 저장소에는 백엔드 코드나 데이터베이스 연결이 없다.
+현재 저장소에는 NestJS API 기본 구조가 있으며 데이터베이스 연결은 아직 없다.
 
 ---
 
@@ -337,6 +343,7 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 ```bash
 npm install
 npm run dev
+npm run dev:server
 ```
 
 ## 12.2 검증 명령
@@ -361,15 +368,21 @@ npm run build
 - 중복 세션과 중복 퀘스트 완료 이력 차단
 - LocalStorage 접근 실패 처리
 - `작업 시작 → 타이머 → 퀘스트 완료 → 새로고침 복구 → 작업 종료` 통합 흐름
+- API Health Check와 공통 성공 응답
+- 전역 입력 검증과 공통 오류 응답
+- API 환경설정 기본값과 범위 검증
 
 ## 12.4 현재 검증 결과
 
 2026-07-15 기준
 
-- 테스트 파일: 4개 통과
-- 자동 테스트: 19개 통과
+- React 테스트 파일: 4개 통과
+- React 자동 테스트: 19개 통과
+- Codex hook 테스트: 4개 통과
+- NestJS 통합 테스트: 4개 통과
 - TypeScript 타입 검사 통과
-- Vite 프로덕션 빌드 통과
+- Vite 및 NestJS 프로덕션 빌드 통과
+- 실제 `GET /api/v1/health` HTTP 200 확인
 - npm 패키지 취약점 0건
 - `git diff --check` 오류 없음
 
@@ -414,8 +427,9 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 1. [x] 실사용 베타 범위 확정
 2. [x] AI 작업 자동 감지 기술 검증 - 정상 turn 자동 감지 및 fallback 범위 확정
 3. [x] 세션 상태와 데이터 흐름 설계 - 상태 전이, 책임 분리, API 계약 확정
-4. [ ] NestJS 백엔드 기본 구성 - 다음 작업
-5. [ ] 이후 작업은 구현 계획 문서 참조
+4. [x] NestJS 백엔드 기본 구성 - Health Check 및 공통 API 기반 구현
+5. [ ] PostgreSQL 데이터베이스 구성 - 다음 작업
+6. [ ] 이후 작업은 구현 계획 문서 참조
 
 확정된 최초 베타 범위
 

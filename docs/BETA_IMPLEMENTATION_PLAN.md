@@ -4,8 +4,8 @@
 
 - 작성일: 2026-07-15
 - 전체 작업: 20개
-- 현재 완료: 3개
-- 다음 작업: 4. NestJS 백엔드 기본 구성
+- 현재 완료: 4개
+- 다음 작업: 5. PostgreSQL 데이터베이스 구성
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -17,8 +17,8 @@
 | 1 | 실사용 베타 범위 확정 | 완료 (2026-07-15) |
 | 2 | AI 작업 자동 감지 기술 검증 | 완료 (2026-07-15) |
 | 3 | 세션 상태와 데이터 흐름 설계 | 완료 (2026-07-15) |
-| 4 | NestJS 백엔드 기본 구성 | 다음 작업 |
-| 5 | PostgreSQL 데이터베이스 구성 | 대기 |
+| 4 | NestJS 백엔드 기본 구성 | 완료 (2026-07-15) |
+| 5 | PostgreSQL 데이터베이스 구성 | 다음 작업 |
 | 6 | 사용자 로그인 구현 | 대기 |
 | 7 | AI 세션 API 구현 | 대기 |
 | 8 | 프런트엔드 세션 상태를 API로 전환 | 대기 |
@@ -80,6 +80,10 @@
 - 환경설정, 공통 응답, 오류 처리, 입력 검증 구성
 - Health Check API와 기본 테스트 추가
 - 완료 기준: 개발 환경에서 서버 실행 및 Health Check 통과
+
+상태: **완료**
+
+구현 결과: `server/`에 NestJS 11 API를 추가하고 환경설정 검증, 공통 성공·오류 응답, 전역 ValidationPipe, CORS, `GET /api/v1/health`를 구성했다. 서버 통합 테스트와 실제 HTTP Health Check를 통과했다.
 
 ## 5. PostgreSQL 데이터베이스 구성
 
@@ -365,14 +369,28 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 
 ---
 
-# 5. 4번 작업 입력
+# 5. 4번 작업 결과
 
-다음 작업에서는 현재 React 프로젝트에 NestJS API 개발 환경을 추가한다.
+1. root npm 패키지를 유지하고 `server/`에 독립된 NestJS 빌드 경계를 추가했다.
+2. `NODE_ENV`, `API_HOST`, `API_PORT`, `CORS_ORIGIN` 기본값과 형식 검증을 구성했다.
+3. `{ data, meta.serverTime }` 성공 응답과 `{ error, meta.serverTime }` 오류 응답을 구성했다.
+4. whitelist 기반 전역 ValidationPipe와 CORS를 적용했다.
+5. `GET /api/v1/health` 및 환경설정·검증·404 통합 테스트 4개를 추가했다.
+6. 서버 타입 검사, 빌드, 실제 HTTP Health Check를 통과했다.
 
-1. 현재 npm/Vite 구성을 유지하면서 백엔드 프로젝트 경로와 실행 명령 확정
-2. 환경설정 검증, 전역 입력 검증, 공통 오류 응답 구성
-3. `GET /api/v1/health` 구현
-4. 정상 health check와 잘못된 입력·오류 응답 테스트 추가
-5. 개발 실행, 테스트, 타입 검사, 프로덕션 빌드 검증
+결론: **4번 NestJS 백엔드 기본 구성 작업을 완료한다.**
 
-데이터베이스, 로그인, 세션 비즈니스 API는 각각 5~7번 작업에서 구현하며 4번에는 포함하지 않는다.
+---
+
+# 6. 5번 작업 입력
+
+다음 작업에서는 PostgreSQL 데이터베이스와 migration을 구성한다.
+
+1. 현재 NestJS 11 및 TypeScript 7과 호환되는 ORM·migration 도구 선정
+2. `users`, `ai_sessions`, `quests`, `quest_attempts`, `point_ledger` 테이블 설계
+3. FK, UK, 인덱스 및 활성 세션 제약 정의
+4. 빈 데이터베이스에서 전체 구조를 만드는 최초 migration 작성
+5. 개발용 초기 퀘스트 seed 작성
+6. migration 적용·재실행 및 제약조건 통합 테스트
+
+세션 상태 필드와 event 멱등성 제약은 [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)의 계약을 기준으로 한다.

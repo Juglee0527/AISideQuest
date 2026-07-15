@@ -83,12 +83,11 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 - Vite
 - Tailwind CSS
 
-## Backend (예정)
+## Backend
 
-- Node.js
-- NestJS
-- PostgreSQL
-- Redis
+- Node.js 22
+- NestJS 11
+- PostgreSQL (다음 단계)
 
 ## Extension (예정)
 
@@ -101,7 +100,7 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 
 ## 준비 사항
 
-- Node.js
+- Node.js 22 이상
 - npm
 
 ## 의존성 설치
@@ -110,13 +109,27 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 npm.cmd install
 ```
 
-## 개발 서버 실행
+## 프런트엔드 개발 서버 실행
 
 ```powershell
 npm.cmd run dev
 ```
 
 터미널에 표시된 주소(기본 `http://localhost:5173`)로 접속합니다.
+
+## API 개발 서버 실행
+
+필요하면 `.env.example`을 참고하여 루트에 `.env`를 생성합니다. 기본값만 사용할 때는 `.env`가 없어도 실행됩니다.
+
+```powershell
+npm.cmd run dev:server
+```
+
+기본 API 주소는 `http://127.0.0.1:3000/api/v1`이며 Health Check는 다음 경로에서 확인합니다.
+
+```text
+GET http://127.0.0.1:3000/api/v1/health
+```
 
 ---
 
@@ -141,6 +154,10 @@ npm.cmd run test:watch
 - LocalStorage 저장, 오류 데이터, 스키마 버전 처리
 - 일간, 주간, 월간 활동 통계
 - 경과 시간의 정상·경계·잘못된 입력
+- Codex hook 개인정보 필터
+- API Health Check와 공통 성공 응답
+- 전역 입력 검증과 공통 오류 응답
+- API 환경설정 기본값과 잘못된 포트 차단
 
 ## 타입 검사
 
@@ -154,7 +171,7 @@ npm.cmd run typecheck
 npm.cmd run build
 ```
 
-빌드 결과는 `dist` 디렉터리에 생성됩니다. 생성된 결과물을 로컬에서 확인하려면 다음 명령을 실행합니다.
+프런트엔드 결과는 `dist`, API 결과는 `server/dist`에 생성됩니다. 프런트엔드 결과물을 로컬에서 확인하려면 다음 명령을 실행합니다.
 
 ```powershell
 npm.cmd run preview
@@ -185,7 +202,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 아이디어 및 프로토타입 단계입니다.
+현재는 브라우저 MVP와 NestJS API 기본 구성이 완료된 실사용 베타 개발 단계입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
