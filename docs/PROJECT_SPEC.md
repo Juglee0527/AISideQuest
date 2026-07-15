@@ -274,25 +274,27 @@ Backend
 
 # 8. 개발 순서
 
-1. React 프로젝트 생성
+구현이 완료될 때마다 실제 동작과 검증 결과를 기준으로 이 문서를 함께 현행화한다.
 
-2. 기본 레이아웃
+1. [x] React + TypeScript + Vite + TailwindCSS 구성 (2026-07-15)
 
-3. 타이머 구현
+2. [ ] Home, Side Quest, Dashboard 화면 생성
 
-4. Home 화면
+3. [ ] 더미 퀘스트 데이터 작성
 
-5. SideQuest 화면
+4. [ ] AI 작업 시작·종료와 타이머 구현
 
-6. Dashboard
+5. [ ] 퀘스트 완료 처리
 
-7. LocalStorage 저장
+6. [ ] LocalStorage 저장 및 새로고침 복구
 
-8. PostgreSQL 연동
+7. [ ] 오늘·이번 주·이번 달 통계 계산
 
-9. 로그인
+8. [ ] 테스트·빌드 검증
 
-10. 실제 리워드 연동
+9. [ ] 실제 구현 내용에 맞춰 PROJECT_SPEC.md 최종 점검
+
+MVP 완료 후 PostgreSQL 연동, 로그인, 실제 리워드 연동을 순차적으로 진행한다.
 
 ---
 
