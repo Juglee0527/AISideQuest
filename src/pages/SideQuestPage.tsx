@@ -1,6 +1,8 @@
-import { Clock3, Compass, Gift, ListTodo } from 'lucide-react'
+import { CircleDollarSign, ListTodo } from 'lucide-react'
 
 import PageHeader from '../components/PageHeader'
+import QuestCard from '../components/QuestCard'
+import { mockQuests } from '../data/mockQuests'
 
 function SideQuestPage() {
   return (
@@ -12,47 +14,20 @@ function SideQuestPage() {
         action={
           <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-400">
             <ListTodo size={17} aria-hidden="true" />
-            이용 가능한 퀘스트 0개
+            이용 가능한 퀘스트 {mockQuests.length}개
           </div>
         }
       />
 
-      <section className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/40 px-6 py-16 text-center sm:px-10">
-        <span className="mx-auto grid size-16 place-items-center rounded-2xl bg-emerald-400/10 text-emerald-300">
-          <Compass size={30} aria-hidden="true" />
-        </span>
-        <h2 className="mt-6 text-xl font-bold text-white">퀘스트를 준비하고 있습니다.</h2>
-        <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-slate-400">
-          다음 단계에서 설문조사, 개발 퀴즈, 학습 콘텐츠 등 더미 퀘스트 데이터가 이곳에 카드 형태로 표시됩니다.
-        </p>
-      </section>
+      <aside className="flex gap-3 rounded-2xl border border-amber-400/15 bg-amber-400/5 p-4 text-sm leading-6 text-amber-100/80">
+        <CircleDollarSign className="mt-0.5 shrink-0 text-amber-300" size={19} aria-hidden="true" />
+        <p>표시된 보상은 MVP 확인을 위한 예상 포인트이며 실제로 지급되지 않습니다.</p>
+      </aside>
 
-      <section aria-labelledby="quest-card-guide-title">
-        <div className="mb-5 flex items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-emerald-400">CARD GUIDE</p>
-            <h2 id="quest-card-guide-title" className="mt-2 text-xl font-bold text-white">
-              퀘스트 카드에서 확인할 정보
-            </h2>
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-            <span className="grid size-11 place-items-center rounded-xl bg-sky-400/10 text-sky-300">
-              <Clock3 size={21} aria-hidden="true" />
-            </span>
-            <h3 className="mt-5 font-bold text-white">예상 소요 시간</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-400">현재 남은 대기 시간에 맞는 활동인지 판단할 수 있습니다.</p>
-          </article>
-          <article className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-            <span className="grid size-11 place-items-center rounded-xl bg-amber-400/10 text-amber-300">
-              <Gift size={21} aria-hidden="true" />
-            </span>
-            <h3 className="mt-5 font-bold text-white">예상 보상</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-400">퀘스트 완료 시 적립될 더미 포인트를 확인할 수 있습니다.</p>
-          </article>
-        </div>
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="사이드 퀘스트 목록">
+        {mockQuests.map((quest, index) => (
+          <QuestCard key={quest.id} quest={quest} sequence={index + 1} />
+        ))}
       </section>
     </div>
   )
