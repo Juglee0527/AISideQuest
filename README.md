@@ -120,17 +120,32 @@ npm.cmd run dev
 
 ## API 개발 서버 실행
 
-필요하면 `.env.example`을 참고하여 루트에 `.env`를 생성합니다. 기본값만 사용할 때는 `.env`가 없어도 실행됩니다.
+먼저 PostgreSQL을 실행하고 migration을 적용합니다.
+
+```powershell
+npm.cmd run db:up
+npm.cmd run db:migrate
+```
+
+`.env.example`을 참고하여 루트에 `.env`를 생성합니다. GitHub 로그인을 사용하려면 GitHub OAuth App의 client ID와 secret이 필요합니다.
 
 ```powershell
 npm.cmd run dev:server
 ```
 
-기본 API 주소는 `http://127.0.0.1:3000/api/v1`이며 Health Check는 다음 경로에서 확인합니다.
+브라우저에서 사용하는 기본 API 주소는 `http://localhost:3000/api/v1`이며 Health Check는 다음 경로에서 확인합니다. 서버는 로컬 인터페이스 `127.0.0.1`에 바인딩됩니다.
 
 ```text
-GET http://127.0.0.1:3000/api/v1/health
+GET http://localhost:3000/api/v1/health
 ```
+
+GitHub 로그인은 다음 경로에서 시작합니다.
+
+```text
+GET http://localhost:3000/api/v1/auth/github
+```
+
+현재 사용자 조회는 `GET /api/v1/auth/me`, 로그아웃은 `POST /api/v1/auth/logout`입니다. OAuth App 설정, cookie와 CSRF 계약은 [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md)를 확인합니다.
 
 ## PostgreSQL 실행
 
@@ -170,6 +185,8 @@ npm.cmd run test:watch
 - API 환경설정 기본값과 잘못된 포트 차단
 - PostgreSQL migration 적용·되돌리기·재적용
 - 개발 퀴즈 seed 멱등성과 핵심 FK·UK 제약
+- GitHub OAuth state·PKCE, 사용자 연결과 hash 세션 저장
+- 현재 사용자 조회, CSRF logout, 세션 만료·폐기
 
 DB 통합 테스트는 초기화 가능한 test 전용 DB에서 실행합니다.
 
@@ -217,7 +234,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API 기반과 PostgreSQL 구조까지 완료된 실사용 베타 개발 단계입니다. 다음 작업은 GitHub OAuth 로그인입니다.
+현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API, PostgreSQL과 GitHub OAuth 인증까지 완료된 실사용 베타 개발 단계입니다. 다음 작업은 인증된 사용자별 AI 세션 API입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -227,7 +244,6 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- GitHub OAuth 로그인과 서버 인증 세션
 - AI 세션 API와 프런트엔드 서버 동기화
 - AISideQuest Codex 플러그인 정식 연동
 - 객관식 개발 퀴즈와 포인트 원장

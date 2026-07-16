@@ -16,6 +16,7 @@ import request from 'supertest'
 import { AppModule } from '../src/app.module'
 import { configureApplication } from '../src/bootstrap/configure-application'
 import { validateEnvironment } from '../src/config/environment'
+import { DatabaseService } from '../src/database/database.service'
 
 class ValidationProbeDto {
   @IsString()
@@ -37,7 +38,13 @@ before(async () => {
   const testingModule = await Test.createTestingModule({
     imports: [AppModule],
     controllers: [ValidationProbeController],
-  }).compile()
+  })
+    .overrideProvider(DatabaseService)
+    .useValue({
+      onModuleInit: () => undefined,
+      onModuleDestroy: () => undefined,
+    })
+    .compile()
 
   app = testingModule.createNestApplication()
   configureApplication(app)
@@ -99,6 +106,13 @@ test('environment validation applies defaults and rejects invalid ports', () => 
     'postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest',
   )
   assert.equal(environment.DATABASE_SSL, false)
+  assert.equal(environment.GITHUB_CLIENT_ID, '')
+  assert.equal(environment.GITHUB_CLIENT_SECRET, '')
+  assert.equal(
+    environment.GITHUB_CALLBACK_URL,
+    'http://localhost:3000/api/v1/auth/github/callback',
+  )
+  assert.equal(environment.AUTH_SESSION_TTL_HOURS, 168)
   assert.throws(
     () => validateEnvironment({ API_PORT: '0' }),
     /API_PORT must be an integer between 1 and 65535/,
@@ -110,5 +124,21 @@ test('environment validation applies defaults and rejects invalid ports', () => 
   assert.throws(
     () => validateEnvironment({ DATABASE_SSL: 'yes' }),
     /DATABASE_SSL must be true or false/,
+  )
+  assert.throws(
+    () => validateEnvironment({ AUTH_SESSION_TTL_HOURS: '0' }),
+    /AUTH_SESSION_TTL_HOURS must be an integer from 1 to 720/,
+  )
+  assert.throws(
+    () =>
+      validateEnvironment({
+        GITHUB_CALLBACK_URL:
+          'http://127.0.0.1:3000/api/v1/auth/github/callback',
+      }),
+    /GITHUB_CALLBACK_URL and CORS_ORIGIN must use the same hostname/,
+  )
+  assert.throws(
+    () => validateEnvironment({ NODE_ENV: 'production' }),
+    /GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are required in production/,
   )
 })

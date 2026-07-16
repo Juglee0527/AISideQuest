@@ -2,10 +2,14 @@ import {
   readDatabaseEnvironment,
   type DatabaseEnvironment,
 } from '../database/database-environment'
+import {
+  readAuthEnvironment,
+  type AuthEnvironment,
+} from '../auth/auth-environment'
 
 export type NodeEnvironment = 'development' | 'test' | 'production'
 
-export interface AppEnvironment extends DatabaseEnvironment {
+export interface AppEnvironment extends DatabaseEnvironment, AuthEnvironment {
   NODE_ENV: NodeEnvironment
   API_HOST: string
   API_PORT: number
@@ -71,18 +75,39 @@ function parseCorsOrigin(value: unknown) {
   }
 }
 
+function assertCompatibleAuthCookieHost(
+  authEnvironment: AuthEnvironment,
+  corsOrigin: string,
+) {
+  const callbackHost = new URL(authEnvironment.GITHUB_CALLBACK_URL).hostname
+  const clientHost = new URL(corsOrigin).hostname
+
+  if (callbackHost !== clientHost) {
+    throw new Error(
+      'GITHUB_CALLBACK_URL and CORS_ORIGIN must use the same hostname for authentication cookies',
+    )
+  }
+}
+
 export function validateEnvironment(
   configuration: Record<string, unknown>,
 ): Record<string, unknown> & AppEnvironment {
+  const nodeEnvironment = parseNodeEnvironment(configuration.NODE_ENV)
+  const authEnvironment = readAuthEnvironment(configuration, nodeEnvironment)
+  const corsOrigin = parseCorsOrigin(configuration.CORS_ORIGIN)
+
+  assertCompatibleAuthCookieHost(authEnvironment, corsOrigin)
+
   return {
     ...configuration,
     ...readDatabaseEnvironment(configuration),
-    NODE_ENV: parseNodeEnvironment(configuration.NODE_ENV),
+    ...authEnvironment,
+    NODE_ENV: nodeEnvironment,
     API_HOST: readNonEmptyString(
       configuration.API_HOST,
       DEFAULT_ENVIRONMENT.API_HOST,
     ),
     API_PORT: parsePort(configuration.API_PORT),
-    CORS_ORIGIN: parseCorsOrigin(configuration.CORS_ORIGIN),
+    CORS_ORIGIN: corsOrigin,
   }
 }

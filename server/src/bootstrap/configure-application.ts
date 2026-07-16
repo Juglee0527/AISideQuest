@@ -1,5 +1,6 @@
 import { ValidationPipe, type INestApplication } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import cookieParser from 'cookie-parser'
 
 import { ApiExceptionFilter } from '../common/http/api-exception.filter'
 import { ApiResponseInterceptor } from '../common/http/api-response.interceptor'
@@ -24,6 +25,7 @@ export function configureApplication(app: INestApplication) {
   const corsOrigin = configService.getOrThrow<string>('CORS_ORIGIN')
 
   app.setGlobalPrefix(API_PREFIX)
+  app.use(cookieParser())
   app.enableCors({
     origin: corsOrigin,
     credentials: true,

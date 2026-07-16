@@ -2,9 +2,9 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 플랫폼
 
-- 현재 상태: 브라우저 LocalStorage 기반 MVP 및 NestJS API 기본 구성 완료
+- 현재 상태: 브라우저 LocalStorage 기반 MVP, NestJS API, PostgreSQL 및 GitHub OAuth 인증 구현
 - 애플리케이션 버전: `0.1.0`
-- 최종 현행화: 2026-07-15
+- 최종 현행화: 2026-07-16
 
 ---
 
@@ -213,15 +213,18 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 | `completed` | `boolean` | 현재 구현에서는 항상 `true` |
 | `completedAt` | `string` | ISO 8601 완료 시각 |
 
-## 7.4 User
+## 7.4 서버 User
 
-`User` 모델은 로그인 구현 이후 추가할 계획이며 현재 MVP에는 존재하지 않는다.
+프런트엔드 MVP 상태에는 아직 연결되지 않았지만 서버는 GitHub OAuth 로그인 사용자를 다음 정보로 관리한다.
 
-예정 필드
+| 필드 | 설명 |
+|---|---|
+| `id` | 내부 UUID |
+| `displayName` | GitHub 표시 이름 또는 사용자명 |
+| `avatarUrl` | GitHub 프로필 이미지 URL |
+| `githubLogin` | GitHub 사용자명 |
 
-- `id`
-- `nickname`
-- `createdAt`
+GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용자명 변경과 관계없이 같은 사용자를 식별한다. 이메일과 GitHub access token은 저장하지 않는다.
 
 ---
 
@@ -317,6 +320,7 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 - NestJS Config 4
 - class-validator
 - class-transformer
+- cookie-parser
 
 ## 11.2 테스트
 
@@ -334,7 +338,7 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 - TypeORM 1.1 SQL migration
 - 로컬 Docker Compose 실행 환경
 
-현재 저장소에는 NestJS API 기본 구조와 PostgreSQL 스키마·migration·개발 seed가 있다. 인증과 비즈니스 API의 repository 연결은 후속 작업에서 구현한다.
+현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed와 GitHub OAuth 기반 인증 모듈이 있다. AI 세션·퀘스트·포인트 비즈니스 API는 후속 작업에서 구현한다.
 
 ---
 
@@ -375,15 +379,18 @@ npm run build
 - API 환경설정 기본값과 범위 검증
 - 빈 PostgreSQL DB migration 적용·되돌리기·재적용
 - 개발 퀴즈 seed 반복 실행과 DB FK·UK 제약조건
+- GitHub OAuth state·PKCE와 사용자·OAuth 계정 연결
+- 서버 인증 세션, 현재 사용자 조회, CSRF logout과 세션 만료
 
 ## 12.4 현재 검증 결과
 
-2026-07-15 기준
+2026-07-16 기준
 
 - React 테스트 파일: 4개 통과
 - React 자동 테스트: 19개 통과
 - Codex hook 테스트: 4개 통과
 - NestJS 통합 테스트: 4개 통과
+- 인증·PostgreSQL 통합 테스트: 9개 통과
 - TypeScript 타입 검사 통과
 - Vite 및 NestJS 프로덕션 빌드 통과
 - 실제 `GET /api/v1/health` HTTP 200 확인
@@ -402,7 +409,8 @@ npm run build
 - 퀘스트 완료 취소를 지원하지 않는다.
 - 실제 리워드를 지급하지 않는다.
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
-- 로그인, 서버 비즈니스 API와 Codex 플러그인 서버 연동이 없다.
+- 서버 로그인 API는 있지만 실제 GitHub OAuth App 자격 증명과 프런트엔드 로그인 UI가 연결되지 않았다.
+- AI 세션 비즈니스 API와 Codex 플러그인 서버 연동이 없다.
 - PostgreSQL 구조는 준비됐지만 현재 프런트엔드는 아직 DB 데이터를 사용하지 않는다.
 
 ---
@@ -434,8 +442,9 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 3. [x] 세션 상태와 데이터 흐름 설계 - 상태 전이, 책임 분리, API 계약 확정
 4. [x] NestJS 백엔드 기본 구성 - Health Check 및 공통 API 기반 구현
 5. [x] PostgreSQL 데이터베이스 구성 - migration, 개발 seed, DB 제약 통합 테스트 완료
-6. [ ] 사용자 로그인 구현 - 다음 작업
-7. [ ] 이후 작업은 구현 계획 문서 참조
+6. [x] 사용자 로그인 구현 - GitHub OAuth, 서버 세션, 현재 사용자 조회와 logout 완료
+7. [ ] AI 세션 API 구현 - 다음 작업
+8. [ ] 이후 작업은 구현 계획 문서 참조
 
 확정된 최초 베타 범위
 
@@ -449,6 +458,7 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 
 세션 상태와 데이터 흐름의 상세 계약은 [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)를 따른다.
 PostgreSQL 구조와 실행 방법은 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.
+사용자 인증 계약과 설정 방법은 [`AUTHENTICATION.md`](./AUTHENTICATION.md)를 따른다.
 
 ---
 

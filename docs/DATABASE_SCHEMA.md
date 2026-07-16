@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`
 
 ---
 
@@ -26,6 +26,8 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 |---|---|
 | `users` | 사용자 기본 정보와 시간대 |
 | `user_auth_accounts` | GitHub OAuth 계정 식별 정보 |
+| `oauth_login_states` | 1회용 OAuth state hash와 PKCE verifier |
+| `auth_sessions` | hash token 기반 웹 인증 세션 |
 | `devices` | Codex 플러그인 연결 기기와 hash token |
 | `ai_sessions` | 자동·수동 AI 작업 세션과 상태 |
 | `integration_events` | 개인정보가 제거된 Codex lifecycle event |
@@ -44,6 +46,9 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 
 - `(provider, provider_account_id)`는 유일하다.
 - 한 사용자는 provider별 계정을 하나만 연결한다.
+- OAuth state는 hash로 식별하고 10분 안에 한 번만 소비한다.
+- 웹 세션과 CSRF token은 원문이 아니라 64자리 SHA-256 hash로 저장한다.
+- 인증 세션 token hash는 유일하며 만료와 logout 폐기를 시각으로 기록한다.
 - 기기 token 원문은 저장하지 않고 64자리 SHA-256 hash만 저장한다.
 - 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
 
@@ -127,6 +132,8 @@ npm.cmd run test:database
 - 빈 DB에 전체 migration 적용
 - migration 재실행 시 변경 없음
 - 마지막 migration 되돌리기 후 재적용
+- OAuth state 1회 사용과 인증 session hash 저장
+- 현재 사용자 조회, CSRF logout, 만료·폐기 세션 차단
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
 - 기기별 event 중복 방지와 FK 소유권
@@ -134,9 +141,9 @@ npm.cmd run test:database
 
 # 8. 다음 작업 경계
 
-5번에서는 DB 구조와 migration만 구성했다. 다음 기능은 해당 번호에서 구현한다.
+5번에서 기본 DB 구조를 구성했고 6번에서 인증 migration과 런타임 연결을 추가했다. 다음 기능은 해당 번호에서 구현한다.
 
-- 6번: Entity/repository, GitHub OAuth, 웹 인증 세션
+- 6번 완료: GitHub OAuth, 웹 인증 세션과 인증 guard
 - 7번: AI 세션과 integration event transaction
 - 10번: 일회성 기기 연결 코드와 token 발급·회전·해제
 - 14번: 퀘스트 제출과 서버 판정

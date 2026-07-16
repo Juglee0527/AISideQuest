@@ -4,8 +4,8 @@
 
 - 작성일: 2026-07-15
 - 전체 작업: 20개
-- 현재 완료: 5개
-- 다음 작업: 6. 사용자 로그인 구현
+- 현재 완료: 6개
+- 다음 작업: 7. AI 세션 API 구현
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -19,8 +19,8 @@
 | 3 | 세션 상태와 데이터 흐름 설계 | 완료 (2026-07-15) |
 | 4 | NestJS 백엔드 기본 구성 | 완료 (2026-07-15) |
 | 5 | PostgreSQL 데이터베이스 구성 | 완료 (2026-07-16) |
-| 6 | 사용자 로그인 구현 | 다음 작업 |
-| 7 | AI 세션 API 구현 | 대기 |
+| 6 | 사용자 로그인 구현 | 완료 (2026-07-16) |
+| 7 | AI 세션 API 구현 | 다음 작업 |
 | 8 | 프런트엔드 세션 상태를 API로 전환 | 대기 |
 | 9 | 기존 LocalStorage 데이터 처리 | 대기 |
 | 10 | AISideQuest Codex 플러그인 기본 구성 | 대기 |
@@ -106,6 +106,10 @@
 - 현재 사용자 조회, logout, 탈퇴 전 계정 식별 경계 구현
 - 인증·소유권 검증과 로그인 callback 통합 테스트
 - 완료 기준: 로그인 사용자만 자신의 API에 접근하고 logout·만료 후 재사용 불가
+
+상태: **완료**
+
+구현 결과: GitHub OAuth state와 PKCE를 적용하고 GitHub 숫자 ID로 사용자를 연결했다. 서버 저장형 hash 세션, 안전한 cookie, CSRF guard, 현재 사용자 조회와 logout을 구현했으며 실제 PostgreSQL을 사용하는 인증·DB 통합 테스트 9개를 통과했다. 상세 기준은 [`AUTHENTICATION.md`](./AUTHENTICATION.md)에 기록했다.
 
 ## 7. AI 세션 API 구현
 
@@ -443,12 +447,26 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 
 ---
 
-# 7. 6번 작업 입력
+# 7. 6번 작업 결과
 
-다음 작업에서는 GitHub OAuth 기반 사용자 로그인을 구현한다.
+1. GitHub OAuth callback과 `user_auth_accounts` upsert를 구현했다.
+2. OAuth `state` 1회 사용과 PKCE `S256`을 적용했다.
+3. 서버 저장형 인증 세션과 hash token 저장, `HttpOnly`, `Secure`, `SameSite` cookie를 구성했다.
+4. `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`, 인증 guard와 CSRF guard를 구현했다.
+5. 실제 PostgreSQL과 모의 GitHub API로 로그인, 재로그인, state 재사용, CSRF, logout, 만료를 검증했다.
 
-1. GitHub OAuth callback과 `user_auth_accounts` upsert 구현
-2. 서버 저장형 웹 인증 세션과 안전한 cookie 설정
-3. OAuth `state`, CSRF, 세션 고정, 만료·logout 처리
-4. 현재 사용자 조회와 인증 guard 구현
-5. 인증·소유권·만료 통합 테스트
+상세 구현과 실행 방법은 [`AUTHENTICATION.md`](./AUTHENTICATION.md)를 기준으로 한다.
+
+결론: **6번 사용자 로그인 구현 작업을 완료한다.**
+
+---
+
+# 8. 7번 작업 입력
+
+다음 작업에서는 인증된 사용자별 AI 세션 API를 구현한다.
+
+1. 수동 시작·종료, 현재 세션과 cursor 기반 이력 조회 API 구현
+2. 사용자 소유권과 상태 전이 transaction 구현
+3. `Idempotency-Key`와 request hash 기반 중복 요청 처리
+4. 사용자당 활성 세션 동시성 제어
+5. 중복·동시·역순 요청과 인증 경계 통합 테스트

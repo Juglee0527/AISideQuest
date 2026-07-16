@@ -3,8 +3,8 @@
 - 작성일: 2026-07-16
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~5번, 총 5개
-- 다음 작업: 6. 사용자 로그인 구현
+- 완료: 1~6번, 총 6개
+- 다음 작업: 7. AI 세션 API 구현
 
 ---
 
@@ -19,8 +19,9 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 3. 자동 감지와 수동 조작을 하나의 서버 세션으로 처리하는 상태 및 API 계약을 확정했다.
 4. NestJS API 실행 환경과 공통 응답, 오류 처리, 입력 검증, Health Check를 구현했다.
 5. PostgreSQL 스키마, migration, 개발 퀴즈 seed와 DB 제약조건 검증을 구현했다.
+6. GitHub OAuth 로그인, 서버 저장형 인증 세션, 현재 사용자 조회와 logout을 구현했다.
 
-현재 프런트엔드는 아직 LocalStorage를 사용하며, PostgreSQL 구조는 준비됐지만 NestJS 기능 모듈에는 인증·세션 비즈니스 API가 연결되지 않았다.
+현재 인증 API는 PostgreSQL에 연결됐지만 프런트엔드는 아직 로그인 UI와 서버 API를 사용하지 않고 세션·퀘스트 데이터를 LocalStorage에 저장한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -254,7 +255,7 @@ npm.cmd run dev:server
 기본 주소:
 
 ```text
-http://127.0.0.1:3000/api/v1
+http://localhost:3000/api/v1
 ```
 
 ### 관련 구현
@@ -330,6 +331,41 @@ seed는 반복 실행해도 중복되지 않으며 공개된 version의 내용�
 
 관련 문서: [PostgreSQL 데이터베이스 구성](./DATABASE_SCHEMA.md)
 
+## 3.6 6번: 사용자 로그인 구현
+
+### 구현 방식
+
+- GitHub OAuth Web Application Flow
+- OAuth `state` 1회 사용과 PKCE `S256`
+- GitHub 숫자 ID를 기준으로 `users`, `user_auth_accounts` 생성 또는 갱신
+- PostgreSQL 서버 저장형 인증 세션
+- 세션·CSRF token 원문 대신 SHA-256 hash 저장
+- 개발 환경 `SameSite=Lax`, `HttpOnly` session cookie
+- 운영 환경 `Secure`, `__Host-` prefix 추가
+
+### 인증 API
+
+| Method | Path | 역할 |
+|---|---|---|
+| `GET` | `/api/v1/auth/github` | GitHub 로그인 시작 |
+| `GET` | `/api/v1/auth/github/callback` | state·PKCE 검증과 로그인 완료 |
+| `GET` | `/api/v1/auth/me` | 현재 사용자 조회 |
+| `POST` | `/api/v1/auth/logout` | CSRF 검증 후 현재 세션 폐기 |
+
+GitHub access token은 사용자 식별 요청에만 사용하고 저장하지 않는다. 이메일도 요청하거나 저장하지 않는다.
+
+### 검증
+
+- 비로그인 보호 API 접근 거부
+- state·PKCE 적용과 state 재사용 차단
+- 사용자·OAuth 계정 생성 및 재로그인 시 재사용
+- session·CSRF token 원문 미저장
+- CSRF 누락 logout 거부
+- logout·만료 후 세션 재사용 차단
+- GitHub 승인 거부 callback 처리
+
+관련 문서: [사용자 인증](./AUTHENTICATION.md)
+
 # 4. 현재 디렉터리 구조
 
 ```text
@@ -337,6 +373,7 @@ AISideQuest/
 ├─ src/                         React MVP
 ├─ server/
 │  ├─ src/
+│  │  ├─ auth/                  GitHub OAuth, cookie 세션과 인증 guard
 │  │  ├─ bootstrap/             전역 API 설정
 │  │  ├─ common/http/           공통 성공·오류 응답
 │  │  ├─ config/                환경설정 검증
@@ -405,8 +442,8 @@ npm.cmd run test:database
 | React 테스트 | 19개 통과 |
 | Codex hook 테스트 | 4개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
-| PostgreSQL 통합 테스트 | 5개 통과 |
-| 전체 자동 테스트 | 32개 통과 |
+| 인증·PostgreSQL 통합 테스트 | 9개 통과 |
+| 전체 자동 테스트 | 36개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -415,8 +452,7 @@ npm.cmd run test:database
 
 # 6. 현재 제한사항
 
-- DB 스키마와 migration은 준비됐지만 NestJS 기능 모듈에는 아직 repository가 연결되지 않았다.
-- 사용자 로그인과 권한 검증이 없다.
+- GitHub OAuth와 인증 API는 구현됐지만 실제 OAuth App 자격 증명과 프런트엔드 로그인 UI는 아직 연결되지 않았다.
 - 서버 세션 API는 설계만 있고 구현되지 않았다.
 - 프런트엔드 `SessionContext`는 여전히 LocalStorage를 사용한다.
 - 기존 LocalStorage 데이터 전환 정책은 구현되지 않았다.
@@ -428,17 +464,15 @@ npm.cmd run test:database
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: 사용자 로그인 구현
+# 7. 다음 작업: AI 세션 API 구현
 
-6번 작업에서 다음 항목을 진행한다.
+7번 작업에서 다음 항목을 진행한다.
 
-1. GitHub OAuth callback과 사용자·OAuth 계정 연결 구현
-2. 서버 저장형 웹 인증 세션 구성
-3. `HttpOnly`, `Secure`, `SameSite` cookie와 OAuth `state`, CSRF 방어 적용
-4. 현재 사용자 조회, 인증 guard, logout과 세션 만료 구현
-5. 인증·소유권·만료 통합 테스트
-
-인증 구현에서도 DB 변경은 추가 migration으로 작성하고, 보안 검증은 17번까지 미루지 않고 함께 완료한다.
+1. 인증된 사용자의 수동 세션 시작·종료 API 구현
+2. 현재 활성 세션과 cursor 기반 이력 조회 구현
+3. 서버 기준 시각과 상태 전이 transaction 적용
+4. `Idempotency-Key`, request hash와 DB unique 제약으로 중복 요청 처리
+5. 사용자 소유권, 동시 시작, 중복·역순 종료 통합 테스트
 
 # 8. 기준 문서
 
@@ -449,7 +483,8 @@ npm.cmd run test:database
 | [AUTO_DETECTION_POC.md](./AUTO_DETECTION_POC.md) | Codex 자동 감지 기술 검증과 라이브 결과 |
 | [SESSION_STATE_AND_DATA_FLOW.md](./SESSION_STATE_AND_DATA_FLOW.md) | 세션 상태, 장애 규칙, 책임 분리, API 계약 |
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | PostgreSQL 테이블, 제약, migration, seed와 실행 방법 |
+| [AUTHENTICATION.md](./AUTHENTICATION.md) | GitHub OAuth, cookie 세션, CSRF와 인증 API 계약 |
 
 ---
 
-현재 결론: **베타 범위, 자동 감지, 세션 계약, API 실행 기반과 PostgreSQL 구조까지 준비됐다. 다음 단계에서는 GitHub OAuth 로그인과 서버 인증 세션을 구현한다.**
+현재 결론: **GitHub OAuth와 서버 인증 세션까지 구현됐다. 다음 단계에서는 인증된 사용자별 AI 세션 API와 멱등성 경계를 구현한다.**
