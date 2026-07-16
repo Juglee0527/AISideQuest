@@ -3,8 +3,8 @@
 - 작성일: 2026-07-16
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~6번, 총 6개
-- 다음 작업: 7. AI 세션 API 구현
+- 완료: 1~7번, 총 7개
+- 다음 작업: 8. 프런트엔드 세션 상태를 API로 전환
 
 ---
 
@@ -20,8 +20,9 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 4. NestJS API 실행 환경과 공통 응답, 오류 처리, 입력 검증, Health Check를 구현했다.
 5. PostgreSQL 스키마, migration, 개발 퀴즈 seed와 DB 제약조건 검증을 구현했다.
 6. GitHub OAuth 로그인, 서버 저장형 인증 세션, 현재 사용자 조회와 logout을 구현했다.
+7. 인증 사용자별 AI 세션 API, Codex event 상태 전이와 멱등성 처리를 구현했다.
 
-현재 인증 API는 PostgreSQL에 연결됐지만 프런트엔드는 아직 로그인 UI와 서버 API를 사용하지 않고 세션·퀘스트 데이터를 LocalStorage에 저장한다.
+현재 인증·AI 세션 API는 PostgreSQL에 연결됐지만 React 프런트엔드는 아직 로그인 UI와 서버 API를 사용하지 않고 세션·퀘스트 데이터를 LocalStorage에 저장한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -366,6 +367,35 @@ GitHub access token은 사용자 식별 요청에만 사용하고 저장하지 �
 
 관련 문서: [사용자 인증](./AUTHENTICATION.md)
 
+## 3.7 7번: AI 세션 API 구현
+
+### 사용자 세션 API
+
+- 수동 시작과 완료·실패·취소 종료
+- 활성 세션 조회
+- 상태 필터와 opaque cursor 기반 이력 조회
+- 다른 사용자 세션의 존재를 노출하지 않는 소유권 `404`
+- 모든 응답의 `meta.serverTime` 유지
+
+### Codex event 처리
+
+- device bearer token hash 인증
+- `UserPromptSubmit`, `PermissionRequest`, `PostToolUse`, `Stop`, `Heartbeat` 상태 전이
+- 수동 세션과 자동 turn 연결
+- 새 turn이 기존 활성 세션을 대체하는 transaction
+- 시작보다 먼저 도착한 event의 `DEFERRED` 저장과 24시간 내 재처리
+- 프롬프트, 코드, 경로 같은 허용되지 않은 요청 필드 차단
+
+### 멱등성과 동시성
+
+- 사용자 단위 PostgreSQL advisory transaction lock
+- 사용자당 활성 세션 unique index
+- UUID `Idempotency-Key`, request hash와 최초 응답 snapshot 저장
+- 같은 key의 동일 요청 재생과 다른 요청 재사용 `409`
+- `(device_id, event_id)` unique key와 event request hash 검증
+
+관련 문서: [세션 상태와 데이터 흐름](./SESSION_STATE_AND_DATA_FLOW.md)
+
 # 4. 현재 디렉터리 구조
 
 ```text
@@ -379,6 +409,7 @@ AISideQuest/
 │  │  ├─ config/                환경설정 검증
 │  │  ├─ database/              DataSource, migration, 개발 seed
 │  │  ├─ health/                Health Check
+│  │  ├─ sessions/              AI 세션 API와 Codex event 상태 전이
 │  │  ├─ app.module.ts
 │  │  └─ main.ts
 │  ├─ test/                     NestJS·PostgreSQL 통합 테스트
@@ -442,8 +473,8 @@ npm.cmd run test:database
 | React 테스트 | 19개 통과 |
 | Codex hook 테스트 | 4개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
-| 인증·PostgreSQL 통합 테스트 | 9개 통과 |
-| 전체 자동 테스트 | 36개 통과 |
+| 인증·PostgreSQL·세션 통합 테스트 | 18개 통과 |
+| 전체 자동 테스트 | 45개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -453,10 +484,10 @@ npm.cmd run test:database
 # 6. 현재 제한사항
 
 - GitHub OAuth와 인증 API는 구현됐지만 실제 OAuth App 자격 증명과 프런트엔드 로그인 UI는 아직 연결되지 않았다.
-- 서버 세션 API는 설계만 있고 구현되지 않았다.
+- 서버 세션 API는 구현됐지만 프런트엔드 `SessionContext`가 아직 호출하지 않는다.
 - 프런트엔드 `SessionContext`는 여전히 LocalStorage를 사용한다.
 - 기존 LocalStorage 데이터 전환 정책은 구현되지 않았다.
-- Codex 플러그인은 로컬 PoC이며 서버로 event를 전송하지 않는다.
+- Codex event 수신 API는 구현됐지만 기기 token 발급과 플러그인의 실제 서버 전송은 아직 연결되지 않았다.
 - heartbeat, 오프라인 queue, 재전송은 설계만 있고 구현되지 않았다.
 - DB에는 개발 퀘스트 seed가 있지만 프런트엔드는 여전히 더미 데이터를 사용하며 서버 판정이 없다.
 - 포인트 원장 테이블과 중복 제약은 있지만 적립 transaction 서비스가 없다.
@@ -464,15 +495,15 @@ npm.cmd run test:database
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: AI 세션 API 구현
+# 7. 다음 작업: 프런트엔드 세션 상태를 API로 전환
 
-7번 작업에서 다음 항목을 진행한다.
+8번 작업에서 다음 항목을 진행한다.
 
-1. 인증된 사용자의 수동 세션 시작·종료 API 구현
-2. 현재 활성 세션과 cursor 기반 이력 조회 구현
-3. 서버 기준 시각과 상태 전이 transaction 적용
-4. `Idempotency-Key`, request hash와 DB unique 제약으로 중복 요청 처리
-5. 사용자 소유권, 동시 시작, 중복·역순 종료 통합 테스트
+1. `SessionContext`의 LocalStorage 권위 상태 제거
+2. 로그인 사용자 기준 활성 세션과 이력 복구
+3. 수동 시작·종료를 세션 API에 연결
+4. 5초 polling, focus 즉시 조회와 `meta.serverTime` 시각 보정
+5. 로딩, 인증 만료, 네트워크 오류와 재시도 상태 구현
 
 # 8. 기준 문서
 
@@ -487,4 +518,4 @@ npm.cmd run test:database
 
 ---
 
-현재 결론: **GitHub OAuth와 서버 인증 세션까지 구현됐다. 다음 단계에서는 인증된 사용자별 AI 세션 API와 멱등성 경계를 구현한다.**
+현재 결론: **인증 사용자별 AI 세션 API와 Codex event 상태 전이까지 구현됐다. 다음 단계에서는 React 세션 상태를 LocalStorage에서 API로 전환한다.**

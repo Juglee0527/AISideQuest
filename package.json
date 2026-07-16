@@ -25,7 +25,7 @@
     "test:client": "vitest run",
     "test:hooks": "node --test plugins/aisidequest-hook-poc/tests/event-recorder.test.mjs",
     "test:server": "tsc -p server/tsconfig.test.json && node --test server/dist-test/test/app.e2e.test.js",
-    "test:database": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js server/dist-test/test/auth/auth.integration.test.js",
+    "test:database": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js server/dist-test/test/auth/auth.integration.test.js server/dist-test/test/sessions/session.integration.test.js",
     "test:watch": "vitest",
     "preview": "vite preview"
   },

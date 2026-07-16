@@ -2,7 +2,7 @@
 
 - 설계일: 2026-07-15
 - 대상: Windows ChatGPT 데스크톱 앱의 Codex 작업
-- 상태: **확정**
+- 상태: **설계 확정 / 7번 API 구현 완료**
 - 선행 작업: [`AUTO_DETECTION_POC.md`](./AUTO_DETECTION_POC.md)
 
 ---
@@ -17,7 +17,7 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 4. Codex 플러그인, API 서버, 웹의 책임
 5. AI 세션 및 integration event API 계약
 
-이 문서는 3번 설계 작업의 기준 문서다. 실제 NestJS 코드와 DB 스키마는 이후 작업에서 이 계약을 구현한다.
+이 문서는 3번 설계 작업과 7번 AI 세션 API 구현의 기준 문서다. NestJS 구현은 `server/src/sessions/`, 멱등성 추가 migration은 `1784167200000-add-session-api-idempotency`에 있다.
 
 # 2. 핵심 결정
 
@@ -171,7 +171,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 
 # 7. 데이터 모델 계약
 
-실제 테이블과 인덱스는 5번 작업에서 작성한다. 여기서는 상태 처리에 필요한 논리 필드만 확정한다.
+기본 테이블과 인덱스는 5번 작업에서 작성했고, 7번에서 API 멱등성 원장과 integration event 응답 snapshot을 추가했다.
 
 ## 7.1 AiSession
 
@@ -450,7 +450,7 @@ Authorization: <user-session-cookie>
 
 # 13. 검증 시나리오
 
-후속 구현은 최소한 다음 시나리오를 자동 테스트한다.
+7번과 후속 장애 복구 구현은 최소한 다음 시나리오를 자동 테스트한다.
 
 ## 13.1 정상 및 경계값
 
@@ -498,4 +498,47 @@ Authorization: <user-session-cookie>
 - [x] API 요청·응답·오류·멱등성 계약 정의
 - [x] 현재 MVP의 후속 변경 경계 정의
 
-결론: **3번 세션 상태와 데이터 흐름 설계를 완료한다. 다음 작업은 4번 NestJS 백엔드 기본 구성이다.**
+결론: **3번 세션 상태와 데이터 흐름 설계 및 7번 AI 세션 API 구현을 완료한다. 다음 작업은 8번 프런트엔드 세션 상태의 API 전환이다.**
+
+---
+
+# 15. 7번 구현 결과
+
+## 15.1 구현 API
+
+| Method | Path | 인증 | 구현 결과 |
+|---|---|---|---|
+| `POST` | `/api/v1/sessions/manual` | 사용자 cookie + CSRF | 활성 세션 생성 또는 기존 세션 반환 |
+| `POST` | `/api/v1/sessions/{sessionId}/end` | 사용자 cookie + CSRF | 완료·실패·취소 종료, terminal 재요청 무변경 |
+| `GET` | `/api/v1/sessions/active` | 사용자 cookie | 활성 세션 또는 `data: null` |
+| `GET` | `/api/v1/sessions` | 사용자 cookie | 상태 필터와 opaque cursor 이력 |
+| `POST` | `/api/v1/integration-events` | device bearer token | Codex event 저장과 상태 전이 transaction |
+
+## 15.2 멱등성과 동시성
+
+- 모든 웹 변경 요청은 UUID 형식 `Idempotency-Key`를 요구한다.
+- 사용자와 idempotency key 조합으로 request hash와 최초 응답 body를 저장한다.
+- 같은 key와 같은 요청은 저장된 응답을 반환한다.
+- 같은 key를 다른 endpoint, session 또는 outcome에 재사용하면 `IDEMPOTENCY_KEY_REUSED`를 반환한다.
+- 사용자별 `pg_advisory_xact_lock`으로 수동 요청과 integration event를 직렬화한다.
+- DB의 사용자별 활성 세션 unique index를 최종 방어선으로 유지한다.
+- integration event는 `(device_id, event_id)` unique key와 request hash를 함께 검증한다.
+
+## 15.3 구현된 상태 처리
+
+- 수동 시작과 `UserPromptSubmit` 시작
+- 수동 세션에 자동 turn 연결
+- 같은 turn의 의미 중복 시작 차단
+- 다른 turn 시작 시 기존 활성 세션 `ABANDONED/SUPERSEDED_BY_NEW_TURN` 처리
+- `PermissionRequest` 대기, `PostToolUse` 실행 복귀, `Stop` 완료
+- 시작보다 먼저 도착한 event `DEFERRED` 저장
+- 24시간 안에 시작이 도착한 역순 event 재처리
+- 역순 `Stop`의 0ms 종료와 `DEGRADED` 품질 표시
+- 종료 세션 재요청 시 기존 terminal 상태 유지
+
+## 15.4 다음 작업에 남긴 경계
+
+- 기기 token을 발급하는 웹 연결 코드와 회전·해제는 10번에서 구현한다.
+- plugin의 실제 event 전송 연결은 11번에서 구현한다.
+- heartbeat 만료 스캔, 수동 12시간 만료, 오프라인 queue와 재전송은 12번에서 구현한다.
+- React `SessionContext`의 API 연결은 8번에서 구현한다.

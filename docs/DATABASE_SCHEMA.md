@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`
 
 ---
 
@@ -28,6 +28,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 | `user_auth_accounts` | GitHub OAuth 계정 식별 정보 |
 | `oauth_login_states` | 1회용 OAuth state hash와 PKCE verifier |
 | `auth_sessions` | hash token 기반 웹 인증 세션 |
+| `api_idempotency_keys` | 사용자 변경 API의 request hash와 응답 snapshot |
 | `devices` | Codex 플러그인 연결 기기와 hash token |
 | `ai_sessions` | 자동·수동 AI 작업 세션과 상태 |
 | `integration_events` | 개인정보가 제거된 Codex lifecycle event |
@@ -49,6 +50,8 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - OAuth state는 hash로 식별하고 10분 안에 한 번만 소비한다.
 - 웹 세션과 CSRF token은 원문이 아니라 64자리 SHA-256 hash로 저장한다.
 - 인증 세션 token hash는 유일하며 만료와 logout 폐기를 시각으로 기록한다.
+- `(user_id, idempotency_key)`는 유일하며 같은 key의 다른 request hash를 거부한다.
+- 멱등성 응답은 JSON object snapshot으로 저장해 재요청 시 논리 결과를 그대로 반환한다.
 - 기기 token 원문은 저장하지 않고 64자리 SHA-256 hash만 저장한다.
 - 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
 
@@ -59,6 +62,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - 활성 상태에는 종료 시각과 종료 사유가 없어야 한다.
 - 종료 상태에는 종료 시각과 종료 사유가 모두 있어야 한다.
 - `(device_id, event_id)` unique key로 event 재전송을 한 번만 저장한다.
+- integration event에는 request hash와 처리 당시 응답 snapshot을 저장한다.
 - event의 사용자와 기기 소유자, 연결 세션의 사용자가 일치하도록 복합 FK를 사용한다.
 - 프롬프트, 응답, 코드, 파일 경로, 원본 hook JSON을 저장할 컬럼은 두지 않는다.
 
@@ -134,6 +138,9 @@ npm.cmd run test:database
 - 마지막 migration 되돌리기 후 재적용
 - OAuth state 1회 사용과 인증 session hash 저장
 - 현재 사용자 조회, CSRF logout, 만료·폐기 세션 차단
+- 수동 세션 시작·종료 멱등성과 동시 시작 직렬화
+- cursor 이력, 세션 소유권과 Codex event 상태 전이
+- 의미 중복 event, 새 turn 대체와 역순 `Stop` 재처리
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
 - 기기별 event 중복 방지와 FK 소유권
@@ -141,10 +148,10 @@ npm.cmd run test:database
 
 # 8. 다음 작업 경계
 
-5번에서 기본 DB 구조를 구성했고 6번에서 인증 migration과 런타임 연결을 추가했다. 다음 기능은 해당 번호에서 구현한다.
+5번에서 기본 DB 구조를 구성하고 6번에서 인증, 7번에서 세션 API 멱등성 migration과 런타임 연결을 추가했다. 다음 기능은 해당 번호에서 구현한다.
 
 - 6번 완료: GitHub OAuth, 웹 인증 세션과 인증 guard
-- 7번: AI 세션과 integration event transaction
+- 7번 완료: AI 세션과 integration event transaction
 - 10번: 일회성 기기 연결 코드와 token 발급·회전·해제
 - 14번: 퀘스트 제출과 서버 판정
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction

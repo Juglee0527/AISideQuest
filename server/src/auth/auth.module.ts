@@ -16,6 +16,11 @@ import { SessionAuthGuard } from './session-auth.guard'
     SessionAuthGuard,
     CsrfGuard,
   ],
-  exports: [AuthService, SessionAuthGuard, CsrfGuard],
+  exports: [
+    AuthService,
+    AuthCookieService,
+    SessionAuthGuard,
+    CsrfGuard,
+  ],
 })
 export class AuthModule {}

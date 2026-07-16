@@ -147,6 +147,18 @@ GET http://localhost:3000/api/v1/auth/github
 
 현재 사용자 조회는 `GET /api/v1/auth/me`, 로그아웃은 `POST /api/v1/auth/logout`입니다. OAuth App 설정, cookie와 CSRF 계약은 [`docs/AUTHENTICATION.md`](./docs/AUTHENTICATION.md)를 확인합니다.
 
+AI 세션 API는 다음 경로를 사용합니다.
+
+```text
+POST /api/v1/sessions/manual
+POST /api/v1/sessions/{sessionId}/end
+GET  /api/v1/sessions/active
+GET  /api/v1/sessions
+POST /api/v1/integration-events
+```
+
+변경 API는 UUID `Idempotency-Key`가 필요하며 사용자 cookie 요청은 CSRF header도 함께 전송합니다. 상태 전이와 event 계약은 [`docs/SESSION_STATE_AND_DATA_FLOW.md`](./docs/SESSION_STATE_AND_DATA_FLOW.md)를 확인합니다.
+
 ## PostgreSQL 실행
 
 ```powershell
@@ -187,6 +199,8 @@ npm.cmd run test:watch
 - 개발 퀴즈 seed 멱등성과 핵심 FK·UK 제약
 - GitHub OAuth state·PKCE, 사용자 연결과 hash 세션 저장
 - 현재 사용자 조회, CSRF logout, 세션 만료·폐기
+- AI 세션 수동 시작·종료, 활성 조회와 cursor 이력
+- 동시 요청 멱등성, Codex event 상태 전이와 역순 event 복구
 
 DB 통합 테스트는 초기화 가능한 test 전용 DB에서 실행합니다.
 
@@ -234,7 +248,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API, PostgreSQL과 GitHub OAuth 인증까지 완료된 실사용 베타 개발 단계입니다. 다음 작업은 인증된 사용자별 AI 세션 API입니다.
+현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API, PostgreSQL, GitHub OAuth와 AI 세션 API까지 완료된 실사용 베타 개발 단계입니다. 다음 작업은 React 세션 상태의 API 전환입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -244,7 +258,7 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- AI 세션 API와 프런트엔드 서버 동기화
+- 프런트엔드 세션 상태의 서버 동기화
 - AISideQuest Codex 플러그인 정식 연동
 - 객관식 개발 퀴즈와 포인트 원장
 - 서버 통계와 운영 파일럿

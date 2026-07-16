@@ -59,6 +59,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
   test('migration creates the full schema and can be reapplied after revert', async () => {
     const expectedTables = [
       'ai_sessions',
+      'api_idempotency_keys',
       'auth_sessions',
       'devices',
       'integration_events',
@@ -89,6 +90,18 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [sessionApiReverted] = (await dataSource.query(`
+      SELECT
+        to_regclass('public.api_idempotency_keys') AS idempotency_table,
+        to_regclass('public.auth_sessions') AS auth_sessions_table
+    `)) as Array<{
+      idempotency_table: string | null
+      auth_sessions_table: string | null
+    }>
+    assert.equal(sessionApiReverted.idempotency_table, null)
+    assert.equal(sessionApiReverted.auth_sessions_table, 'auth_sessions')
+
+    await dataSource.undoLastMigration()
     const [authReverted] = (await dataSource.query(`
       SELECT
         to_regclass('public.auth_sessions') AS auth_sessions_table,
@@ -107,7 +120,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 2)
+    assert.equal(reappliedMigrations.length, 3)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

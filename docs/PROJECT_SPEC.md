@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 플랫폼
 
-- 현재 상태: 브라우저 LocalStorage 기반 MVP, NestJS API, PostgreSQL 및 GitHub OAuth 인증 구현
+- 현재 상태: 브라우저 LocalStorage 기반 MVP, NestJS API, PostgreSQL, GitHub OAuth 및 AI 세션 API 구현
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-16
 
@@ -338,7 +338,7 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 - TypeORM 1.1 SQL migration
 - 로컬 Docker Compose 실행 환경
 
-현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed와 GitHub OAuth 기반 인증 모듈이 있다. AI 세션·퀘스트·포인트 비즈니스 API는 후속 작업에서 구현한다.
+현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증과 AI 세션 API가 있다. 퀘스트·포인트 비즈니스 API는 후속 작업에서 구현한다.
 
 ---
 
@@ -381,6 +381,8 @@ npm run build
 - 개발 퀴즈 seed 반복 실행과 DB FK·UK 제약조건
 - GitHub OAuth state·PKCE와 사용자·OAuth 계정 연결
 - 서버 인증 세션, 현재 사용자 조회, CSRF logout과 세션 만료
+- AI 세션 수동 시작·종료, 활성 조회와 cursor 이력
+- Codex event 상태 전이, 동시성·멱등성과 역순 event 재처리
 
 ## 12.4 현재 검증 결과
 
@@ -410,7 +412,8 @@ npm run build
 - 실제 리워드를 지급하지 않는다.
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
 - 서버 로그인 API는 있지만 실제 GitHub OAuth App 자격 증명과 프런트엔드 로그인 UI가 연결되지 않았다.
-- AI 세션 비즈니스 API와 Codex 플러그인 서버 연동이 없다.
+- AI 세션 API는 있지만 프런트엔드와 Codex 플러그인이 아직 호출하지 않는다.
+- Codex 기기 token 발급과 플러그인 서버 연동이 없다.
 - PostgreSQL 구조는 준비됐지만 현재 프런트엔드는 아직 DB 데이터를 사용하지 않는다.
 
 ---
@@ -443,8 +446,9 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 4. [x] NestJS 백엔드 기본 구성 - Health Check 및 공통 API 기반 구현
 5. [x] PostgreSQL 데이터베이스 구성 - migration, 개발 seed, DB 제약 통합 테스트 완료
 6. [x] 사용자 로그인 구현 - GitHub OAuth, 서버 세션, 현재 사용자 조회와 logout 완료
-7. [ ] AI 세션 API 구현 - 다음 작업
-8. [ ] 이후 작업은 구현 계획 문서 참조
+7. [x] AI 세션 API 구현 - 상태 전이, 멱등성, 동시성 및 이력 조회 완료
+8. [ ] 프런트엔드 세션 상태를 API로 전환 - 다음 작업
+9. [ ] 이후 작업은 구현 계획 문서 참조
 
 확정된 최초 베타 범위
 

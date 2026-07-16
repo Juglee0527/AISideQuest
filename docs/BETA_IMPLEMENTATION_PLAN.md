@@ -4,8 +4,8 @@
 
 - 작성일: 2026-07-15
 - 전체 작업: 20개
-- 현재 완료: 6개
-- 다음 작업: 7. AI 세션 API 구현
+- 현재 완료: 7개
+- 다음 작업: 8. 프런트엔드 세션 상태를 API로 전환
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -20,8 +20,8 @@
 | 4 | NestJS 백엔드 기본 구성 | 완료 (2026-07-15) |
 | 5 | PostgreSQL 데이터베이스 구성 | 완료 (2026-07-16) |
 | 6 | 사용자 로그인 구현 | 완료 (2026-07-16) |
-| 7 | AI 세션 API 구현 | 다음 작업 |
-| 8 | 프런트엔드 세션 상태를 API로 전환 | 대기 |
+| 7 | AI 세션 API 구현 | 완료 (2026-07-16) |
+| 8 | 프런트엔드 세션 상태를 API로 전환 | 다음 작업 |
 | 9 | 기존 LocalStorage 데이터 처리 | 대기 |
 | 10 | AISideQuest Codex 플러그인 기본 구성 | 대기 |
 | 11 | AI 작업 자동 감지 연동 | 대기 |
@@ -120,6 +120,10 @@
 - 사용자별 활성 세션 잠금과 DB unique 제약으로 동시 시작 직렬화
 - 인증, 소유권, 상태 전이, 중복·역순 요청 통합 테스트
 - 완료 기준: 동시·중복 시작과 종료에도 상태 및 event가 한 번만 변경
+
+상태: **완료**
+
+구현 결과: 인증 사용자용 수동 시작·종료·활성 세션·cursor 이력 API와 device token 기반 Codex event API를 구현했다. 사용자 단위 PostgreSQL advisory lock, 활성 세션 unique index, 요청 hash와 응답 snapshot을 저장하는 멱등성 원장으로 동시·중복 요청을 처리한다. 실제 PostgreSQL에서 인증·DB·세션 통합 테스트 18개를 통과했다. 세부 계약은 [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)를 따른다.
 
 ## 8. 프런트엔드 세션 상태를 API로 전환
 
@@ -461,12 +465,26 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 
 ---
 
-# 8. 7번 작업 입력
+# 8. 7번 작업 결과
 
-다음 작업에서는 인증된 사용자별 AI 세션 API를 구현한다.
+1. `POST /api/v1/sessions/manual`, `POST /api/v1/sessions/{sessionId}/end`를 구현했다.
+2. `GET /api/v1/sessions/active`, cursor 기반 `GET /api/v1/sessions`를 구현했다.
+3. device bearer token을 검증하는 `POST /api/v1/integration-events`와 Codex 상태 전이를 구현했다.
+4. 사용자 단위 DB advisory lock과 기존 active unique index로 동시 시작을 직렬화했다.
+5. `api_idempotency_keys`와 integration event 응답 snapshot으로 동일 요청을 재생하고, 같은 key의 다른 요청은 `409`로 차단했다.
+6. 수동·자동 연결, 새 turn 대체, 대기·복귀·완료, 역순 `Stop` 보류·재처리를 구현했다.
+7. 인증, CSRF, 소유권, 동시성, 멱등성, cursor, 개인정보 입력 차단 통합 테스트를 통과했다.
 
-1. 수동 시작·종료, 현재 세션과 cursor 기반 이력 조회 API 구현
-2. 사용자 소유권과 상태 전이 transaction 구현
-3. `Idempotency-Key`와 request hash 기반 중복 요청 처리
-4. 사용자당 활성 세션 동시성 제어
-5. 중복·동시·역순 요청과 인증 경계 통합 테스트
+결론: **7번 AI 세션 API 구현 작업을 완료한다.**
+
+---
+
+# 9. 8번 작업 입력
+
+다음 작업에서는 React 세션 상태의 권위 있는 저장소를 LocalStorage에서 API로 전환한다.
+
+1. `SessionContext`를 세션 API adapter로 변경
+2. 로그인 사용자 기준 활성 세션과 이력 복구
+3. 5초 polling, 창 focus 즉시 조회와 서버 시각 보정
+4. 로딩, 인증 만료, 오류와 재시도 상태 구현
+5. 새로고침과 다른 인증 브라우저에서 같은 세션 상태 검증
