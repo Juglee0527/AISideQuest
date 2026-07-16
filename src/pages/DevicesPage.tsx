@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertCircle,
   Cable,
   KeyRound,
@@ -8,7 +9,7 @@ import {
   ShieldCheck,
   Unplug,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { ApiClientError } from '../api/apiClient'
 import {
@@ -20,6 +21,7 @@ import {
 import PageHeader from '../components/PageHeader'
 import { useSession } from '../contexts/SessionContext'
 import type { Device, DeviceLink } from '../types/device'
+import { getAutoDetectionSummary } from '../utils/autoDetectionStatus'
 
 interface PendingLink extends DeviceLink {
   code: string
@@ -57,9 +59,21 @@ function DevicesPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [mutationId, setMutationId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const requestInFlightRef = useRef(false)
 
-  const loadDevices = useCallback(async (signal?: AbortSignal) => {
-    setIsLoading(true)
+  const loadDevices = useCallback(async (
+    signal?: AbortSignal,
+    showLoading = true,
+  ) => {
+    if (requestInFlightRef.current) {
+      return
+    }
+
+    requestInFlightRef.current = true
+
+    if (showLoading) {
+      setIsLoading(true)
+    }
 
     try {
       const result = await getDevices(signal)
@@ -70,6 +84,8 @@ function DevicesPage() {
         setErrorMessage(getErrorMessage(error))
       }
     } finally {
+      requestInFlightRef.current = false
+
       if (!signal?.aborted) {
         setIsLoading(false)
       }
@@ -84,6 +100,30 @@ function DevicesPage() {
     const controller = new AbortController()
     void loadDevices(controller.signal)
     return () => controller.abort()
+  }, [loadDevices, loadStatus])
+
+  useEffect(() => {
+    if (loadStatus !== 'ready') {
+      return undefined
+    }
+
+    const controller = new AbortController()
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void loadDevices(controller.signal, false)
+      }
+    }
+    const intervalId = window.setInterval(refreshWhenVisible, 5_000)
+
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      controller.abort()
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
   }, [loadDevices, loadStatus])
 
   const issueLink = async (deviceId: string | null) => {
@@ -128,6 +168,27 @@ function DevicesPage() {
   const connectCommand = pendingLink === null
     ? null
     : `node .\\scripts\\connect-device.mjs --code ${pendingLink.code}`
+  const autoDetection = useMemo(
+    () => getAutoDetectionSummary(devices),
+    [devices],
+  )
+  const autoDetectionContent = autoDetection.status === 'MANUAL'
+    ? {
+        label: '수동 모드',
+        description: '활성 플러그인 연결이 없습니다. Home에서 작업을 직접 시작하고 종료할 수 있습니다.',
+        className: 'border-slate-700 bg-slate-900/60 text-slate-300',
+      }
+    : autoDetection.status === 'READY'
+      ? {
+          label: '자동 감지 준비',
+          description: `활성 기기 ${autoDetection.activeDeviceCount}개가 연결되었습니다. 첫 lifecycle 이벤트를 기다립니다.`,
+          className: 'border-amber-400/20 bg-amber-400/5 text-amber-200',
+        }
+      : {
+          label: '자동 감지 이벤트 수신',
+          description: `마지막 이벤트 ${formatDate(autoDetection.lastEventAt!)} · 활성 기기 ${autoDetection.activeDeviceCount}개`,
+          className: 'border-emerald-400/20 bg-emerald-400/5 text-emerald-200',
+        }
 
   return (
     <div className="space-y-10">
@@ -163,6 +224,17 @@ function DevicesPage() {
             <p className="mt-4 text-sm leading-6 text-slate-300">{description}</p>
           </div>
         ))}
+      </section>
+
+      <section className={`flex items-start gap-3 rounded-2xl border p-5 ${autoDetectionContent.className}`} aria-live="polite">
+        <Activity className="mt-0.5 shrink-0" size={21} aria-hidden="true" />
+        <div>
+          <h2 className="font-bold">{autoDetectionContent.label}</h2>
+          <p className="mt-1 text-sm opacity-75">{autoDetectionContent.description}</p>
+          {autoDetection.status === 'RECEIVING' ? (
+            <p className="mt-2 text-xs opacity-60">실시간 온라인 여부와 장애 판정은 다음 heartbeat 단계에서 추가합니다.</p>
+          ) : null}
+        </div>
       </section>
 
       {pendingLink !== null && connectCommand !== null ? (
@@ -235,7 +307,7 @@ function DevicesPage() {
                   </div>
                   <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
                     <div>
-                      <dt className="text-slate-500">마지막 확인</dt>
+                      <dt className="text-slate-500">마지막 이벤트</dt>
                       <dd className="mt-1 text-slate-300">{device.lastSeenAt === null ? '아직 없음' : formatDate(device.lastSeenAt)}</dd>
                     </div>
                     <div>

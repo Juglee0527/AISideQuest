@@ -3,6 +3,7 @@ import {
   resolveDataDirectory,
   sanitizeHookPayload,
 } from './event-recorder.mjs'
+import { trySendIntegrationEvent } from './event-sender.mjs'
 
 const MAX_INPUT_BYTES = 64 * 1024
 
@@ -40,6 +41,7 @@ async function main() {
     }
 
     await appendEvent(event, resolveDataDirectory())
+    await trySendIntegrationEvent(event)
   } catch {
     // Telemetry must never block or fail the Codex task.
   }

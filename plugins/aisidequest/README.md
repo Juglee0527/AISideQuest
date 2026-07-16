@@ -22,7 +22,7 @@ node .\scripts\connect-device.mjs --code <연결-코드>
 
 API가 로컬 기본값과 다르면 `--api-url https://example.com/api/v1`을 추가합니다.
 
-5. 연결 후 테스트 이벤트를 명시적으로 전송합니다.
+5. 연결 후 테스트 이벤트를 명시적으로 전송해 연결을 확인합니다.
 
 ```powershell
 node .\scripts\send-test-event.mjs
@@ -32,4 +32,6 @@ node .\scripts\send-test-event.mjs
 
 ## 현재 범위
 
-훅 이벤트는 개인정보 필터링 후 로컬 `events.jsonl`에 기록됩니다. 훅 이벤트의 자동 서버 전송, heartbeat, 오프라인 재전송은 후속 단계에서 구현합니다.
+`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Stop` 훅은 개인정보 필터링 후 로컬 `events.jsonl`에 먼저 기록하고 세션 API로 한 번 전송합니다. 전송은 3초 안에 끝내며 실패해도 Codex 작업을 중단하지 않고 로컬 기록과 웹 수동 모드를 유지합니다.
+
+heartbeat, durable queue, 오프라인 재전송과 비정상 종료 복구는 12번 작업에서 구현합니다.

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { connectDevice } from '../scripts/connect-device.mjs'
@@ -14,6 +16,9 @@ import {
 import { sendTestEvent } from '../scripts/send-test-event.mjs'
 
 const LINK_CODE = '123e4567-e89b-42d3-a456-426614174000'
+const recorderScriptPath = fileURLToPath(
+  new URL('../scripts/record-event.mjs', import.meta.url),
+)
 
 async function startApiServer(handler) {
   const server = createServer(handler)
@@ -40,6 +45,31 @@ async function readRequest(request) {
   }
 
   return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+}
+
+function runRecorder(payload, environment) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [recorderScriptPath], {
+      env: { ...process.env, ...environment },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    let standardError = ''
+
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk) => {
+      standardError += chunk
+    })
+    child.on('error', reject)
+    child.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve()
+        return
+      }
+
+      reject(new Error(`Recorder exited with ${exitCode}: ${standardError}`))
+    })
+    child.stdin.end(JSON.stringify(payload))
+  })
 }
 
 test('keeps only the server event contract and hashed identifiers', () => {
@@ -158,6 +188,120 @@ test('sends an explicit privacy-filtered test event with device authentication',
     assert.doesNotMatch(JSON.stringify(eventRequest.body), /prompt|source|transcript|tool_input/)
   } finally {
     await api.close()
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('automatically sends every supported lifecycle event after local persistence', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = { AISIDEQUEST_DATA_DIR: dataDirectory }
+  const requests = []
+  const api = await startApiServer(async (request, response) => {
+    const body = await readRequest(request)
+    requests.push({ url: request.url, headers: request.headers, body })
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({
+      data: request.url?.endsWith('/device-links/redeem')
+        ? {
+            device: {
+              id: '123e4567-e89b-42d3-a456-426614174004',
+              name: 'Automatic detection device',
+            },
+          }
+        : { eventId: body.eventId, result: 'APPLIED', session: null },
+      meta: { serverTime: new Date().toISOString() },
+    }))
+  })
+  const events = [
+    'SessionStart',
+    'UserPromptSubmit',
+    'PreToolUse',
+    'PermissionRequest',
+    'PostToolUse',
+    'Stop',
+  ]
+
+  try {
+    await connectDevice({
+      code: LINK_CODE,
+      apiUrl: api.apiUrl,
+      deviceName: 'Automatic detection device',
+      environment,
+    })
+
+    for (const event of events) {
+      await runRecorder(
+        {
+          hook_event_name: event,
+          session_id: 'session-automatic',
+          ...(event === 'SessionStart' ? {} : { turn_id: 'turn-automatic' }),
+          prompt: 'must not be sent',
+          transcript_path: 'must not be sent',
+          tool_input: { command: 'must not be sent' },
+        },
+        environment,
+      )
+    }
+
+    const eventRequests = requests.slice(1)
+    assert.deepEqual(
+      eventRequests.map((request) => request.body.event),
+      events,
+    )
+
+    for (const eventRequest of eventRequests) {
+      assert.equal(
+        eventRequest.headers['idempotency-key'],
+        eventRequest.body.eventId,
+      )
+      assert.match(
+        eventRequest.headers.authorization,
+        /^Bearer [A-Za-z0-9_-]{43}$/,
+      )
+      assert.equal(
+        eventRequest.body.sessionKey,
+        hashIdentifier('session-automatic'),
+      )
+      assert.doesNotMatch(
+        JSON.stringify(eventRequest.body),
+        /prompt|transcript|tool_input|must not be sent/,
+      )
+    }
+
+    const log = await readFile(join(dataDirectory, 'events.jsonl'), 'utf8')
+    const localEvents = log.trim().split('\n').map((line) => JSON.parse(line))
+
+    assert.deepEqual(
+      localEvents.map((event) => event.eventId),
+      eventRequests.map((request) => request.body.eventId),
+    )
+  } finally {
+    await api.close()
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('keeps a local event and exits successfully when no device is connected', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = { AISIDEQUEST_DATA_DIR: dataDirectory }
+
+  try {
+    await runRecorder(
+      {
+        hook_event_name: 'UserPromptSubmit',
+        session_id: 'manual-fallback-session',
+        turn_id: 'manual-fallback-turn',
+        prompt: 'must not be persisted',
+      },
+      environment,
+    )
+
+    const log = await readFile(join(dataDirectory, 'events.jsonl'), 'utf8')
+    const event = JSON.parse(log.trim())
+
+    assert.equal(event.event, 'UserPromptSubmit')
+    assert.doesNotMatch(log, /must not be persisted|prompt/)
+  } finally {
     await rm(dataDirectory, { recursive: true, force: true })
   }
 })

@@ -91,7 +91,7 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 ## Codex 연동
 
 - Windows ChatGPT 데스크톱 앱용 AISideQuest Codex 플러그인
-- Codex lifecycle hook
+- 개인정보 필터를 거친 Codex lifecycle hook 자동 전송
 - 웹 일회성 연결 코드를 이용한 기기 연결
 
 ---
@@ -195,6 +195,7 @@ npm.cmd run test:watch
 - 일간, 주간, 월간 활동 통계
 - 경과 시간의 정상·경계·잘못된 입력
 - Codex hook 개인정보 필터
+- Codex lifecycle event 자동 전송과 연결 실패 시 로컬 fallback
 - API Health Check와 공통 성공 응답
 - 전역 입력 검증과 공통 오류 응답
 - API 환경설정 기본값과 잘못된 포트 차단
@@ -241,6 +242,7 @@ npm.cmd run preview
 6. 참고 요약의 퀘스트 완료 수가 현재 통계와 포인트에 합산되지 않는지 확인합니다.
 7. `AI 작업 종료` 후 완료된 서버 세션 시간이 보존되는지 확인합니다.
 8. 모바일 화면 크기에서 레이아웃과 주요 버튼이 정상적으로 표시되는지 확인합니다.
+9. 연결된 Codex에서 작업을 시작·대기·재개·종료할 때 웹 상태가 5초 이내 갱신되는지 확인합니다.
 
 ---
 
@@ -253,7 +255,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API, 프런트엔드 서버 동기화와 AISideQuest Codex 플러그인 기본 구성을 완료한 실사용 베타 개발 단계입니다. 웹 일회용 연결 코드로 플러그인 기기를 연결하고 명시적 테스트 이벤트로 서버 사용자 식별을 확인할 수 있으며, 다음 작업은 lifecycle hook 이벤트의 자동 서버 연동입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인의 lifecycle event가 서버 세션과 웹 화면에 자동 반영되며, 자동 감지를 사용할 수 없을 때는 수동 모드를 유지합니다. 다음 작업은 heartbeat와 장애 복구입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -263,7 +265,7 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- Codex lifecycle hook 이벤트 자동 연동과 장애 복구
+- Codex heartbeat, 오프라인 재전송과 비정상 종료 복구
 - 객관식 개발 퀴즈와 포인트 원장
 - 서버 통계와 운영 파일럿
 

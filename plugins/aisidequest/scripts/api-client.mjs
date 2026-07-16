@@ -12,7 +12,14 @@ export function normalizeApiUrl(value) {
   return apiUrl.toString().replace(/\/+$/, '')
 }
 
-export async function postApi(path, body, headers, apiUrl, fetchImpl = fetch) {
+export async function postApi(
+  path,
+  body,
+  headers,
+  apiUrl,
+  fetchImpl = fetch,
+  signal,
+) {
   const response = await fetchImpl(`${apiUrl}${path}`, {
     method: 'POST',
     headers: {
@@ -21,6 +28,7 @@ export async function postApi(path, body, headers, apiUrl, fetchImpl = fetch) {
       ...headers,
     },
     body: JSON.stringify(body),
+    signal,
   })
   let payload
 

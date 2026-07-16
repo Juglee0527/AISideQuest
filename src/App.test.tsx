@@ -243,4 +243,50 @@ describe('AISideQuest API session flow', () => {
 
     expect(screen.getByRole('timer')).toHaveTextContent('01:00')
   })
+
+  it('polls connected devices and shows the latest automatic event', async () => {
+    let hasReceivedEvent = false
+
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+
+      if (url.pathname.endsWith('/sessions/active')) {
+        return jsonResponse(null)
+      }
+
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+
+      if (url.pathname.endsWith('/devices')) {
+        return jsonResponse({
+          items: [{
+            id: '00000000-0000-4000-8000-000000000010',
+            name: 'Windows Codex',
+            pluginVersion: '0.1.0',
+            lastSeenAt: hasReceivedEvent ? '2026-07-15T00:00:04.000Z' : null,
+            expiresAt: '2026-10-15T00:00:00.000Z',
+            revokedAt: null,
+            createdAt: '2026-07-15T00:00:00.000Z',
+          }],
+        })
+      }
+
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    }))
+
+    renderApp('/devices')
+    await flushRequests()
+
+    expect(screen.getByText('자동 감지 준비')).toBeInTheDocument()
+
+    hasReceivedEvent = true
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000)
+    })
+    await flushRequests()
+
+    expect(screen.getByText('자동 감지 이벤트 수신')).toBeInTheDocument()
+    expect(screen.getByText(/^마지막 이벤트 .*활성 기기 1개$/)).toBeInTheDocument()
+  })
 })

@@ -20,20 +20,13 @@ export class DeviceAuthService {
 
     const devices = await this.databaseService.query<DeviceRow[]>(
       `
-        WITH authenticated_device AS (
-          UPDATE devices
-          SET last_seen_at = clock_timestamp(),
-              updated_at = clock_timestamp()
-          FROM users
-          WHERE devices.user_id = users.id
-            AND devices.token_hash = $1
-            AND devices.revoked_at IS NULL
-            AND devices.expires_at > now()
-            AND users.deleted_at IS NULL
-          RETURNING devices.id AS device_id, devices.user_id
-        )
-        SELECT device_id, user_id
-        FROM authenticated_device
+        SELECT devices.id AS device_id, devices.user_id
+        FROM devices
+        JOIN users ON users.id = devices.user_id
+        WHERE devices.token_hash = $1
+          AND devices.revoked_at IS NULL
+          AND devices.expires_at > now()
+          AND users.deleted_at IS NULL
       `,
       [hashToken(token)],
     )

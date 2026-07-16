@@ -1,15 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 
-import { postApi } from './api-client.mjs'
-import { readDeviceConfig } from './device-config.mjs'
 import { hashIdentifier } from './event-recorder.mjs'
+import { sendIntegrationEvent } from './event-sender.mjs'
 
 export async function sendTestEvent({
   environment = process.env,
   fetchImpl = fetch,
 } = {}) {
-  const config = await readDeviceConfig(environment)
   const eventId = randomUUID()
   const sessionKey = hashIdentifier(`device-test:${eventId}`)
 
@@ -17,8 +15,7 @@ export async function sendTestEvent({
     throw new Error('테스트 이벤트 식별자를 생성하지 못했습니다.')
   }
 
-  const data = await postApi(
-    '/integration-events',
+  const data = await sendIntegrationEvent(
     {
       schemaVersion: 1,
       eventId,
@@ -27,12 +24,7 @@ export async function sendTestEvent({
       sessionKey,
       observedAt: new Date().toISOString(),
     },
-    {
-      Authorization: `Bearer ${config.deviceToken}`,
-      'Idempotency-Key': eventId,
-    },
-    config.apiUrl,
-    fetchImpl,
+    { environment, fetchImpl },
   )
 
   return data

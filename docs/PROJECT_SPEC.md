@@ -391,16 +391,18 @@ npm run build
 - 서버 인증 세션, 현재 사용자 조회, CSRF logout과 세션 만료
 - AI 세션 수동 시작·종료, 활성 조회와 cursor 이력
 - Codex event 상태 전이, 동시성·멱등성과 역순 event 재처리
+- Codex lifecycle hook 자동 전송, 개인정보 필터와 로컬 fallback
+- 활성 기기와 마지막 event 기반 자동 감지 상태 계산
 
 ## 12.4 현재 검증 결과
 
 2026-07-16 기준
 
-- React 테스트 파일: 6개 통과
-- React 자동 테스트: 31개 통과
-- Codex hook 테스트: 4개 통과
+- React 테스트 파일: 8개 통과
+- React 자동 테스트: 38개 통과
+- Codex hook 테스트: 5개 통과
 - NestJS 통합 테스트: 4개 통과
-- DB·인증·AI 세션 PostgreSQL 통합 테스트: 18개 통과
+- DB·인증·AI 세션 PostgreSQL 통합 테스트: 22개 통과
 - TypeScript 타입 검사 통과
 - Vite 및 NestJS 프로덕션 빌드 통과
 - 실제 `GET /api/v1/health` HTTP 200 확인
@@ -419,8 +421,7 @@ npm run build
 - 실제 리워드를 지급하지 않는다.
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
 - GitHub 로그인 진입 UI는 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
-- AI 세션 API는 프런트엔드가 호출하지만 Codex 플러그인은 아직 호출하지 않는다.
-- Codex 기기 token 발급과 플러그인 서버 연동이 없다.
+- lifecycle event는 즉시 한 번 전송하며 durable queue와 오프라인 재전송은 12번 작업 전까지 적용되지 않는다.
 - 세션만 PostgreSQL 데이터를 사용하며 퀘스트·포인트·통계 API 전환은 후속 작업이다.
 
 ---
@@ -457,7 +458,8 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 8. [x] 프런트엔드 세션 상태를 API로 전환 - polling, 시각 보정, 인증·오류 상태 완료
 9. [x] 기존 LocalStorage 데이터 처리 - 참고 요약·초기화, 손상·재실행 처리 완료
 10. [x] AISideQuest Codex 플러그인 기본 구성 - 연결 코드, 기기 token, 테스트 event 완료
-11. [ ] AI 작업 자동 감지 연동 - 다음 작업
+11. [x] AI 작업 자동 감지 연동 - lifecycle event 자동 전송, 웹 상태 반영과 수동 fallback 완료
+12. [ ] Heartbeat와 장애 복구 구현 - 다음 작업
 
 확정된 최초 베타 범위
 

@@ -521,6 +521,11 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
   })
 
   test('integration input validation rejects unsupported, private and unsafe data', async () => {
+    await databaseService.query(
+      'UPDATE devices SET last_seen_at = NULL WHERE user_id = $1',
+      [firstIdentity.userId],
+    )
+
     const unsupported = await sendIntegrationEvent({
       event: 'UnknownHook',
     }).request.expect(422)
@@ -542,5 +547,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       body: { prompt: 'must not be accepted' },
     }).request.expect(400)
     assert.equal(privateField.body.error.code, 'VALIDATION_ERROR')
+
+    const [device] = await databaseService.query<
+      Array<{ last_seen_at: Date | null }>
+    >('SELECT last_seen_at FROM devices WHERE user_id = $1', [
+      firstIdentity.userId,
+    ])
+    assert.equal(device.last_seen_at, null)
   })
 }
