@@ -3,7 +3,9 @@ import {
   resolveDataDirectory,
   sanitizeHookPayload,
 } from './event-recorder.mjs'
-import { trySendIntegrationEvent } from './event-sender.mjs'
+import { enqueueEvent } from './durable-event-queue.mjs'
+import { updateHeartbeatState } from './heartbeat-state.mjs'
+import { ensureDeliveryWorker } from './worker-launcher.mjs'
 
 const MAX_INPUT_BYTES = 64 * 1024
 
@@ -40,8 +42,18 @@ async function main() {
       return
     }
 
-    await appendEvent(event, resolveDataDirectory())
-    await trySendIntegrationEvent(event)
+    const dataDirectory = resolveDataDirectory()
+
+    if (event.event === 'Stop') {
+      await enqueueEvent(event, dataDirectory)
+      await updateHeartbeatState(event, dataDirectory)
+    } else {
+      await updateHeartbeatState(event, dataDirectory)
+      await enqueueEvent(event, dataDirectory)
+    }
+
+    await appendEvent(event, dataDirectory)
+    ensureDeliveryWorker()
   } catch {
     // Telemetry must never block or fail the Codex task.
   }

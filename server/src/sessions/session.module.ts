@@ -5,6 +5,7 @@ import { ApiIdempotencyModule } from '../common/idempotency/api-idempotency.modu
 import { DeviceAuthGuard } from './device-auth.guard'
 import { DeviceAuthService } from './device-auth.service'
 import { IntegrationEventController } from './integration-event.controller'
+import { SessionRecoveryService } from './session-recovery.service'
 import { SessionController } from './session.controller'
 import { SessionService } from './session.service'
 
@@ -13,9 +14,10 @@ import { SessionService } from './session.service'
   controllers: [SessionController, IntegrationEventController],
   providers: [
     SessionService,
+    SessionRecoveryService,
     DeviceAuthService,
     DeviceAuthGuard,
   ],
-  exports: [SessionService, DeviceAuthGuard],
+  exports: [SessionService, SessionRecoveryService, DeviceAuthGuard],
 })
 export class SessionModule {}

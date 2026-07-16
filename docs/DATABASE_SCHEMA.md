@@ -146,6 +146,8 @@ npm.cmd run test:database
 - 의미 중복 event, 새 turn 대체와 역순 `Stop` 재처리
 - 연결 코드 1회 소비, 기기 token hash 저장, 소유권 격리
 - token 회전 후 구 token 차단과 연결 폐기 후 인증 차단
+- 자동·수동 세션 만료 scheduler의 advisory lock 경쟁과 정확한 종료 시각
+- 24시간 deferred event 정리와 같은 기기·turn의 제한된 late `Stop` 복구
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
 - 기기별 event 중복 방지와 FK 소유권
@@ -153,10 +155,11 @@ npm.cmd run test:database
 
 # 8. 다음 작업 경계
 
-5번에서 기본 DB 구조를 구성하고 6번에서 인증, 7번에서 세션 API 멱등성 migration과 런타임 연결을 추가했다. 다음 기능은 해당 번호에서 구현한다.
+5번에서 기본 DB 구조를 구성하고 6번에서 인증, 7번에서 세션 API 멱등성, 12번에서 수동 세션 만료 scan index와 recovery scheduler를 추가했다. 다음 기능은 해당 번호에서 구현한다.
 
 - 6번 완료: GitHub OAuth, 웹 인증 세션과 인증 guard
 - 7번 완료: AI 세션과 integration event transaction
 - 10번 완료: 일회성 기기 연결 코드와 token 발급·회전·해제
+- 12번 완료: 120초 자동 만료, 12시간 수동 만료, orphan 정리와 late `Stop` 복구
 - 14번: 퀘스트 제출과 서버 판정
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction

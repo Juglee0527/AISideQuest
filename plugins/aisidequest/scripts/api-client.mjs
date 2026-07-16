@@ -2,6 +2,31 @@ function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+export class ApiRequestError extends Error {
+  constructor(message, { status, code, retryAfterMs = null }) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.code = code
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+function parseRetryAfter(value, now = Date.now()) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null
+  }
+
+  const seconds = Number(value)
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.floor(seconds * 1_000)
+  }
+
+  const date = Date.parse(value)
+  return Number.isFinite(date) ? Math.max(0, date - now) : null
+}
+
 export function normalizeApiUrl(value) {
   const apiUrl = new URL(value)
 
@@ -35,6 +60,17 @@ export async function postApi(
   try {
     payload = await response.json()
   } catch {
+    if (!response.ok) {
+      throw new ApiRequestError(
+        `AISideQuest API가 JSON이 아닌 오류 응답을 반환했습니다. (${response.status})`,
+        {
+          status: response.status,
+          code: 'NON_JSON_ERROR_RESPONSE',
+          retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+        },
+      )
+    }
+
     throw new Error(`AISideQuest API가 JSON이 아닌 응답을 반환했습니다. (${response.status})`)
   }
 
@@ -44,7 +80,14 @@ export async function postApi(
       ? payload.error.code
       : 'HTTP_ERROR'
 
-    throw new Error(`AISideQuest API 요청에 실패했습니다. (${response.status} ${code})`)
+    throw new ApiRequestError(
+      `AISideQuest API 요청에 실패했습니다. (${response.status} ${code})`,
+      {
+        status: response.status,
+        code,
+        retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+      },
+    )
   }
 
   if (!isRecord(payload) || !('data' in payload)) {

@@ -1,18 +1,33 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { connectDevice } from '../scripts/connect-device.mjs'
-import { resolveConfigPath } from '../scripts/device-config.mjs'
+import {
+  resolveConfigPath,
+  writeDeviceConfig,
+} from '../scripts/device-config.mjs'
+import {
+  enqueueEvent,
+  readDeadLetterSnapshot,
+  readQueueSnapshot,
+  resolveQueueFilePath,
+} from '../scripts/durable-event-queue.mjs'
+import { deliverNextQueuedEvent } from '../scripts/delivery-worker.mjs'
 import {
   hashIdentifier,
   sanitizeHookPayload,
 } from '../scripts/event-recorder.mjs'
+import {
+  enqueueDueHeartbeat,
+  updateHeartbeatState,
+} from '../scripts/heartbeat-state.mjs'
 import { sendTestEvent } from '../scripts/send-test-event.mjs'
 
 const LINK_CODE = '123e4567-e89b-42d3-a456-426614174000'
@@ -70,6 +85,34 @@ function runRecorder(payload, environment) {
     })
     child.stdin.end(JSON.stringify(payload))
   })
+}
+
+async function waitFor(assertion, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs
+
+  while (Date.now() < deadline) {
+    try {
+      return assertion()
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+  }
+
+  return assertion()
+}
+
+function createEvent(event, index, observedAt = new Date()) {
+  return {
+    schemaVersion: 1,
+    eventId: randomUUID(),
+    provider: 'CODEX',
+    event,
+    sessionKey: hashIdentifier(`session-${index}`),
+    ...(event === 'SessionStart'
+      ? {}
+      : { turnKey: hashIdentifier(`turn-${index}`) }),
+    observedAt: observedAt.toISOString(),
+  }
 }
 
 test('keeps only the server event contract and hashed identifiers', () => {
@@ -243,6 +286,8 @@ test('automatically sends every supported lifecycle event after local persistenc
       )
     }
 
+    await waitFor(() => assert.equal(requests.length, events.length + 1))
+
     const eventRequests = requests.slice(1)
     assert.deepEqual(
       eventRequests.map((request) => request.body.event),
@@ -277,6 +322,169 @@ test('automatically sends every supported lifecycle event after local persistenc
     )
   } finally {
     await api.close()
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('durable queue preserves FIFO and acknowledges only accepted responses', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-queue-'))
+  const environment = { AISIDEQUEST_DATA_DIR: dataDirectory }
+  const queuedAt = new Date('2026-07-16T00:00:00.000Z')
+  const firstEvent = createEvent('UserPromptSubmit', 1, queuedAt)
+  const secondEvent = createEvent('Stop', 1, queuedAt)
+  let requestCount = 0
+  const api = await startApiServer(async (request, response) => {
+    const body = await readRequest(request)
+    requestCount += 1
+
+    if (requestCount === 1) {
+      response.writeHead(503, {
+        'Content-Type': 'application/json',
+        'Retry-After': '2',
+      })
+      response.end(JSON.stringify({ error: { code: 'TEMPORARY_FAILURE' } }))
+      return
+    }
+
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({
+      data: { eventId: body.eventId, result: 'APPLIED', session: null },
+    }))
+  })
+
+  try {
+    await writeDeviceConfig({
+      schemaVersion: 1,
+      apiUrl: api.apiUrl,
+      deviceToken: 'test-device-token',
+      pluginVersion: 'test',
+      device: { id: randomUUID(), name: 'Queue test' },
+    }, environment)
+    await enqueueEvent(firstEvent, dataDirectory, { now: queuedAt })
+    await enqueueEvent(secondEvent, dataDirectory, { now: queuedAt })
+
+    const firstAttempt = await deliverNextQueuedEvent(dataDirectory, {
+      environment,
+      now: new Date('2026-07-16T00:00:00.000Z'),
+    })
+    assert.equal(firstAttempt.status, 'RETRY_SCHEDULED')
+    assert.equal(firstAttempt.waitMs, 2_000)
+
+    const waitingQueue = await readQueueSnapshot(dataDirectory)
+    assert.deepEqual(
+      waitingQueue.map((item) => item.event.eventId),
+      [firstEvent.eventId, secondEvent.eventId],
+    )
+    assert.equal(waitingQueue[0].attemptCount, 1)
+
+    const deliveredFirst = await deliverNextQueuedEvent(dataDirectory, {
+      environment,
+      now: new Date('2026-07-16T00:00:02.000Z'),
+    })
+    assert.equal(deliveredFirst.status, 'DELIVERED')
+    assert.equal(
+      (await readQueueSnapshot(dataDirectory))[0].event.eventId,
+      secondEvent.eventId,
+    )
+
+    const deliveredSecond = await deliverNextQueuedEvent(dataDirectory, {
+      environment,
+      now: new Date('2026-07-16T00:00:03.000Z'),
+    })
+    assert.equal(deliveredSecond.status, 'DELIVERED')
+    assert.equal((await readQueueSnapshot(dataDirectory)).length, 0)
+  } finally {
+    await api.close()
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('queue recovers a partial tail and dead-letters capacity overflow', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-queue-'))
+  const now = new Date('2026-07-16T00:00:00.000Z')
+  const policy = {
+    maxItems: 2,
+    maxBytes: 1024 * 1024,
+    retentionMs: 48 * 60 * 60 * 1_000,
+    deadLetterMaxItems: 10,
+    deadLetterMaxBytes: 1024 * 1024,
+    deadLetterRetentionMs: 7 * 24 * 60 * 60 * 1_000,
+  }
+
+  try {
+    const first = createEvent('UserPromptSubmit', 1, now)
+    const second = createEvent('PermissionRequest', 1, now)
+    const overflow = createEvent('Stop', 1, now)
+
+    await enqueueEvent(first, dataDirectory, { now, policy })
+    await enqueueEvent(second, dataDirectory, { now, policy })
+    const result = await enqueueEvent(overflow, dataDirectory, { now, policy })
+
+    assert.equal(result.queued, false)
+    assert.deepEqual(
+      (await readQueueSnapshot(dataDirectory)).map((item) => item.event.event),
+      ['UserPromptSubmit', 'PermissionRequest'],
+    )
+    const deadLetters = await readDeadLetterSnapshot(dataDirectory)
+    assert.equal(deadLetters.length, 1)
+    assert.equal(deadLetters[0].reason, 'QUEUE_CAPACITY_EXCEEDED')
+    assert.equal(deadLetters[0].event.eventId, overflow.eventId)
+
+    await appendFile(resolveQueueFilePath(dataDirectory), '{partial', 'utf8')
+    assert.deepEqual(
+      (await readQueueSnapshot(dataDirectory)).map((item) => item.event.eventId),
+      [first.eventId, second.eventId],
+    )
+  } finally {
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('heartbeat is queued every 30 seconds and stops with the turn or host', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-heartbeat-'))
+  const startedAt = new Date('2026-07-16T00:00:00.000Z')
+  const start = createEvent('UserPromptSubmit', 1, startedAt)
+
+  try {
+    await updateHeartbeatState(start, dataDirectory, {
+      environment: { AISIDEQUEST_HOST_PID: String(process.pid) },
+      now: startedAt,
+    })
+
+    const early = await enqueueDueHeartbeat(dataDirectory, {
+      now: new Date('2026-07-16T00:00:29.999Z'),
+    })
+    assert.equal(early.enqueued, false)
+
+    const due = await enqueueDueHeartbeat(dataDirectory, {
+      now: new Date('2026-07-16T00:00:30.000Z'),
+    })
+    assert.equal(due.enqueued, true)
+    assert.equal(
+      (await readQueueSnapshot(dataDirectory))[0].event.event,
+      'Heartbeat',
+    )
+
+    await updateHeartbeatState(
+      { ...start, event: 'Stop', eventId: randomUUID() },
+      dataDirectory,
+      { now: new Date('2026-07-16T00:00:31.000Z') },
+    )
+    const afterStop = await enqueueDueHeartbeat(dataDirectory, {
+      now: new Date('2026-07-16T00:01:00.000Z'),
+    })
+    assert.equal(afterStop.active, false)
+
+    await updateHeartbeatState(start, dataDirectory, {
+      environment: { AISIDEQUEST_HOST_PID: '999999999' },
+      now: new Date('2026-07-16T01:00:00.000Z'),
+    })
+    const stoppedHost = await enqueueDueHeartbeat(dataDirectory, {
+      now: new Date('2026-07-16T01:00:30.000Z'),
+      processAlive: () => false,
+    })
+    assert.equal(stoppedHost.active, false)
+  } finally {
     await rm(dataDirectory, { recursive: true, force: true })
   }
 })

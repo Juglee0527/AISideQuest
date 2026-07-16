@@ -5,6 +5,9 @@ import { pathToFileURL } from 'node:url'
 
 import { normalizeApiUrl, postApi } from './api-client.mjs'
 import { writeDeviceConfig } from './device-config.mjs'
+import { unblockAuthBlockedEvents } from './durable-event-queue.mjs'
+import { resolveDataDirectory } from './event-recorder.mjs'
+import { ensureDeliveryWorker } from './worker-launcher.mjs'
 
 const DEFAULT_API_URL = 'http://localhost:3000/api/v1'
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -95,6 +98,9 @@ export async function connectDevice({
     },
     environment,
   )
+
+  await unblockAuthBlockedEvents(resolveDataDirectory(environment))
+  ensureDeliveryWorker(environment)
 
   return { device: data.device, configPath }
 }

@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -17,8 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -29,8 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -41,8 +41,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -53,8 +53,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -65,8 +65,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]

@@ -72,6 +72,7 @@ interface StoredIntegrationEventRow {
 interface DeferredEventRow {
   id: string
   event_id: string
+  device_id: string
   event: IntegrationEventName
   received_at: Date
 }
@@ -389,6 +390,7 @@ export class SessionService {
       let applied = await this.applyIntegrationEvent(
         manager,
         deviceAuth.userId,
+        deviceAuth.deviceId,
         event,
         dto.sessionKey,
         dto.turnKey ?? null,
@@ -465,6 +467,7 @@ export class SessionService {
   private async applyIntegrationEvent(
     manager: EntityManager,
     userId: string,
+    deviceId: string,
     event: IntegrationEventName,
     sessionKey: string,
     turnKey: string | null,
@@ -499,7 +502,13 @@ export class SessionService {
       return { result: 'DEFERRED', session: null }
     }
 
-    return this.applySessionEvent(manager, session, event, receivedAt)
+    return this.applySessionEvent(
+      manager,
+      session,
+      deviceId,
+      event,
+      receivedAt,
+    )
   }
 
   private async applyTurnStart(
@@ -585,6 +594,7 @@ export class SessionService {
   private async applySessionEvent(
     manager: EntityManager,
     session: SessionRow,
+    deviceId: string,
     event: Exclude<
       IntegrationEventName,
       'SessionStart' | 'UserPromptSubmit'
@@ -595,7 +605,14 @@ export class SessionService {
       if (
         event === 'Stop' &&
         session.status === 'ABANDONED' &&
+        session.terminal_reason === 'HEARTBEAT_TIMEOUT' &&
         session.ended_at &&
+        await this.wasSessionStartedByDevice(
+          manager,
+          session.id,
+          deviceId,
+        ) &&
+        receivedAt.getTime() >= session.ended_at.getTime() &&
         receivedAt.getTime() - session.ended_at.getTime() <=
           DEFERRED_EVENT_TTL_MS
       ) {
@@ -667,7 +684,7 @@ export class SessionService {
   ) {
     const deferredEvents = (await manager.query(
       `
-        SELECT id, event_id, event, received_at
+        SELECT id, event_id, device_id, event, received_at
         FROM integration_events
         WHERE user_id = $1
           AND provider = 'CODEX'
@@ -692,6 +709,7 @@ export class SessionService {
         applied = await this.applySessionEvent(
           manager,
           session,
+          deferredEvent.device_id,
           deferredEvent.event as Exclude<
             IntegrationEventName,
             'SessionStart' | 'UserPromptSubmit'
@@ -835,6 +853,27 @@ export class SessionService {
     )) as SessionRow[]
 
     return rows[0] ?? null
+  }
+
+  private async wasSessionStartedByDevice(
+    manager: EntityManager,
+    sessionId: string,
+    deviceId: string,
+  ) {
+    const rows = (await manager.query(
+      `
+        SELECT EXISTS (
+          SELECT 1
+          FROM integration_events
+          WHERE ai_session_id = $1
+            AND device_id = $2
+            AND event = 'UserPromptSubmit'
+        ) AS matches
+      `,
+      [sessionId, deviceId],
+    )) as Array<{ matches: boolean }>
+
+    return rows[0]?.matches === true
   }
 
   private async lockUserSessions(manager: EntityManager, userId: string) {

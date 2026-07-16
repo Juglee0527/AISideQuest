@@ -14,12 +14,14 @@ import { configureApplication } from '../../src/bootstrap/configure-application'
 import { validateEnvironment } from '../../src/config/environment'
 import { createDataSourceOptions } from '../../src/database/data-source'
 import { DatabaseService } from '../../src/database/database.service'
+import { SessionRecoveryService } from '../../src/sessions/session-recovery.service'
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL
 const databaseResetAllowed = process.env.ALLOW_DATABASE_RESET === 'true'
 const SESSION_KEY = 'a'.repeat(64)
 const FIRST_TURN_KEY = 'b'.repeat(64)
 const SECOND_TURN_KEY = 'c'.repeat(64)
+const THIRD_TURN_KEY = 'd'.repeat(64)
 
 interface TestIdentity {
   userId: string
@@ -66,8 +68,10 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     csrfToken: 'second-user-csrf-token',
   }
   const deviceToken = 'codex-device-token'
+  const otherDeviceToken = 'other-codex-device-token'
   let app: INestApplication
   let databaseService: DatabaseService
+  let sessionRecoveryService: SessionRecoveryService
 
   before(async () => {
     assert.match(
@@ -98,6 +102,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     configureApplication(app)
     await app.init()
     databaseService = app.get(DatabaseService)
+    sessionRecoveryService = app.get(SessionRecoveryService)
 
     const users = await databaseService.query<Array<{ id: string }>>(
       `
@@ -142,9 +147,15 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     await databaseService.query(
       `
         INSERT INTO devices (user_id, name, token_hash, expires_at)
-        VALUES ($1, 'Session integration device', $2, now() + interval '1 day')
+        VALUES
+          ($1, 'Session integration device', $2, now() + interval '1 day'),
+          ($1, 'Other integration device', $3, now() + interval '1 day')
       `,
-      [firstIdentity.userId, hashToken(deviceToken)],
+      [
+        firstIdentity.userId,
+        hashToken(deviceToken),
+        hashToken(otherDeviceToken),
+      ],
     )
   })
 
@@ -518,6 +529,241 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     }).request.expect(200)
     assert.equal(stopReplay.body.data.result, 'APPLIED')
     assert.equal(stopReplay.body.data.session.status, 'COMPLETED')
+  })
+
+  test('recovery scheduler expires automatic and manual sessions once and closes old deferred events', async () => {
+    const automatic = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      turnKey: FIRST_TURN_KEY,
+    }).request.expect(200)
+    const manual = await startManual(secondIdentity, randomUUID()).expect(200)
+    const deferred = sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: SECOND_TURN_KEY,
+    })
+    await deferred.request.expect(200)
+
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET started_at = clock_timestamp() - interval '10 minutes',
+            last_activity_at = clock_timestamp() - interval '121 seconds'
+        WHERE id = $1
+      `,
+      [automatic.body.data.session.id],
+    )
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET started_at = clock_timestamp() - interval '13 hours',
+            last_activity_at = clock_timestamp() - interval '13 hours'
+        WHERE id = $1
+      `,
+      [manual.body.data.session.id],
+    )
+    await databaseService.query(
+      `
+        UPDATE integration_events
+        SET received_at = clock_timestamp() - interval '25 hours'
+        WHERE event_id = $1
+      `,
+      [deferred.eventId],
+    )
+
+    const results = await Promise.all([
+      sessionRecoveryService.runRecoveryCycle(),
+      sessionRecoveryService.runRecoveryCycle(),
+    ])
+    assert.equal(
+      results.reduce((sum, result) => sum + result.heartbeatTimeouts, 0),
+      1,
+    )
+    assert.equal(
+      results.reduce((sum, result) => sum + result.manualTimeouts, 0),
+      1,
+    )
+    assert.equal(
+      results.reduce((sum, result) => sum + result.ignoredOrphans, 0),
+      1,
+    )
+
+    const sessions = await databaseService.query<Array<{
+      id: string
+      status: string
+      terminal_reason: string
+      timeout_seconds: number
+      version: number
+    }>>(
+      `
+        SELECT
+          id,
+          status,
+          terminal_reason,
+          CASE
+            WHEN terminal_reason = 'HEARTBEAT_TIMEOUT'
+              THEN EXTRACT(EPOCH FROM (ended_at - last_activity_at))::integer
+            ELSE EXTRACT(EPOCH FROM (ended_at - started_at))::integer
+          END AS timeout_seconds,
+          version
+        FROM ai_sessions
+        ORDER BY terminal_reason
+      `,
+    )
+    assert.deepEqual(
+      sessions.map((session) => ({
+        status: session.status,
+        reason: session.terminal_reason,
+        seconds: session.timeout_seconds,
+        version: session.version,
+      })),
+      [
+        {
+          status: 'ABANDONED',
+          reason: 'HEARTBEAT_TIMEOUT',
+          seconds: 120,
+          version: 2,
+        },
+        {
+          status: 'ABANDONED',
+          reason: 'MANUAL_TIMEOUT',
+          seconds: 43_200,
+          version: 2,
+        },
+      ],
+    )
+
+    const [orphan] = await databaseService.query<Array<{
+      processing_result: string
+      response_body: Record<string, unknown>
+    }>>(
+      `
+        SELECT processing_result, response_body
+        FROM integration_events
+        WHERE event_id = $1
+      `,
+      [deferred.eventId],
+    )
+    assert.equal(orphan.processing_result, 'IGNORED_ORPHAN')
+    assert.deepEqual(orphan.response_body, {
+      eventId: deferred.eventId,
+      result: 'IGNORED_ORPHAN',
+      session: null,
+    })
+  })
+
+  test('heartbeat refresh prevents timeout and late Stop recovery is limited by reason, device and age', async () => {
+    const heartbeatTurn = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      turnKey: FIRST_TURN_KEY,
+    }).request.expect(200)
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET started_at = clock_timestamp() - interval '10 minutes',
+            last_activity_at = clock_timestamp() - interval '121 seconds'
+        WHERE id = $1
+      `,
+      [heartbeatTurn.body.data.session.id],
+    )
+    await sendIntegrationEvent({
+      event: 'Heartbeat',
+      turnKey: FIRST_TURN_KEY,
+    }).request.expect(200)
+    const heartbeatRecovery = await sessionRecoveryService.runRecoveryCycle()
+    assert.equal(heartbeatRecovery.heartbeatTimeouts, 0)
+
+    await sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: FIRST_TURN_KEY,
+    }).request.expect(200)
+
+    const recoverable = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      turnKey: SECOND_TURN_KEY,
+    }).request.expect(200)
+    const recoverableId = recoverable.body.data.session.id as string
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET status = 'ABANDONED',
+            started_at = clock_timestamp() - interval '2 hours',
+            last_activity_at = clock_timestamp() - interval '62 minutes',
+            ended_at = clock_timestamp() - interval '1 hour',
+            terminal_reason = 'HEARTBEAT_TIMEOUT',
+            version = version + 1
+        WHERE id = $1
+      `,
+      [recoverableId],
+    )
+    const [timedOut] = await databaseService.query<Array<{ ended_at: Date }>>(
+      'SELECT ended_at FROM ai_sessions WHERE id = $1',
+      [recoverableId],
+    )
+    const recovered = await sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: SECOND_TURN_KEY,
+    }).request.expect(200)
+    assert.equal(recovered.body.data.result, 'APPLIED')
+    assert.equal(recovered.body.data.session.status, 'COMPLETED')
+    assert.equal(
+      recovered.body.data.session.terminalReason,
+      'RECOVERED_LATE_STOP',
+    )
+    assert.equal(recovered.body.data.session.timingQuality, 'DEGRADED')
+    assert.equal(
+      recovered.body.data.session.endedAt,
+      timedOut.ended_at.toISOString(),
+    )
+
+    const wrongDevice = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      turnKey: THIRD_TURN_KEY,
+    }).request.expect(200)
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET status = 'ABANDONED',
+            started_at = clock_timestamp() - interval '2 hours',
+            last_activity_at = clock_timestamp() - interval '62 minutes',
+            ended_at = clock_timestamp() - interval '1 hour',
+            terminal_reason = 'HEARTBEAT_TIMEOUT',
+            version = version + 1
+        WHERE id = $1
+      `,
+      [wrongDevice.body.data.session.id],
+    )
+    const ignoredDevice = await sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: THIRD_TURN_KEY,
+      token: otherDeviceToken,
+    }).request.expect(200)
+    assert.equal(ignoredDevice.body.data.result, 'IGNORED_TERMINAL')
+    assert.equal(ignoredDevice.body.data.session.status, 'ABANDONED')
+
+    const tooOldTurnKey = 'e'.repeat(64)
+    const tooOld = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      turnKey: tooOldTurnKey,
+    }).request.expect(200)
+    await databaseService.query(
+      `
+        UPDATE ai_sessions
+        SET status = 'ABANDONED',
+            started_at = clock_timestamp() - interval '26 hours',
+            last_activity_at = clock_timestamp() - interval '25 hours 2 minutes',
+            ended_at = clock_timestamp() - interval '25 hours',
+            terminal_reason = 'HEARTBEAT_TIMEOUT',
+            version = version + 1
+        WHERE id = $1
+      `,
+      [tooOld.body.data.session.id],
+    )
+    const ignoredAge = await sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: tooOldTurnKey,
+    }).request.expect(200)
+    assert.equal(ignoredAge.body.data.result, 'IGNORED_TERMINAL')
+    assert.equal(ignoredAge.body.data.session.status, 'ABANDONED')
   })
 
   test('integration input validation rejects unsupported, private and unsafe data', async () => {

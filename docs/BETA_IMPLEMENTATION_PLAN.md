@@ -5,8 +5,8 @@
 - 작성일: 2026-07-15
 - 최종 보완일: 2026-07-16
 - 전체 작업: 20개
-- 현재 완료: 11개
-- 다음 작업: 12. Heartbeat와 장애 복구 구현
+- 현재 완료: 12개
+- 다음 작업: 13. 퀘스트 목록 API 구현
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -26,8 +26,8 @@
 | 9 | 기존 LocalStorage 데이터 처리 | 완료 (2026-07-16) |
 | 10 | AISideQuest Codex 플러그인 기본 구성 | 완료 (2026-07-16) |
 | 11 | AI 작업 자동 감지 연동 | 완료 (2026-07-16) |
-| 12 | Heartbeat와 장애 복구 구현 | 다음 작업 |
-| 13 | 퀘스트 목록 API 구현 | 대기 |
+| 12 | Heartbeat와 장애 복구 구현 | 완료 (2026-07-16) |
+| 13 | 퀘스트 목록 API 구현 | 다음 작업 |
 | 14 | 실제 개발 퀴즈 구현 | 대기 |
 | 15 | 포인트 원장 구현 | 대기 |
 | 16 | 통계 API와 대시보드 전환 | 대기 |
@@ -197,6 +197,10 @@
 - 플러그인 시작 시 queue 복구와 전송을 먼저 수행하고, Codex·플러그인 비정상 종료는 별도 추측 상태가 아니라 heartbeat 만료와 재시작 reconciliation으로 정리
 - 정상, 중복, 역순, 오프라인, queue 손상, 용량 초과, 프로세스 강제 종료와 다중 scheduler 경쟁을 자동 테스트
 - 완료 기준: 정의한 queue 용량·보존 범위에서 네트워크 단절, 앱 강제 종료, 재시작, 중복·역순 event 이후에도 event 유실이나 중복 상태 전이 없이 서버 세션이 하나의 일관된 terminal 상태에 도달함
+
+상태: **완료**
+
+구현 결과: 플러그인에 append-only JSONL FIFO queue, ack 후 제거, `Retry-After`·지수 backoff, 인증 차단 복구, 용량·보존 제한과 DLQ를 구현했다. 별도 worker가 Codex 호스트 process 생존을 확인하며 30초마다 heartbeat를 queue에 넣고, 서버 recovery scheduler는 PostgreSQL advisory lock으로 120초 자동 만료, 12시간 수동 만료와 24시간 deferred event 정리를 직렬화한다. late `Stop`은 `HEARTBEAT_TIMEOUT`이며 같은 시작 기기·turn이고 24시간 이내인 경우에만 기존 종료 시각을 유지해 복구한다. 플러그인 테스트 8개와 PostgreSQL 통합 테스트 24개를 통과했다.
 
 ## 13. 퀘스트 목록 API 구현
 
@@ -618,11 +622,25 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 
 ---
 
-# 13. 12번 작업 입력
+# 13. 12번 작업 결과
 
-다음 작업에서는 정상 종료 event가 오지 않는 상황에서도 세션 일관성을 회복한다.
+1. lifecycle event를 append-only JSONL queue에 먼저 넣고 기기별 single worker가 `sequence` 순서대로 전송한다.
+2. 서버가 event를 수락한 뒤에만 ack하며 네트워크·`408`·`429`·`5xx`는 full jitter backoff로 동일 `eventId`를 재전송한다.
+3. queue는 10,000건·10MiB·48시간, DLQ는 1,000건·1MiB·7일로 제한하고 부분 JSONL tail도 복구한다.
+4. Codex host process가 살아 있는 활성 turn에서 30초 heartbeat를 생성하고 `Stop`, 새 `SessionStart`, host 종료 시 중단한다.
+5. 서버 scheduler는 120초 자동 만료, 12시간 수동 만료와 24시간 orphan 정리를 DB advisory lock으로 한 번만 적용한다.
+6. late `Stop`은 같은 사용자·시작 기기·turn의 `HEARTBEAT_TIMEOUT`만 24시간 안에 복구하고 기존 `endedAt`을 유지한다.
+7. 플러그인 테스트 8개, NestJS 테스트 4개와 PostgreSQL 통합 테스트 24개를 통과했다.
 
-1. 작업 중 heartbeat 전송과 120초 만료 처리
-2. durable queue, 순서 보존, 지수 backoff와 동일 event ID 재전송
-3. 비정상 종료, 재시작과 late `Stop` 복구
-4. 완료 기준: 네트워크 단절과 Codex 재시작 후에도 세션 상태 일관성 유지
+결론: **12번 Heartbeat와 장애 복구 구현을 완료한다.**
+
+---
+
+# 14. 13번 작업 입력
+
+다음 작업에서는 프런트엔드 더미 퀘스트를 게시된 DB 퀘스트 API로 전환한다.
+
+1. `PUBLISHED` 최신 version 목록·상세와 인증 사용자 응시 상태 조회
+2. 명시적 응답 DTO allowlist와 정답·내부 판정 필드 차단
+3. `retry_allowed` additive migration과 게시 전 문항·선택지·정답 무결성 검증
+4. 프런트엔드 loading, empty, error, retry 상태 구현

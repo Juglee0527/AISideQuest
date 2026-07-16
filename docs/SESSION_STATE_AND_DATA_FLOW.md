@@ -161,7 +161,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 - 같은 turn의 `Stop`이 24시간 안에 지연 도착하면 `COMPLETED/RECOVERED_LATE_STOP`으로 정정하지만 기존 종료 시각은 유지한다.
 - 24시간 이후 도착한 event는 기록만 남기고 상태를 변경하지 않는다.
 
-로컬 queue와 재전송 구현은 12번 작업에서 수행한다.
+12번에서 append-only JSONL FIFO queue, 성공 ack 이후 제거, 지수 backoff, 용량·보존 제한과 DLQ를 구현했다. 새 `SessionStart`와 Codex host process 종료 시 heartbeat lease를 닫고, 미전송 event는 다음 worker 시작 때 같은 `eventId`로 복구한다.
 
 ## 6.5 hook 미지원 또는 신뢰 해제
 
@@ -536,9 +536,10 @@ Authorization: <user-session-cookie>
 - 역순 `Stop`의 0ms 종료와 `DEGRADED` 품질 표시
 - 종료 세션 재요청 시 기존 terminal 상태 유지
 
-## 15.4 다음 작업에 남긴 경계
+## 15.4 후속 작업 반영 상태
 
 - 기기 token을 발급하는 웹 연결 코드와 회전·해제는 10번에서 구현한다.
 - plugin의 실제 event 전송 연결은 11번에서 구현한다.
-- heartbeat 만료 스캔, 수동 12시간 만료, 오프라인 queue와 재전송은 12번에서 구현한다.
+- 12번 완료: heartbeat 만료 스캔, 수동 12시간 만료, 24시간 orphan 정리, 오프라인 queue와 재전송
+- 12번 완료: 같은 시작 기기·turn의 `HEARTBEAT_TIMEOUT`에 한정한 late `Stop` 복구와 기존 종료 시각 유지
 - React `SessionContext`의 API 연결은 8번에서 구현한다.

@@ -3,8 +3,8 @@
 - 작성일: 2026-07-16
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~11번, 총 11개
-- 다음 작업: 12. Heartbeat와 장애 복구 구현
+- 완료: 1~12번, 총 12개
+- 다음 작업: 13. 퀘스트 목록 API 구현
 
 ---
 
@@ -25,6 +25,7 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 9. 기존 LocalStorage를 참고 요약 또는 초기화로 1회 처리하고 신규 데이터와 분리했다.
 10. 정식 Codex 플러그인, 일회성 연결 코드, hash 기기 token, 회전·폐기와 테스트 event를 구현했다.
 11. Codex lifecycle event 자동 전송, 서버 세션 상태 반영, 마지막 event 표시와 수동 fallback을 구현했다.
+12. 30초 heartbeat, FIFO durable queue, backoff·DLQ와 서버 만료·late `Stop` 복구를 구현했다.
 
 현재 React 프런트엔드는 GitHub 로그인 진입점과 PostgreSQL 기반 세션 API를 사용한다. 퀘스트 완료·예상 포인트만 13~15번 서버 전환 전까지 별도 브라우저 키에 임시 저장한다.
 
@@ -419,6 +420,31 @@ GitHub access token은 사용자 식별 요청에만 사용하고 저장하지 �
 - 구형 활성 세션과 예상 포인트의 서버 이전 차단
 - 신규 임시 퀘스트 이력을 v2 키로 분리
 
+## 3.10 10번: AISideQuest Codex 플러그인 기본 구성
+
+- 공식 Codex 플러그인 manifest, lifecycle hook과 repo-local marketplace 구성
+- 웹 일회성 연결 코드와 로컬 기기 token 발급·회전·폐기
+- prompt, 응답, 코드, 경로와 원본 hook payload를 제거하는 개인정보 필터
+
+## 3.11 11번: AI 작업 자동 감지 연동
+
+- 6개 lifecycle hook을 기존 세션 API에 자동 연결
+- 시작, 권한 대기, 실행 복귀와 종료 상태의 웹 polling 반영
+- 자동 전송 실패 시 Codex 작업을 막지 않고 수동 fallback 유지
+
+## 3.12 12번: Heartbeat와 장애 복구 구현
+
+- append-only JSONL queue와 원자적 checkpoint/compaction
+- 기기별 single worker의 FIFO 전송과 성공 ack 이후 제거
+- `Retry-After`, full jitter 지수 backoff, 최대 300회·24시간 재시도
+- 10,000건·10MiB·48시간 active queue와 1,000건·1MiB·7일 DLQ
+- `401`·`403` 인증 차단 후 기기 재연결 시 FIFO 재개
+- Codex host process를 로컬에서만 확인하는 30초 heartbeat
+- 호스트 PID를 확인할 수 없을 때 최근 hook 기준 120초 안전 lease 적용
+- DB advisory lock 기반 120초 자동 만료, 12시간 수동 만료와 24시간 orphan 정리
+- 같은 시작 기기·turn의 `HEARTBEAT_TIMEOUT`에 한정한 24시간 late `Stop` 복구
+- late 복구 시 기존 `endedAt` 유지와 `timingQuality=DEGRADED` 적용
+
 # 4. 현재 디렉터리 구조
 
 ```text
@@ -436,13 +462,14 @@ AISideQuest/
 │  │  ├─ config/                환경설정 검증
 │  │  ├─ database/              DataSource, migration, 개발 seed
 │  │  ├─ health/                Health Check
-│  │  ├─ sessions/              AI 세션 API와 Codex event 상태 전이
+│  │  ├─ sessions/              AI 세션 API, event 상태 전이와 recovery scheduler
 │  │  ├─ app.module.ts
 │  │  └─ main.ts
 │  ├─ test/                     NestJS·PostgreSQL 통합 테스트
 │  ├─ tsconfig.json
 │  └─ tsconfig.test.json
 ├─ plugins/
+│  ├─ aisidequest/              정식 Codex plugin, durable queue와 heartbeat worker
 │  └─ aisidequest-hook-poc/     Codex lifecycle hook PoC
 ├─ docs/                        기준 문서와 기술 검증 기록
 ├─ compose.yaml                 PostgreSQL 16 로컬 개발 환경
@@ -498,10 +525,10 @@ npm.cmd run test:database
 | 구분 | 결과 |
 |---|---:|
 | React 테스트 | 38개 통과 |
-| Codex hook 테스트 | 5개 통과 |
+| Codex plugin 테스트 | 8개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
-| 인증·PostgreSQL·세션 통합 테스트 | 22개 통과 |
-| 전체 자동 테스트 | 69개 통과 |
+| 인증·PostgreSQL·세션 통합 테스트 | 24개 통과 |
+| 전체 자동 테스트 | 74개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -512,21 +539,21 @@ npm.cmd run test:database
 
 - GitHub 로그인 진입점은 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
 - 기존 참고 요약과 신규 임시 퀘스트 이력은 브라우저 로컬 데이터이며 다른 기기와 공유되지 않는다.
-- lifecycle hook event는 한 번 자동 전송하지만 heartbeat, 오프라인 queue와 재전송은 아직 구현되지 않았다.
+- queue depth와 DLQ는 아직 로컬 진단 정보이며 서버 운영 지표·경보 연결은 18번 범위다.
 - DB에는 개발 퀘스트 seed가 있지만 프런트엔드는 여전히 더미 데이터를 사용하며 서버 판정이 없다.
 - 포인트 원장 테이블과 중복 제약은 있지만 적립 transaction 서비스가 없다.
 - 통계는 브라우저 데이터로 계산되며 다른 기기와 공유되지 않는다.
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: Heartbeat와 장애 복구 구현
+# 7. 다음 작업: 퀘스트 목록 API 구현
 
-12번 작업에서 다음 항목을 진행한다.
+13번 작업에서 다음 항목을 진행한다.
 
-1. 작업 중 heartbeat 전송과 120초 만료 처리
-2. 로컬 durable queue, 순서 보존, 지수 backoff와 중복 방지
-3. Codex 비정상 종료와 재시작 후 세션 자동 정리
-4. 24시간 안에 지연 도착한 `Stop` 복구
+1. 게시된 최신 퀘스트 목록·상세 API
+2. 정답과 내부 판정 필드를 제외하는 DTO allowlist
+3. 재응시 정책과 게시 전 퀘스트 무결성 검증
+4. 프런트엔드 loading, empty, error와 retry 상태
 
 # 8. 기준 문서
 
@@ -541,4 +568,4 @@ npm.cmd run test:database
 
 ---
 
-현재 결론: **Codex lifecycle event가 사용자 세션과 웹 화면에 자동 반영된다. 다음 단계에서는 heartbeat와 durable 재전송으로 네트워크 단절과 비정상 종료를 복구한다.**
+현재 결론: **Codex lifecycle event는 heartbeat와 durable FIFO 재전송을 사용하며 서버가 비정상 종료·만료·late Stop을 복구한다. 다음 단계는 게시된 DB 퀘스트 목록 API 전환이다.**

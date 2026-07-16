@@ -5,6 +5,13 @@ import { resolveDataDirectory } from './event-recorder.mjs'
 
 const CONFIG_FILE_NAME = 'device.json'
 
+export class DeviceConfigError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'DeviceConfigError'
+  }
+}
+
 function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -40,7 +47,9 @@ export async function readDeviceConfig(environment = process.env) {
   try {
     parsed = JSON.parse(await readFile(configPath, 'utf8'))
   } catch {
-    throw new Error('AISideQuest 기기 연결 정보가 없습니다. 먼저 connect-device.mjs를 실행해 주세요.')
+    throw new DeviceConfigError(
+      'AISideQuest 기기 연결 정보가 없습니다. 먼저 connect-device.mjs를 실행해 주세요.',
+    )
   }
 
   if (
@@ -51,7 +60,9 @@ export async function readDeviceConfig(environment = process.env) {
     !isRecord(parsed.device) ||
     typeof parsed.device.id !== 'string'
   ) {
-    throw new Error('AISideQuest 기기 연결 정보가 올바르지 않습니다. 다시 연결해 주세요.')
+    throw new DeviceConfigError(
+      'AISideQuest 기기 연결 정보가 올바르지 않습니다. 다시 연결해 주세요.',
+    )
   }
 
   return parsed

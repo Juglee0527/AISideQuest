@@ -91,6 +91,23 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [recoveryIndexReverted] = (await dataSource.query(`
+      SELECT
+        to_regclass(
+          'public.ix_ai_sessions_manual_expiration'
+        ) AS recovery_index,
+        to_regclass('public.device_link_codes') AS device_link_codes_table
+    `)) as Array<{
+      recovery_index: string | null
+      device_link_codes_table: string | null
+    }>
+    assert.equal(recoveryIndexReverted.recovery_index, null)
+    assert.equal(
+      recoveryIndexReverted.device_link_codes_table,
+      'device_link_codes',
+    )
+
+    await dataSource.undoLastMigration()
     const [deviceLinkingReverted] = (await dataSource.query(`
       SELECT
         to_regclass('public.device_link_codes') AS device_link_codes_table,
@@ -136,7 +153,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 4)
+    assert.equal(reappliedMigrations.length, 5)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
