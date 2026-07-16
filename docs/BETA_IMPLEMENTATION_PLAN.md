@@ -3,6 +3,7 @@
 > 브라우저 LocalStorage 기반 MVP를 실제 사용 가능한 폐쇄형 베타로 전환하기 위한 기준 문서
 
 - 작성일: 2026-07-15
+- 최종 보완일: 2026-07-16
 - 전체 작업: 20개
 - 현재 완료: 11개
 - 다음 작업: 12. Heartbeat와 장애 복구 구현
@@ -179,85 +180,150 @@
 
 ## 12. Heartbeat와 장애 복구 구현
 
-- 작업 중 heartbeat 전송
-- 로컬 durable queue, 지수 backoff, 전송 순서 보존과 중복 방지
-- Codex 또는 연동 도구의 비정상 종료 시 세션 자동 정리
-- 120초 heartbeat 만료, 12시간 수동 만료, 24시간 late `Stop` 복구 구현
-- queue 크기·보존 기간 제한과 영구 실패 event 처리
-- 완료 기준: 네트워크 단절, 앱 종료, 재시작, 역순 event 후에도 세션 상태 일관성 유지
+- 자동 turn에 연결된 활성 세션에서만 30초 간격 `Heartbeat`를 생성하고, lifecycle event와 동일하게 로컬 queue에 먼저 기록한 뒤 전송
+- 현재 플러그인 배포 구조를 유지하기 위해 네이티브 의존성 없는 append-only JSONL spool과 원자적 checkpoint/compaction으로 durable queue 구현
+- event마다 기기 단위 증가 `sequence`와 재전송에도 바뀌지 않는 `eventId`를 저장하고, 기기별 single-flight worker가 FIFO로 한 건씩 전송
+- 연속된 미전송 `Heartbeat`만 안전하게 병합하고 `UserPromptSubmit`, `PermissionRequest`, `PostToolUse`, `Stop`의 상대 순서는 변경하지 않음
+- 성공 또는 서버의 멱등 중복 응답을 받은 뒤에만 queue에서 ack 처리하고, 프로세스 강제 종료와 부분 파일 쓰기 이후에도 미확인 event를 복구
+- 네트워크 오류, `408`, `429`, `5xx`는 `Retry-After`를 우선하고 `1초 → 2초 → 4초` 지수 backoff, 최대 5분, full jitter, event당 최대 300회 또는 24시간까지 재시도
+- 재시도할 수 없는 `4xx`와 최대 횟수·기간을 소진한 event는 영구 실패로 분류하고, `401`·`403`은 기기 재연결이 필요한 `AUTH_BLOCKED`로 표시해 무한 재시도를 중단
+- 활성 queue는 10,000건 또는 10MiB, 48시간으로 제한하고 만료된 heartbeat를 먼저 제거하며, 나머지 영구 실패 event는 실패 사유와 함께 7일 제한 dead-letter queue에 보관
+- queue 초과 시 lifecycle event를 조용히 폐기하지 않고 로컬 진단 상태와 웹의 재연결·수동 fallback 안내에 반영
+- 서버 정리 job은 다중 인스턴스에서도 한 번만 적용되도록 DB lock과 조건부 update를 사용하고, 자동 연결 세션은 마지막 유효 활동 후 120초, 순수 수동 세션은 시작 후 12시간에 `ABANDONED` 처리
+- 만료 job이 늦게 실행돼도 자동 세션의 `endedAt`은 `lastActivityAt + 120초`, 수동 세션은 `startedAt + 12시간`으로 기록해 통계가 scheduler 지연만큼 늘어나지 않게 처리
+- 시작 event 없이 24시간이 지난 `DEFERRED` event는 `IGNORED_ORPHAN`으로 정리
+- `HEARTBEAT_TIMEOUT`으로 끝난 같은 사용자·기기·turn의 `Stop`만 만료 후 24시간 안에 `COMPLETED/RECOVERED_LATE_STOP`으로 복구하고, 기존 `endedAt`은 유지하며 `timingQuality=DEGRADED`로 표시
+- 수동 종료, 새 turn에 의한 종료 또는 24시간이 지난 terminal event는 과거 상태를 다시 열지 않음
+- 플러그인 시작 시 queue 복구와 전송을 먼저 수행하고, Codex·플러그인 비정상 종료는 별도 추측 상태가 아니라 heartbeat 만료와 재시작 reconciliation으로 정리
+- 정상, 중복, 역순, 오프라인, queue 손상, 용량 초과, 프로세스 강제 종료와 다중 scheduler 경쟁을 자동 테스트
+- 완료 기준: 정의한 queue 용량·보존 범위에서 네트워크 단절, 앱 강제 종료, 재시작, 중복·역순 event 이후에도 event 유실이나 중복 상태 전이 없이 서버 세션이 하나의 일관된 terminal 상태에 도달함
 
 ## 13. 퀘스트 목록 API 구현
 
-- 더미 데이터를 DB 기반 퀘스트로 전환
-- 공개된 최신 버전 퀘스트 목록과 상세 조회 구현
-- 예상 시간, 100P 보상, 통과 점수와 재응시 가능 여부 제공
-- 정답 필드는 목록·상세 응답에서 제외
-- 프런트엔드의 loading, empty, error 상태 구현
-- 완료 기준: 더미 데이터 없이 서버 퀘스트 목록을 표시하고 정답이 노출되지 않음
+- 프런트엔드 더미 퀘스트를 제거하고 DB의 `PUBLISHED` 상태 퀘스트를 source of truth로 전환
+- 여기서 공개는 비로그인 공개가 아니라 게시 상태를 뜻하며, 사용자별 응시 상태를 포함하는 목록·상세 API는 로그인 사용자에게만 제공
+- `GET /api/v1/quests`는 code별 현재 `PUBLISHED` version 한 건만 안정적인 정렬과 제한된 cursor pagination으로 반환
+- `GET /api/v1/quests/:code`는 조회 시점의 게시 version 메타데이터를 반환하고 `DRAFT`, `ARCHIVED`, 존재하지 않는 code는 `404` 처리
+- 목록·상세 응답에 quest `id`, `code`, `version`, 제목, 설명, 예상 시간, 100P 보상, 통과 점수, 재응시 정책과 사용자의 최근 응시 상태를 명시
+- 현재 schema에 없는 재응시 정책은 `retry_allowed` additive migration으로 추가하고, 이미 통과한 version은 정책과 무관하게 완료 상태로 처리
+- 목록·상세에서는 문제·선택지까지 반환하지 않고, 14번의 응시 시작 응답에서 고정 version의 문제를 제공
+- entity나 SQL row를 그대로 직렬화하지 않고 응답 DTO allowlist를 사용해 `isCorrect`, 정답 option ID, 내부 판정 필드, draft 정보가 어떤 중첩 경로에도 노출되지 않게 처리
+- 게시 전 검증으로 문항 1개 이상, 문항별 선택지 2개 이상, 정확히 1개의 정답과 유효한 통과 점수를 보장
+- 프런트엔드에 최초 loading, 재조회 loading, empty, 인증 만료, error, retry 상태를 분리하고 이전 성공 데이터가 있으면 재조회 중 화면 깜빡임 방지
+- 목록·상세 계약, 인증·게시 상태, pagination, 금지 필드 부재를 API 통합 테스트로 검증
+- 완료 기준: 더미 데이터 없이 서버의 게시 퀘스트만 표시되고, 응답 JSON 전체를 검사해 정답과 내부 판정 정보가 클라이언트에 노출되지 않음
 
 ## 14. 실제 개발 퀴즈 구현
 
-- 문제, 선택지, 답변 제출 화면 구현
-- 정답은 서버에서 판정
-- 퀘스트 시작, 답안 저장, 제출, 통과·실패와 재응시 상태 관리
-- 응시 시작 시 퀘스트 version을 고정하고 완료 판정 시 보상 snapshot 저장
-- AI 세션 종료 후 5분 제출 허용 규칙을 서버에서 검증
-- 같은 응시의 중복 제출을 멱등하게 처리
-- 완료 기준: 실제 답안 제출과 서버 판정을 통과해야 퀘스트 완료
+- `POST /api/v1/quests/:code/attempts`에서 게시 version과 사용자의 AI 세션을 하나의 응시에 고정하고 `Idempotency-Key`로 중복 시작 방지
+- 응시는 본인 소유의 활성 AI 세션에서만 시작할 수 있고, 시작 이후에는 새 version이 게시되어도 고정된 `quest_id`의 문항·선택지·통과 점수·보상 기준을 사용
+- `GET /api/v1/quest-attempts/:attemptId`로 새로고침 이후에도 같은 응시와 저장 답안을 복구하되 다른 사용자의 응시는 `404`로 숨김
+- `PUT /api/v1/quest-attempts/:attemptId/answers`는 `IN_PROGRESS`에서만 전체 답안 집합을 원자적으로 교체하고, 해당 version의 문항·선택지 소속 관계와 중복 문항을 서버에서 검증
+- 문제, 선택지, 답안 저장 상태, 제출 확인, 통과·실패와 재응시 가능 상태를 화면에 구현하고 클라이언트에는 정답 판정 로직을 두지 않음
+- 제출 시 응시 row를 잠그고 저장 답안을 기준으로 서버에서 채점하며, 미응답 문항·다른 version의 선택지·빈 퀘스트·정답이 하나가 아닌 게시 데이터는 명시적으로 거부
+- 점수는 `floor(정답 수 × 100 / 전체 문항 수)`로 계산하고 저장된 `pass_score` 이상일 때만 통과
+- `POST /api/v1/quest-attempts/:attemptId/submissions`는 `Idempotency-Key`, request hash와 저장된 결과 snapshot으로 같은 제출의 재요청에 동일한 결과를 반환하고 다른 본문의 key 재사용은 거부
+- DB row lock과 상태 조건으로 동시 제출 중 한 건만 `COMPLETED` 또는 `FAILED`로 전이하고 답안별 `is_correct`, 점수, 통과 여부와 `reward_points_snapshot=100`을 같은 transaction에 저장
+- 응시가 연결된 AI 세션이 활성 상태이면 제출 가능하고, terminal 상태이면 서버의 `endedAt + 5분`을 초과하기 전에만 제출 가능하도록 서버 시각으로 검증
+- 제한 시간이 지나면 점수 없는 terminal 상태인 `EXPIRED`로 전이해 활성 응시 unique index를 해제하고, 이를 위한 status·check constraint migration과 만료 정리 job 추가
+- 실패 또는 만료 후 `retry_allowed=true`일 때만 새 응시를 허용하고, 같은 quest version을 이미 통과한 사용자는 재응시와 추가 보상을 차단
+- 재응시가 가능한 실패 응답에는 점수와 통과 여부만 제공하고 정답 option은 노출하지 않으며, 통과했거나 재응시 불가일 때만 정답·해설 공개 여부를 별도 응답 DTO로 통제
+- 경계 시각 정확히 5분, 동시 제출, 만료와 제출 경쟁, 새 version 게시, 재응시와 소유권 우회를 실제 PostgreSQL 통합 테스트로 검증
+- 완료 기준: 실제 저장 답안을 서버가 판정해야만 응시가 완료되고, 새로고침·중복·동시 제출·만료 이후에도 한 응시의 최종 결과가 한 번만 확정됨
 
 ## 15. 포인트 원장 구현
 
-- 퀘스트 완료와 포인트 적립을 하나의 트랜잭션으로 처리
-- 완료 당시 보상을 원장에 고정 저장
-- append-only 원장을 사용하고 사용자 잔액은 원장 합계로 계산
-- DB unique 제약과 멱등성으로 중복 제출·재요청·동시 요청 방지
-- 실패한 퀴즈와 이전 LocalStorage 이력에는 포인트를 지급하지 않음
-- 완료 기준: 동일 사용자와 퀘스트 version으로 100P가 한 번만 적립
+- 14번의 제출 application service 경계를 확장해 최초 통과 판정, `reward_points_snapshot=100` 확정과 `point_ledger` insert를 하나의 DB transaction으로 처리
+- point 원장 insert가 실패하면 응시의 최초 통과 전이도 rollback하고, API는 포인트 없는 완료 상태를 성공으로 반환하지 않음
+- 원장에는 사용자, 고정된 quest version, attempt, `QUEST_REWARD`, 지급 당시 100P와 생성 시각을 저장하고 이후 퀘스트 수정과 관계없이 변경하지 않음
+- `(user_id, quest_id)`와 `quest_attempt_id` unique 제약, 제출 멱등성 원장과 attempt row lock을 함께 사용해 재요청·동시 요청에도 한 번만 적립
+- 이미 통과한 version의 다른 attempt, `FAILED`, `EXPIRED`, 보상 없는 LocalStorage 참고 이력에는 원장을 생성하지 않음
+- 일반 애플리케이션 DB 권한과 service에는 원장 `UPDATE`·`DELETE` 또는 운영자 수동 정정 API를 제공하지 않으며, 베타 중 정정이 필요하면 DB 직접 수정 대신 원인·처리 절차를 먼저 확정
+- 계정 삭제는 일반 포인트 정정과 구분된 개인정보 삭제 절차로 처리하며, 사용자에 연결된 원장도 확정한 보존 정책에 따라 함께 삭제
+- `GET /api/v1/points/balance`는 `COALESCE(SUM(points), 0)`으로 잔액을 계산하고, cursor 기반 원장 이력은 본인 데이터만 제한된 page 크기로 반환
+- 큰 합계에서도 overflow가 나지 않도록 DB 합계와 API 타입을 검증하고 원장 조회 index의 실행 계획 확인
+- point insert 실패, transaction rollback, 동일·다른 idempotency key, 동시 통과와 이미 보상된 재응시를 실제 PostgreSQL에서 검증
+- 완료 기준: 동일 사용자와 quest version 조합의 최초 통과 transaction에서만 100P가 적립되고, 어떤 재요청·경쟁 조건에서도 완료 상태와 잔액이 서로 어긋나지 않음
 
 ## 16. 통계 API와 대시보드 전환
 
-- 대기 시간, 완료 퀘스트, 포인트를 서버에서 집계
-- DB 시각은 UTC로 저장하고 사용자 time zone으로 오늘·주·월 경계 계산
-- 진행 중 세션은 `meta.serverTime`까지 계산하고 종료 세션은 저장 시각 사용
-- cursor/기간 제한과 집계 index의 실행 계획 확인
-- 기존 대시보드를 서버 통계 API에 연결
-- 완료 기준: 기기와 브라우저가 달라도 동일 통계 표시
+- AI 작업 대기 시간, 최초 통과한 퀘스트 수와 point 원장 합계를 서버 통계 API에서 집계하고 LocalStorage 통계 계산 제거
+- 사용자 time zone은 브라우저가 최초 로그인·변경 시 IANA zone ID로 전송하고 서버가 검증해 사용자 설정으로 저장하며, 잘못된 값은 조용히 추정하지 않고 `UTC` fallback과 수정 안내 제공
+- DB 시각은 `timestamptz`로 저장하고, 오늘은 로컬 자정, 이번 주는 월요일 00:00, 이번 달은 1일 00:00 기준의 반열린 구간 `[start, end)`을 UTC로 변환해 조회
+- DST 전환일, 월·연도 경계와 서버·브라우저 시계 차이는 `meta.serverTime`과 IANA time zone 기준 자동 테스트로 검증
+- AI 작업 시간은 상태와 관계없이 선택 기간과 세션 `[startedAt, endedAt)`이 실제로 겹치는 구간만 합산하며, 활성 세션은 응답의 동일한 `meta.serverTime`까지 계산
+- `DEGRADED` timing 세션 수를 함께 반환해 복구된 시간이 정확한 측정치처럼 숨겨지지 않게 처리
+- 완료 퀘스트 수는 기간 내 최초 통과한 사용자·quest version 수, 포인트는 같은 기간에 생성된 append-only 원장 합계로 계산하고 LocalStorage 참고 이력은 제외
+- `GET /api/v1/stats/summary?period=today|week|month|custom` 계약을 정의하고 custom 기간은 최대 366일, 상세 이력 cursor page는 기본 20건·최대 100건으로 제한
+- 모든 집계 값과 목록이 동일한 사용자·시간 경계를 사용하도록 한 요청 안에서 기준 시각을 한 번만 확정
+- 세션 구간 조회, 완료 응시와 point 원장 집계를 위한 복합·부분 index를 점검하고 현실적인 대량 fixture에서 `EXPLAIN (ANALYZE, BUFFERS)` 결과 기록
+- 대시보드에 loading, empty, error, retry, time zone 변경 상태를 연결하고 기기 local clock으로 집계 값을 다시 계산하지 않음
+- 완료 기준: 동일 계정의 서로 다른 기기·브라우저에서 같은 time zone과 `meta.serverTime` 기준의 오늘·주·월 통계가 표시되고 경계·대량 데이터 테스트를 통과함
 
 ## 17. 보안과 개인정보 보호 최종 점검
 
-- 앞 작업에서 적용한 입력 검증, 인증, 소유권, cookie, CORS를 전체 API 기준으로 재점검
-- 로그인·기기 연결·event endpoint별 Rate Limit과 abuse 방어 적용
-- 프롬프트, 응답, 소스 코드, 경로가 로그·DB·오류 응답에 없는지 자동 검사
-- 사용자 데이터 조회, 기기 해제, 계정 삭제와 보존 기간 구현
-- 의존성 취약점과 주요 권한 우회 시나리오 점검
-- 완료 기준: 보안 체크리스트와 공격·권한 우회 테스트 통과
+- 전체 endpoint를 인증 방식, CSRF 필요 여부, 소유권 대상, 입력 크기, 멱등성, Rate Limit 기준으로 표로 만들고 누락된 guard를 각 기능 계층에서 수정
+- 웹 cookie의 `HttpOnly`, 운영 `Secure`, `SameSite`, 만료·logout 폐기와 정확한 CORS origin·credential 설정을 실제 preflight·cross-site 요청으로 재검증
+- 로그인 시작·callback은 IP와 OAuth state, 기기 연결·회전은 사용자와 IP, integration event는 device와 IP를 조합한 endpoint별 Rate Limit 적용
+- 다중 API 인스턴스에서 우회되지 않도록 공유 저장소 기반 limiter를 사용하고 `429`와 `Retry-After`를 반환하되 정상 heartbeat burst는 허용 범위에 포함
+- payload 크기, 허용 event 이름, turn별 event 수, 미래 시각, 중복·replay, idempotency key 본문 변경과 비정상 상태 전이를 제한
+- 프롬프트, Codex 응답, source code, 파일 경로, 원본 hook payload와 token·cookie가 요청 DTO, DB column, 구조화 로그, 오류 추적, 오류 응답에 남지 않는지 fixture 기반 자동 검사
+- 예외 stack과 validation 오류가 요청 원문을 포함하지 않게 하고 token, cookie, authorization header, OAuth code, 기기 연결 code는 공통 redaction
+- 사용자 데이터 조회·내보내기, 기기 연결 해제, 모든 웹 세션·기기 token 폐기와 계정 삭제 API에 재인증·CSRF·소유권 검증 적용
+- 계정 삭제 시 OAuth 연결, 세션, 기기, AI 세션, event, 응시·답안과 point 원장을 어떤 순서로 삭제할지 transaction과 FK 정책으로 확정하고 로컬 플러그인 token 폐기 안내 제공
+- 인증 세션, OAuth state, 연결 code, integration event, dead-letter 진단, 운영 로그, 백업별 보존 기간과 계정 삭제 시 예외 범위를 문서화
+- IDOR, CSRF, CORS 오설정, OAuth state replay, 탈취·만료 token, 다른 사용자 attempt·session 접근, 중복 보상과 Rate Limit 우회 테스트 추가
+- `npm audit` 결과를 검토하고 실제 도달 가능한 high·critical 취약점은 배포 차단, 예외는 영향·보완 통제·만료일을 기록
+- 완료 기준: endpoint 보안 matrix, 개인정보 보존·삭제 문서, 금지 데이터 자동 검사와 공격·권한 우회 통합 테스트가 모두 통과함
 
 ## 18. 운영 로그와 장애 대응 구성
 
-- request ID 기반 구조화 로그와 개인정보 redaction, 오류 추적 구성
-- 기존 liveness Health Check에 DB readiness와 migration 상태 확인 추가
-- DB 백업 및 복원과 마이그레이션 실패 대응 작성
-- 운영 환경 설정 검증, 비밀값 관리와 key/token 회전 절차 작성
-- 세션 만료·deferred event·queue 실패 운영 지표와 경보 구성
-- 완료 기준: 장애 원인 추적, 복원 훈련, migration 실패 복구 가능
+- 외부의 유효한 request ID는 전달하고 없거나 잘못된 값은 서버가 생성해 응답 header, 구조화 JSON 로그와 오류 추적 event에 동일하게 연결
+- 로그에 환경, service version, route template, status, latency와 오류 code만 남기고 body·query 원문, cookie, authorization, OAuth code, 기기 token과 hash 식별자 원문은 redaction
+- 오류 추적 도구는 운영·스테이징 환경을 분리하고 source map 접근을 제한하며, 전송 전 공통 sanitizer와 sample event 검사 적용
+- liveness는 프로세스 event loop만 확인하고, readiness는 DB 연결·간단 query·필수 migration 적용 여부를 확인하는 별도 endpoint로 분리하며 공개 응답에는 내부 상세를 노출하지 않음
+- migration은 애플리케이션 인스턴스 자동 실행이 아니라 배포당 한 번 실행하는 별도 단계와 DB advisory lock으로 직렬화하고, 실패 시 새 버전 traffic 전환을 중단
+- backward-compatible expand/contract migration을 원칙으로 하고, 이미 적용된 운영 migration 파일 수정과 운영 DB에서의 임의 `synchronize`를 금지
+- 자동 백업 주기·보존·암호화·접근 권한을 구성하고 별도 환경에 복원한 뒤 row count, 핵심 제약, 로그인·퀘스트 smoke test까지 확인
+- 파일럿 전 운영 목표를 확정하며 초기안은 `RPO ≤ 24시간`, `RTO ≤ 4시간`으로 두고 실제 복원 훈련 결과와 차이를 기록
+- migration 실패, API rollback, DB roll-forward, 백업 복원, OAuth secret·cookie 서명 key·기기 token 회전에 대한 실행 명령, 판단 기준과 중단 조건을 runbook으로 작성
+- secret은 저장소와 이미지에 포함하지 않고 운영 secret manager에서 주입하며 시작 시 필수값·금지 기본값·production cookie/CORS 설정을 fail-fast 검증
+- 활성 세션 수, heartbeat 만료율, deferred event 수와 최고 age, late `Stop` 복구율, API queue 실패 보고, 인증 실패·Rate Limit, DB pool과 `5xx` 지표·경보 구성
+- 로컬 queue는 서버가 직접 볼 수 없으므로 연결 시 민감정보 없는 depth·oldest age·dead-letter count만 진단 지표로 전송하고 장기 미접속은 device `lastSeenAt`으로 탐지
+- 각 경보에 담당자, severity, 확인 dashboard, 첫 대응과 종료 조건을 연결하고 test alert로 전달 경로 확인
+- 완료 기준: request ID 하나로 오류와 관련 상태를 추적하고, readiness가 잘못된 배포를 차단하며, 문서만 보고 백업 복원·migration 실패·secret 회전을 재현할 수 있음
 
 ## 19. 통합 테스트와 CI 구성
 
-- 각 작업에서 누적한 단위·DB 통합 테스트를 CI에 연결
-- 로그인부터 자동 감지, 퀴즈 제출, 포인트 확인까지 프런트엔드 E2E 추가
-- 로그인, 자동 감지, 중복 요청, 오프라인 복구 검증
-- migration을 빈 PostgreSQL에 적용하는 CI job 추가
-- PR마다 테스트, 타입 검사, build, dependency audit 실행
-- 완료 기준: 핵심 사용자 흐름과 DB migration이 깨지면 병합 불가
+- 1~18번에서 누적한 프런트엔드, 서버 단위, 플러그인, 실제 PostgreSQL 통합 테스트를 격리된 CI job으로 연결하고 실패 원인이 구분되게 구성
+- 빈 PostgreSQL 16에 모든 migration 적용·seed 검증·재실행 안전성 검사를 수행하고, 직전 release schema에서 최신 schema로 upgrade하는 job 추가
+- GitHub OAuth는 CI에서 제어 가능한 mock OAuth provider로 성공, 거절, state replay, callback 오류와 logout을 검증하고 실제 GitHub OAuth는 staging 수동 smoke test로 분리
+- Codex 데스크톱 앱 자체는 headless CI에서 실행할 수 없으므로 hook fixture와 가짜 event sender로 자동 감지 계약을 검증하고, 실제 앱 설치·신뢰 승인·hook 수신은 release 체크리스트에서 검증
+- 브라우저 E2E는 로그인 → 기기 연결 상태 → 자동 세션 반영 → 퀴즈 시작·답안 복구·제출 → 100P 잔액과 dashboard 확인 흐름을 포함
+- 중복 idempotency key, 다른 본문의 key 재사용, 동시 시작·제출·보상 요청을 실제 DB transaction과 여러 connection으로 검증
+- 네트워크 단절, `429`·`5xx`, queue 부분 손상, 플러그인 프로세스 강제 종료·재시작, 역순 event와 24시간 late `Stop`을 fake clock으로 재현
+- 보안 테스트에 다른 사용자 리소스 접근, CSRF, CORS, token 만료·폐기, 금지 데이터 로그·DB 유입 검사를 포함
+- PR마다 lint, client·server typecheck, unit/integration/E2E test, client·server build, migration과 dependency audit를 실행하고 branch protection의 required check로 설정
+- 테스트 시간 의존성은 fake clock과 고정 time zone을 사용하고, flaky 재실행으로 성공을 덮지 않으며 실패 screenshot·서버 로그는 redaction 후 제한 보존
+- CI secret은 최소 권한과 환경 분리를 적용하고 fork PR이나 artifact에 OAuth·DB·기기 자격 증명이 노출되지 않게 검증
+- 완료 기준: 핵심 사용자 흐름, 보안 불변식, 동시성 또는 DB migration 중 하나라도 깨지면 required check가 실패해 병합할 수 없음
 
 ## 20. 운영 배포와 파일럿 진행
 
-- 프런트엔드, API, DB 운영 환경 배포
-- HTTPS, cookie, OAuth callback, CORS, migration과 이전 버전 배포 절차 확인
-- 배포 전 백업과 복원, 애플리케이션 rollback·roll-forward 훈련
-- 초대 사용자 10명 이상으로 개인정보 안내와 지원 채널을 포함한 파일럿 진행
-- 자동 감지 성공률, 세션 유실, 중복 포인트, 오류율과 사용자 피드백 수집
-- 완료 기준: 실제 사용자가 가입부터 퀘스트 완료까지 수행 가능
+- staging과 production의 프런트엔드, API, PostgreSQL, domain, secret, OAuth App을 분리하고 동일한 배포 artifact를 승격
+- HTTPS 강제, HSTS, 운영 `Secure` cookie, 정확한 GitHub OAuth callback URL과 CORS allowlist를 실제 브라우저에서 확인
+- 배포 순서는 백업 확인 → migration 단일 실행 → readiness 확인 → API → 프런트엔드 → end-to-end smoke test로 고정하고 각 단계의 중단·rollback 조건 기록
+- 애플리케이션은 직전 호환 버전으로 rollback할 수 있게 유지하고, 운영 DB schema는 검증된 forward migration으로 복구하며 파괴적 down migration에 의존하지 않음
+- 배포 전 암호화 백업을 별도 환경에 실제 복원해 RPO·RTO를 측정하고 migration 실패·부분 배포·secret 오설정 훈련 통과
+- 자동 감지 수신과 퀘스트 보상 transaction을 각각 중단할 수 있는 운영 kill switch를 두되, 보상 중단 시에는 제출 자체를 차단해 point 없는 통과를 만들지 않고 event 수신 중단 시에는 재시도 가능한 응답과 수동 fallback 안내 제공
+- 내부 사용자로 먼저 smoke pilot을 수행한 뒤 초대 사용자 10명 이상에게 단계적으로 확대하고 사용자별 설치·로그인·기기 연결·퀘스트 완료 확인
+- 수집 정보, 저장하지 않는 정보, 보존·삭제, 플러그인 해제와 계정 삭제 방법을 가입·설치 전에 안내하고 지원 채널·장애 공지·문의 응답 기준 제공
+- 자동 감지 성공률은 시작된 turn 중 수동 보정 없이 terminal 상태에 도달한 비율, 세션 유실은 수신된 시작 event 중 세션이 생성되지 않은 건, 중복 point는 unique 위반이 아니라 실제 중복 원장 건수로 정의
+- 최소 7일과 자동 세션 100건 이상을 관찰하고, 초기 베타 종료 기준을 자동 감지 성공률 95% 이상, 복구 불가능한 세션 유실 0건, 중복 point 0건, API `5xx` 1% 미만으로 설정
+- 초대 사용자 10명 이상이 각각 가입 → Codex 작업 감지 → 퀘스트 제출 → 100P 확인을 한 번 이상 완료했는지 확인
+- 오류·이탈 구간, 수동 fallback 사용률, queue 복구율, 퀴즈 통과·재응시와 정성 피드백을 함께 검토하고 표본이 부족하면 수치만으로 베타 종료를 판단하지 않음
+- 치명적 개인정보 노출, 권한 우회, 중복 보상 또는 복구 불가능한 데이터 유실이 한 건이라도 발생하면 확대를 중단하고 incident runbook 수행
+- 완료 기준: 실제 초대 사용자 10명 이상이 전체 흐름을 수행하고, 복원·rollback 훈련과 최소 관찰 기간·운영 지표·보안 중단 기준을 모두 충족해 베타 지속 또는 종료를 근거 있게 결정할 수 있음
 
 ---
 
@@ -268,6 +334,10 @@
 - DB 변경은 `synchronize`가 아니라 추가 migration으로만 수행한다.
 - 외부 event와 변경 API는 멱등성, transaction, DB 제약을 함께 사용한다.
 - 프롬프트, Codex 응답, 소스 코드, 파일 경로와 원본 hook payload는 저장하거나 로그로 남기지 않는다.
+- 목록·상세 응답은 DB entity를 직접 반환하지 않고 명시적 DTO allowlist와 금지 필드 계약 테스트를 사용한다.
+- 서버가 시각과 상태의 source of truth이며 클라이언트 시각과 event `observedAt`은 판정 기준으로 신뢰하지 않는다.
+- 14번의 퀘스트 통과 판정과 15번의 point 지급은 최종적으로 하나의 transaction 경계가 되어야 하며, 15번 완료 전에는 실제 point 기능을 운영에 공개하지 않는다.
+- 17~19번은 앞 작업의 보안·테스트를 처음 추가하는 단계가 아니라 누락을 닫고 운영 gate를 완성하는 단계다.
 
 ---
 
