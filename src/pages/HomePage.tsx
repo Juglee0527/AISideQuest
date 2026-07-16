@@ -11,17 +11,27 @@ import { calculateActivityStatistics } from '../utils/statistics'
 import { formatDuration, formatSummaryDuration } from '../utils/time'
 
 function HomePage() {
-  const { activeSession, completedSessions, startSession, endSession } = useSession()
+  const {
+    activeSession,
+    completedSessions,
+    loadStatus,
+    mutationStatus,
+    startSession,
+    endSession,
+    getCurrentTime,
+  } = useSession()
   const { questHistories } = useQuestHistory()
   const activeStartedAt = activeSession?.startedAt ?? null
-  const elapsedMilliseconds = useElapsedTime(activeStartedAt)
+  const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const lastCompletedSession = completedSessions[0]
   const isRunning = activeSession !== null
+  const isWaitingForUser = activeSession?.status === 'WAITING_FOR_USER'
+  const canMutate = loadStatus === 'ready' && mutationStatus === 'idle'
   const displayedDuration = isRunning
     ? elapsedMilliseconds
-    : (lastCompletedSession?.duration ?? 0)
+    : (lastCompletedSession?.durationMs ?? 0)
   const currentTime = activeStartedAt === null
-    ? Date.now()
+    ? getCurrentTime()
     : Date.parse(activeStartedAt) + elapsedMilliseconds
   const todayStatistics = calculateActivityStatistics({
     period: 'today',
@@ -49,20 +59,32 @@ function HomePage() {
                 <p className="text-sm font-medium text-slate-400">현재 AI 상태</p>
                 <div className="mt-2 flex items-center gap-2 text-lg font-bold text-white">
                   <span
-                    className={`size-2.5 rounded-full ${isRunning ? 'animate-pulse bg-emerald-400' : 'bg-slate-600'}`}
+                    className={`size-2.5 rounded-full ${
+                      isWaitingForUser
+                        ? 'animate-pulse bg-amber-300'
+                        : isRunning
+                          ? 'animate-pulse bg-emerald-400'
+                          : 'bg-slate-600'
+                    }`}
                     aria-hidden="true"
                   />
-                  {isRunning ? 'AI 작업 진행 중' : '작업 대기 중'}
+                  {isWaitingForUser
+                    ? 'Codex 확인 필요'
+                    : isRunning
+                      ? 'AI 작업 진행 중'
+                      : '작업 대기 중'}
                 </div>
               </div>
               <span
                 className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  isRunning
+                  isWaitingForUser
+                    ? 'border-amber-400/20 bg-amber-400/10 text-amber-200'
+                    : isRunning
                     ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300'
                     : 'border-slate-700 bg-slate-800/80 text-slate-400'
                 }`}
               >
-                {isRunning ? '측정 중' : '준비됨'}
+                {isWaitingForUser ? '사용자 응답 대기' : isRunning ? '측정 중' : '준비됨'}
               </span>
             </div>
 
@@ -89,29 +111,29 @@ function HomePage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={startSession}
-                disabled={isRunning}
+                onClick={() => void startSession()}
+                disabled={!canMutate || isRunning}
                 aria-describedby="timer-description"
                 className="flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3.5 font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-emerald-400"
               >
                 <Play size={18} fill="currentColor" aria-hidden="true" />
-                AI 작업 시작
+                {mutationStatus === 'starting' ? '시작 중...' : 'AI 작업 시작'}
               </button>
               <button
                 type="button"
-                onClick={endSession}
-                disabled={!isRunning}
+                onClick={() => void endSession()}
+                disabled={!canMutate || !isRunning}
                 aria-describedby="timer-description"
                 className="flex items-center justify-center gap-2 rounded-xl border border-rose-400/20 bg-rose-400/10 px-5 py-3.5 font-bold text-rose-200 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500"
               >
                 <Square size={17} fill="currentColor" aria-hidden="true" />
-                AI 작업 종료
+                {mutationStatus === 'ending' ? '종료 중...' : 'AI 작업 종료'}
               </button>
             </div>
             <p className="mt-3 text-center text-xs text-slate-600">
               {isRunning
-                ? '자동 저장되며 새로고침 후에도 시작 시각부터 이어집니다.'
-                : '작업 기록은 이 브라우저에 자동 저장됩니다.'}
+                ? '서버에 자동 저장되며 새로고침과 다른 로그인 기기에서도 이어집니다.'
+                : '작업 기록은 로그인한 계정의 서버 데이터로 저장됩니다.'}
             </p>
           </div>
         </article>

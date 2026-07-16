@@ -3,8 +3,8 @@
 - 작성일: 2026-07-16
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~7번, 총 7개
-- 다음 작업: 8. 프런트엔드 세션 상태를 API로 전환
+- 완료: 1~9번, 총 9개
+- 다음 작업: 10. AISideQuest Codex 플러그인 기본 구성
 
 ---
 
@@ -21,8 +21,10 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 5. PostgreSQL 스키마, migration, 개발 퀴즈 seed와 DB 제약조건 검증을 구현했다.
 6. GitHub OAuth 로그인, 서버 저장형 인증 세션, 현재 사용자 조회와 logout을 구현했다.
 7. 인증 사용자별 AI 세션 API, Codex event 상태 전이와 멱등성 처리를 구현했다.
+8. React 세션 상태를 API adapter로 전환하고 polling, 서버 시각 보정, 인증·오류 상태를 구현했다.
+9. 기존 LocalStorage를 참고 요약 또는 초기화로 1회 처리하고 신규 데이터와 분리했다.
 
-현재 인증·AI 세션 API는 PostgreSQL에 연결됐지만 React 프런트엔드는 아직 로그인 UI와 서버 API를 사용하지 않고 세션·퀘스트 데이터를 LocalStorage에 저장한다.
+현재 React 프런트엔드는 GitHub 로그인 진입점과 PostgreSQL 기반 세션 API를 사용한다. 퀘스트 완료·예상 포인트만 13~15번 서버 전환 전까지 별도 브라우저 키에 임시 저장한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -396,11 +398,34 @@ GitHub access token은 사용자 식별 요청에만 사용하고 저장하지 �
 
 관련 문서: [세션 상태와 데이터 흐름](./SESSION_STATE_AND_DATA_FLOW.md)
 
+## 3.8 8번: 프런트엔드 세션 상태 API 전환
+
+- `SessionContext`의 세션 LocalStorage 의존 제거
+- cookie 인증, CSRF와 UUID `Idempotency-Key`를 사용하는 API client 추가
+- 활성 세션과 cursor 전체 이력 복구
+- 활성 탭 5초 polling과 focus·visibility 복귀 즉시 조회
+- `meta.serverTime` 기반 브라우저 시각 보정
+- `RUNNING`, `WAITING_FOR_USER`, 종료 상태 표현
+- 로딩, 인증 만료, 네트워크 오류, 재시도와 변경 요청 중 UI 추가
+
+## 3.9 9번: 기존 LocalStorage 데이터 처리
+
+- 앱 Context 마운트 전 구형 세션·퀘스트 저장값 감지 및 검증
+- 초기화 또는 보상 없는 로컬 참고 요약 1회 보관
+- 손상 데이터의 참고 보관 차단과 안전한 초기화 경로
+- 완료 marker 기록 후 구형 원본 반복 정리
+- 구형 활성 세션과 예상 포인트의 서버 이전 차단
+- 신규 임시 퀘스트 이력을 v2 키로 분리
+
 # 4. 현재 디렉터리 구조
 
 ```text
 AISideQuest/
-├─ src/                         React MVP
+├─ src/                         React 웹과 세션 API adapter
+│  ├─ api/                      공통 API·세션 client
+│  ├─ components/               레이아웃과 구형 데이터 전환 화면
+│  ├─ contexts/                 서버 세션·임시 퀘스트 상태
+│  └─ storage/                  구형 데이터 검증과 1회 처리
 ├─ server/
 │  ├─ src/
 │  │  ├─ auth/                  GitHub OAuth, cookie 세션과 인증 guard
@@ -470,11 +495,11 @@ npm.cmd run test:database
 
 | 구분 | 결과 |
 |---|---:|
-| React 테스트 | 19개 통과 |
+| React 테스트 | 31개 통과 |
 | Codex hook 테스트 | 4개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
 | 인증·PostgreSQL·세션 통합 테스트 | 18개 통과 |
-| 전체 자동 테스트 | 45개 통과 |
+| 전체 자동 테스트 | 57개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -483,10 +508,8 @@ npm.cmd run test:database
 
 # 6. 현재 제한사항
 
-- GitHub OAuth와 인증 API는 구현됐지만 실제 OAuth App 자격 증명과 프런트엔드 로그인 UI는 아직 연결되지 않았다.
-- 서버 세션 API는 구현됐지만 프런트엔드 `SessionContext`가 아직 호출하지 않는다.
-- 프런트엔드 `SessionContext`는 여전히 LocalStorage를 사용한다.
-- 기존 LocalStorage 데이터 전환 정책은 구현되지 않았다.
+- GitHub 로그인 진입점은 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
+- 기존 참고 요약과 신규 임시 퀘스트 이력은 브라우저 로컬 데이터이며 다른 기기와 공유되지 않는다.
 - Codex event 수신 API는 구현됐지만 기기 token 발급과 플러그인의 실제 서버 전송은 아직 연결되지 않았다.
 - heartbeat, 오프라인 queue, 재전송은 설계만 있고 구현되지 않았다.
 - DB에는 개발 퀘스트 seed가 있지만 프런트엔드는 여전히 더미 데이터를 사용하며 서버 판정이 없다.
@@ -495,15 +518,14 @@ npm.cmd run test:database
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: 프런트엔드 세션 상태를 API로 전환
+# 7. 다음 작업: AISideQuest Codex 플러그인 기본 구성
 
-8번 작업에서 다음 항목을 진행한다.
+10번 작업에서 다음 항목을 진행한다.
 
-1. `SessionContext`의 LocalStorage 권위 상태 제거
-2. 로그인 사용자 기준 활성 세션과 이력 복구
-3. 수동 시작·종료를 세션 API에 연결
-4. 5초 polling, focus 즉시 조회와 `meta.serverTime` 시각 보정
-5. 로딩, 인증 만료, 네트워크 오류와 재시도 상태 구현
+1. PoC lifecycle hook과 개인정보 필터를 정식 플러그인 구조로 이전
+2. 설치, 활성화와 hook 신뢰 승인 흐름 구성
+3. 웹 일회성 연결 코드와 기기 token 발급·회전·해제 구현
+4. 연결된 사용자로 테스트 event 전송
 
 # 8. 기준 문서
 
@@ -518,4 +540,4 @@ npm.cmd run test:database
 
 ---
 
-현재 결론: **인증 사용자별 AI 세션 API와 Codex event 상태 전이까지 구현됐다. 다음 단계에서는 React 세션 상태를 LocalStorage에서 API로 전환한다.**
+현재 결론: **React 세션의 서버 동기화와 기존 LocalStorage 전환까지 구현됐다. 다음 단계에서는 Codex 플러그인을 로그인 사용자와 안전하게 연결한다.**

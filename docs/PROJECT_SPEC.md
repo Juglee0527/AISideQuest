@@ -56,13 +56,14 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 - React SPA 기본 구성
 - Home, Side Quest, Dashboard 화면
 - 반응형 데스크톱·모바일 내비게이션
-- AI 작업 수동 시작·종료
-- 실시간 경과 시간 표시
+- 인증 사용자 AI 작업 수동 시작·종료 API 연동
+- 서버 시각 보정 실시간 경과 시간 표시
 - 화면 이동 중 타이머 유지
 - 더미 퀘스트 5개 표시
 - 활성 세션 내 퀘스트 완료 처리
 - 세션별 퀘스트 중복 완료 차단
-- LocalStorage 자동 저장 및 새로고침 복구
+- 서버 세션 자동 저장, 새로고침·다른 인증 브라우저 복구
+- 기존 LocalStorage 감지, 참고 요약 또는 초기화 전환
 - 오늘·이번 주·이번 달 통계
 - 자동 테스트와 프로덕션 빌드 검증
 
@@ -228,14 +229,17 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 
 ---
 
-# 8. LocalStorage
+# 8. 브라우저 저장소와 기존 데이터 전환
 
 ## 8.1 저장 키
 
 | 키 | 저장 내용 |
 |---|---|
-| `aisidequest.sessions` | 활성 세션과 완료 세션 목록 |
-| `aisidequest.questHistories` | 퀘스트 완료 이력 목록 |
+| `aisidequest.sessions` | 구형 세션 데이터, 9번 전환 후 삭제 |
+| `aisidequest.questHistories` | 구형 퀘스트 이력, 9번 전환 후 삭제 |
+| `aisidequest.legacyMigration` | 초기화 또는 참고 보관 1회 완료 marker |
+| `aisidequest.legacyReference` | 통계·포인트에 미반영하는 구형 참고 요약 |
+| `aisidequest.questHistories.v2` | 13~14번 서버 전환 전까지 사용하는 신규 임시 퀘스트 이력 |
 
 ## 8.2 저장 형식
 
@@ -248,19 +252,21 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 }
 ```
 
-현재 저장 스키마 버전은 `1`이다.
+현재 저장 봉투 스키마 버전은 `1`이다. AI 세션은 LocalStorage에 저장하지 않고 세션 API만 사용한다.
 
 ## 8.3 검증 및 실패 처리
 
-- JSON 파싱 실패 시 해당 저장값을 사용하지 않는다.
+- JSON 파싱 실패 시 구형 값을 서버 상태로 사용하지 않는다.
 - 지원하지 않는 스키마 버전은 사용하지 않는다.
 - 필수 필드, 날짜 형식, 음수 시간, 세션 ID 중복을 검증한다.
 - 퀘스트 완료 이력 ID와 `(sessionId, questId)` 중복을 검증한다.
-- 검증에 실패하면 해당 기능의 안전한 초기 상태를 사용한다.
-- LocalStorage 접근 또는 저장에 실패해도 앱은 현재 메모리 상태로 계속 동작한다.
-- 세션과 퀘스트 이력은 별도 키로 관리해 한쪽의 손상 데이터가 다른 상태까지 초기화하지 않도록 한다.
+- 검증에 실패한 구형 데이터는 참고 보관을 차단하고 초기화만 허용한다.
+- LocalStorage 접근이 막혀도 서버 세션 기능은 계속 동작한다.
+- 전환 완료 marker를 먼저 기록한 뒤 구형 원본을 삭제하고, 삭제 실패 시 다음 실행에서 정리를 반복한다.
+- 구형 활성 세션, 예상 포인트와 개별 퀘스트 보상은 이전하지 않는다.
+- 참고 보관은 완료 세션 수, 총 시간, 퀘스트 완료 수만 이 브라우저에 남긴다.
 
-LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서버 데이터가 아니다.
+참고 요약과 임시 퀘스트 이력은 현재 브라우저 프로필에만 저장되며 서버 데이터가 아니다.
 
 ---
 
@@ -268,7 +274,7 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 
 ## 9.1 기간 기준
 
-- 브라우저 로컬 시간을 사용한다.
+- `meta.serverTime`으로 보정한 현재 시각을 사용하고 오늘·주·월 경계는 브라우저 time zone을 사용한다.
 - 오늘은 로컬 자정부터 다음 자정 직전까지다.
 - 이번 주는 월요일 00:00부터 다음 월요일 직전까지다.
 - 이번 달은 매월 1일 00:00부터 다음 달 1일 직전까지다.
@@ -295,10 +301,12 @@ LocalStorage 데이터는 현재 브라우저 프로필에만 저장되며 서�
 
 # 10. 상태 구조와 데이터 흐름
 
-- `SessionContext`가 활성 세션과 완료 세션을 관리한다.
+- `SessionContext`가 세션 API를 통해 활성 세션과 cursor 이력을 관리한다.
 - `QuestHistoryContext`가 퀘스트 완료 이력을 관리한다.
 - `QuestHistoryContext`는 현재 활성 세션을 확인한 후 완료 이력을 생성한다.
-- 각 Context는 초기화 시 LocalStorage를 검증해 복구하고 상태 변경 후 다시 저장한다.
+- `SessionContext`는 5초 polling과 focus·visibility 복귀 시 서버 활성 세션을 다시 조회한다.
+- `LegacyDataMigrationGate`가 Context 마운트 전에 구형 LocalStorage를 처리한다.
+- `QuestHistoryContext`만 v2 LocalStorage를 임시 사용하며 13~14번 작업에서 서버 API로 전환한다.
 - Home과 Dashboard는 통계 결과를 별도 저장하지 않고 세션과 완료 이력에서 계산한다.
 - 애플리케이션 전용 상태 관리 라이브러리는 사용하지 않는다.
 
@@ -369,11 +377,11 @@ npm run build
 - 진행 중 세션 통계
 - 미래 완료 이력 제외
 - 알려지지 않은 퀘스트의 보상 처리
-- Session과 QuestHistory 저장·복구
-- 손상 JSON과 지원하지 않는 스키마 버전 처리
-- 중복 세션과 중복 퀘스트 완료 이력 차단
-- LocalStorage 접근 실패 처리
-- `작업 시작 → 타이머 → 퀘스트 완료 → 새로고침 복구 → 작업 종료` 통합 흐름
+- 세션 API cursor 이력, 인증 만료, 서버 응답 형식 검증
+- 5초 polling, `WAITING_FOR_USER`, 서버 시각 보정
+- 손상된 구형 JSON, 지원하지 않는 스키마와 LocalStorage 접근 실패 처리
+- 구형 데이터 참고 요약·초기화, 1회 marker와 신규 키 분리
+- `로그인 상태 → 서버 작업 시작 → 타이머 → 새로고침·브라우저 저장소 초기화 복구 → 서버 작업 종료` 통합 흐름
 - API Health Check와 공통 성공 응답
 - 전역 입력 검증과 공통 오류 응답
 - API 환경설정 기본값과 범위 검증
@@ -388,11 +396,11 @@ npm run build
 
 2026-07-16 기준
 
-- React 테스트 파일: 4개 통과
-- React 자동 테스트: 19개 통과
+- React 테스트 파일: 6개 통과
+- React 자동 테스트: 31개 통과
 - Codex hook 테스트: 4개 통과
 - NestJS 통합 테스트: 4개 통과
-- 인증·PostgreSQL 통합 테스트: 9개 통과
+- DB·인증·AI 세션 PostgreSQL 통합 테스트: 18개 통과
 - TypeScript 타입 검사 통과
 - Vite 및 NestJS 프로덕션 빌드 통과
 - 실제 `GET /api/v1/health` HTTP 200 확인
@@ -403,18 +411,17 @@ npm run build
 
 # 13. 현재 제한사항
 
-- 데이터는 브라우저 LocalStorage에만 존재한다.
-- 브라우저 또는 기기가 달라지면 데이터가 공유되지 않는다.
-- 저장 데이터를 초기화하는 사용자 화면은 없다.
-- 하나의 세션은 사용자가 종료할 때까지 자동 종료되지 않는다.
+- AI 세션은 서버에 저장되지만 퀘스트 완료·예상 포인트는 아직 브라우저 임시 데이터다.
+- 기존 MVP 참고 요약은 서버로 이전하지 않아 다른 브라우저와 공유되지 않는다.
+- 자동 세션 만료 정리와 heartbeat 장애 복구는 12번 작업 전까지 적용되지 않는다.
 - 퀘스트는 실제 콘텐츠를 실행하지 않고 완료 상태만 기록한다.
 - 퀘스트 완료 취소를 지원하지 않는다.
 - 실제 리워드를 지급하지 않는다.
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
-- 서버 로그인 API는 있지만 실제 GitHub OAuth App 자격 증명과 프런트엔드 로그인 UI가 연결되지 않았다.
-- AI 세션 API는 있지만 프런트엔드와 Codex 플러그인이 아직 호출하지 않는다.
+- GitHub 로그인 진입 UI는 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
+- AI 세션 API는 프런트엔드가 호출하지만 Codex 플러그인은 아직 호출하지 않는다.
 - Codex 기기 token 발급과 플러그인 서버 연동이 없다.
-- PostgreSQL 구조는 준비됐지만 현재 프런트엔드는 아직 DB 데이터를 사용하지 않는다.
+- 세션만 PostgreSQL 데이터를 사용하며 퀘스트·포인트·통계 API 전환은 후속 작업이다.
 
 ---
 
@@ -447,8 +454,9 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 5. [x] PostgreSQL 데이터베이스 구성 - migration, 개발 seed, DB 제약 통합 테스트 완료
 6. [x] 사용자 로그인 구현 - GitHub OAuth, 서버 세션, 현재 사용자 조회와 logout 완료
 7. [x] AI 세션 API 구현 - 상태 전이, 멱등성, 동시성 및 이력 조회 완료
-8. [ ] 프런트엔드 세션 상태를 API로 전환 - 다음 작업
-9. [ ] 이후 작업은 구현 계획 문서 참조
+8. [x] 프런트엔드 세션 상태를 API로 전환 - polling, 시각 보정, 인증·오류 상태 완료
+9. [x] 기존 LocalStorage 데이터 처리 - 참고 요약·초기화, 손상·재실행 처리 완료
+10. [ ] AISideQuest Codex 플러그인 기본 구성 - 다음 작업
 
 확정된 최초 베타 범위
 

@@ -436,17 +436,17 @@ Authorization: <user-session-cookie>
 
 # 12. 현재 MVP에서 변경되는 경계
 
-현재 [`SessionContext.tsx`](../src/contexts/SessionContext.tsx)는 LocalStorage 상태를 직접 변경하며 `activeSession !== null`만으로 실행 여부를 판단한다. 이후 구현에서는 다음과 같이 변경한다.
+[`SessionContext.tsx`](../src/contexts/SessionContext.tsx)는 8번 작업에서 다음과 같은 API adapter로 전환했다.
 
 - `SessionContext`는 서버 상태를 조회하고 요청하는 UI adapter가 된다.
 - `startSession`과 `endSession`은 API 호출 후 서버 응답으로 상태를 갱신한다.
 - `RUNNING`과 `WAITING_FOR_USER`를 모두 활성 세션으로 취급한다.
 - `WAITING_FOR_USER`에서는 `Codex 확인 필요` 안내를 표시한다.
-- LocalStorage 세션은 9번 이전 작업에서만 읽고 서버의 권위 있는 상태로 사용하지 않는다.
+- LocalStorage 세션은 9번 전환 화면에서만 검증하고 서버의 권위 있는 상태로 사용하지 않는다.
 - 퀘스트 이력은 서버 세션 ID에 연결한다.
 - 통계 집계 기준은 16번 작업에서 별도로 확정한다.
 
-3번 작업은 설계만 수행하며 현재 MVP의 React 동작은 변경하지 않는다.
+5초 polling은 활성 세션만 조회하고, 활성 세션 ID가 바뀌거나 종료되면 cursor 이력도 다시 읽는다. 초기 진입·수동 변경 후에는 전체 cursor 이력을 복구하며 모든 경과 시간은 `meta.serverTime`으로 보정한다.
 
 # 13. 검증 시나리오
 

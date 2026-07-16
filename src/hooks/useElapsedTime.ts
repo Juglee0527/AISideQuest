@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 
 import { getElapsedMilliseconds } from '../utils/time'
 
-function useElapsedTime(startedAt: string | null) {
+function useElapsedTime(
+  startedAt: string | null,
+  getCurrentTime: () => number = Date.now,
+) {
   const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0)
 
   useEffect(() => {
@@ -12,14 +15,14 @@ function useElapsedTime(startedAt: string | null) {
     }
 
     const updateElapsedTime = () => {
-      setElapsedMilliseconds(getElapsedMilliseconds(startedAt))
+      setElapsedMilliseconds(getElapsedMilliseconds(startedAt, getCurrentTime()))
     }
 
     updateElapsedTime()
     const intervalId = window.setInterval(updateElapsedTime, 1_000)
 
     return () => window.clearInterval(intervalId)
-  }, [startedAt])
+  }, [getCurrentTime, startedAt])
 
   return elapsedMilliseconds
 }

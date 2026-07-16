@@ -1,4 +1,4 @@
-import { BarChart3, Clock3, Coins, TimerReset, Trophy } from 'lucide-react'
+import { Archive, BarChart3, Clock3, Coins, TimerReset, Trophy } from 'lucide-react'
 import { useState } from 'react'
 
 import PageHeader from '../components/PageHeader'
@@ -7,6 +7,7 @@ import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useSession } from '../contexts/SessionContext'
 import { mockQuests } from '../data/mockQuests'
 import useElapsedTime from '../hooks/useElapsedTime'
+import { loadLegacyReferenceSummary } from '../storage/appStorage'
 import {
   calculateActivityStatistics,
   type StatisticsPeriod,
@@ -21,12 +22,13 @@ const periods: readonly { id: StatisticsPeriod; label: string }[] = [
 
 function DashboardPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<StatisticsPeriod>('today')
-  const { activeSession, completedSessions } = useSession()
+  const [legacyReference] = useState(loadLegacyReferenceSummary)
+  const { activeSession, completedSessions, getCurrentTime } = useSession()
   const { questHistories } = useQuestHistory()
   const activeStartedAt = activeSession?.startedAt ?? null
-  const elapsedMilliseconds = useElapsedTime(activeStartedAt)
+  const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const currentTime = activeStartedAt === null
-    ? Date.now()
+    ? getCurrentTime()
     : Date.parse(activeStartedAt) + elapsedMilliseconds
   const statistics = calculateActivityStatistics({
     period: selectedPeriod,
@@ -103,6 +105,17 @@ function DashboardPage() {
           accent="emerald"
         />
       </section>
+
+      {legacyReference !== null ? (
+        <aside className="flex gap-3 rounded-2xl border border-slate-700 bg-slate-900/60 p-5 text-sm leading-6 text-slate-400">
+          <Archive className="mt-0.5 shrink-0 text-slate-300" size={19} aria-hidden="true" />
+          <p>
+            이전 MVP 참고 기록: 완료 세션 {legacyReference.completedSessionCount}개,
+            대기 시간 {formatSummaryDuration(legacyReference.totalDurationMs)},
+            퀘스트 완료 {legacyReference.completedQuestCount}개입니다. 이 값은 현재 통계와 포인트에 합산하지 않습니다.
+          </p>
+        </aside>
+      ) : null}
 
       <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8" aria-labelledby="activity-title">
         <div className="flex items-center justify-between gap-4">

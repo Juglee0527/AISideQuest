@@ -18,35 +18,60 @@ const quests: readonly Quest[] = [
   { id: 'quest-b', title: 'B', description: 'B', reward: 100, estimatedMinutes: 2 },
 ]
 
+function createSession({
+  id,
+  startedAt,
+  endedAt,
+}: {
+  id: string
+  startedAt: string
+  endedAt: string | null
+}): Session {
+  const isActive = endedAt === null
+
+  return {
+    id,
+    provider: 'CODEX',
+    status: isActive ? 'RUNNING' : 'COMPLETED',
+    origin: 'MANUAL',
+    autoLinked: false,
+    startedAt,
+    endedAt,
+    lastActivityAt: endedAt ?? startedAt,
+    durationMs: endedAt === null
+      ? 0
+      : Math.max(0, Date.parse(endedAt) - Date.parse(startedAt)),
+    terminalReason: isActive ? null : 'MANUAL_COMPLETED',
+    timingQuality: 'EXACT',
+    version: 1,
+  }
+}
+
 describe('activity statistics', () => {
   it('counts only the portion of a session overlapping today', () => {
     const currentTime = new Date(2026, 6, 15, 12).getTime()
     const completedSessions: Session[] = [
-      {
+      createSession({
         id: 'today',
         startedAt: toIso(2026, 7, 15, 10),
         endedAt: toIso(2026, 7, 15, 10, 30),
-        duration: 30 * 60_000,
-      },
-      {
+      }),
+      createSession({
         id: 'cross-midnight',
         startedAt: toIso(2026, 7, 14, 23, 50),
         endedAt: toIso(2026, 7, 15, 0, 10),
-        duration: 20 * 60_000,
-      },
-      {
+      }),
+      createSession({
         id: 'previous-day',
         startedAt: toIso(2026, 7, 14, 10),
         endedAt: toIso(2026, 7, 14, 11),
-        duration: 60 * 60_000,
-      },
+      }),
     ]
-    const activeSession: Session = {
+    const activeSession = createSession({
       id: 'active',
       startedAt: toIso(2026, 7, 15, 11, 50),
       endedAt: null,
-      duration: null,
-    }
+    })
 
     const result = calculateActivityStatistics({
       period: 'today',
