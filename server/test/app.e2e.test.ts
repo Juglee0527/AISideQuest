@@ -94,8 +94,21 @@ test('environment validation applies defaults and rejects invalid ports', () => 
   assert.equal(environment.API_HOST, '127.0.0.1')
   assert.equal(environment.API_PORT, 3000)
   assert.equal(environment.CORS_ORIGIN, 'http://localhost:5173')
+  assert.equal(
+    environment.DATABASE_URL,
+    'postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest',
+  )
+  assert.equal(environment.DATABASE_SSL, false)
   assert.throws(
     () => validateEnvironment({ API_PORT: '0' }),
     /API_PORT must be an integer between 1 and 65535/,
+  )
+  assert.throws(
+    () => validateEnvironment({ DATABASE_URL: 'https://example.com/db' }),
+    /DATABASE_URL must be a valid PostgreSQL connection URL/,
+  )
+  assert.throws(
+    () => validateEnvironment({ DATABASE_SSL: 'yes' }),
+    /DATABASE_SSL must be true or false/,
   )
 })

@@ -1,0 +1,143 @@
+# AISideQuest PostgreSQL 데이터베이스 구성
+
+- 작성일: 2026-07-16
+- PostgreSQL: 16
+- ORM 및 migration: TypeORM 1.1
+- 드라이버: `pg` 8.22
+- 기준 migration: `1784160000000-initial-schema`
+
+---
+
+# 1. 구현 원칙
+
+NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터·CommonJS 구조와 일관된 TypeORM을 선택했다.
+
+이번 작업에서는 SQL migration을 스키마의 기준으로 사용한다.
+
+- `synchronize`는 항상 `false`로 유지한다.
+- 운영 스키마는 migration으로만 변경한다.
+- 아직 서비스에서 사용하지 않는 Entity 클래스는 미리 만들지 않는다.
+- Entity와 repository는 6번 이후 실제 API 모듈을 구현할 때 필요한 범위만 추가한다.
+- 개발 seed는 운영 환경에서 실행되지 않도록 차단한다.
+
+# 2. 테이블 구조
+
+| 테이블 | 역할 |
+|---|---|
+| `users` | 사용자 기본 정보와 시간대 |
+| `user_auth_accounts` | GitHub OAuth 계정 식별 정보 |
+| `devices` | Codex 플러그인 연결 기기와 hash token |
+| `ai_sessions` | 자동·수동 AI 작업 세션과 상태 |
+| `integration_events` | 개인정보가 제거된 Codex lifecycle event |
+| `quests` | 버전이 부여된 객관식 퀘스트 |
+| `quest_questions` | 퀘스트 문항 |
+| `quest_options` | 문항 선택지와 서버 정답 |
+| `quest_attempts` | 사용자별 퀘스트 응시와 판정 결과 |
+| `quest_attempt_answers` | 제출한 선택지와 판정 snapshot |
+| `point_ledger` | 변경하지 않는 퀘스트 보상 원장 |
+
+원래 계획의 5개 핵심 테이블만으로는 GitHub 계정 연결, 기기 인증, event 멱등성, 객관식 답안 저장을 보장할 수 없어 필요한 보조 테이블을 최초 migration에 포함했다.
+
+# 3. 주요 데이터 제약
+
+## 3.1 사용자와 인증
+
+- `(provider, provider_account_id)`는 유일하다.
+- 한 사용자는 provider별 계정을 하나만 연결한다.
+- 기기 token 원문은 저장하지 않고 64자리 SHA-256 hash만 저장한다.
+- 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
+
+## 3.2 AI 세션과 event
+
+- 사용자당 `RUNNING` 또는 `WAITING_FOR_USER` 세션은 최대 1개다.
+- `(user_id, provider, external_turn_key)`는 중복될 수 없다.
+- 활성 상태에는 종료 시각과 종료 사유가 없어야 한다.
+- 종료 상태에는 종료 시각과 종료 사유가 모두 있어야 한다.
+- `(device_id, event_id)` unique key로 event 재전송을 한 번만 저장한다.
+- event의 사용자와 기기 소유자, 연결 세션의 사용자가 일치하도록 복합 FK를 사용한다.
+- 프롬프트, 응답, 코드, 파일 경로, 원본 hook JSON을 저장할 컬럼은 두지 않는다.
+
+## 3.3 퀘스트와 포인트
+
+- 퀘스트는 `(code, version)`으로 식별한다.
+- 같은 code에는 공개 버전이 하나만 존재한다.
+- 베타 보상은 성공 시 100P로 고정한다.
+- 한 문항에는 정답 선택지를 최대 하나만 둘 수 있다.
+- 응시 답안의 문항과 선택지가 같은 퀘스트·문항에 속하도록 복합 FK를 사용한다.
+- `point_ledger`는 사용자와 퀘스트 버전 조합당 보상 1건만 허용한다.
+- 포인트 잔액 컬럼은 두지 않고 원장의 합으로 계산한다.
+
+# 4. 개발용 퀘스트 seed
+
+다음 객관식 개발 퀴즈 5개를 version 1, 성공 보상 100P로 제공한다.
+
+1. TypeScript 타입 좁히기
+2. HTTP 멱등성
+3. PostgreSQL 유일성 제약
+4. Git 안전한 이력 관리
+5. 경계값 테스트
+
+seed는 동일한 `code`와 `version`을 다시 생성하지 않으며 반복 실행해도 데이터 수가 증가하지 않는다. 공개된 퀘스트 내용은 덮어쓰지 않고, 변경이 필요하면 새 version을 추가한다.
+
+# 5. 로컬 실행
+
+```powershell
+npm.cmd run db:up
+npm.cmd run db:migrate
+npm.cmd run db:seed
+```
+
+한 번에 실행하려면 다음 명령을 사용한다.
+
+```powershell
+npm.cmd run db:up
+npm.cmd run db:setup
+```
+
+기본 개발 DB 주소는 다음과 같다.
+
+```text
+postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest
+```
+
+운영 환경에서는 `DATABASE_URL`과 `DATABASE_SSL`을 환경변수로 설정한다.
+
+# 6. migration 명령
+
+```powershell
+npm.cmd run db:show
+npm.cmd run db:migrate
+npm.cmd run db:revert
+```
+
+`db:revert`는 마지막 migration의 데이터를 제거할 수 있으므로 운영 적용 전 백업과 별도 복구 migration을 우선 검토한다.
+
+# 7. 통합 테스트
+
+통합 테스트는 명시적으로 초기화 가능한 이름에 `test`가 포함된 전용 DB에서만 실행한다.
+
+```powershell
+$env:TEST_DATABASE_URL='postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest_test'
+$env:ALLOW_DATABASE_RESET='true'
+npm.cmd run test:database
+```
+
+검증 범위는 다음과 같다.
+
+- 빈 DB에 전체 migration 적용
+- migration 재실행 시 변경 없음
+- 마지막 migration 되돌리기 후 재적용
+- 개발 seed 반복 실행
+- 사용자당 활성 세션 1개
+- 기기별 event 중복 방지와 FK 소유권
+- 사용자와 퀘스트 버전당 포인트 보상 1회
+
+# 8. 다음 작업 경계
+
+5번에서는 DB 구조와 migration만 구성했다. 다음 기능은 해당 번호에서 구현한다.
+
+- 6번: Entity/repository, GitHub OAuth, 웹 인증 세션
+- 7번: AI 세션과 integration event transaction
+- 10번: 일회성 기기 연결 코드와 token 발급·회전·해제
+- 14번: 퀘스트 제출과 서버 판정
+- 15번: 퀘스트 완료와 포인트 원장 기록 transaction

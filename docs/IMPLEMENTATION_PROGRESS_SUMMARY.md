@@ -1,10 +1,10 @@
 # AISideQuest 개발 진행 요약
 
-- 작성일: 2026-07-15
+- 작성일: 2026-07-16
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~4번, 총 4개
-- 다음 작업: 5. PostgreSQL 데이터베이스 구성
+- 완료: 1~5번, 총 5개
+- 다음 작업: 6. 사용자 로그인 구현
 
 ---
 
@@ -18,8 +18,9 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 2. Windows ChatGPT 데스크톱 앱의 Codex hook으로 작업 시작과 종료를 실제 감지했다.
 3. 자동 감지와 수동 조작을 하나의 서버 세션으로 처리하는 상태 및 API 계약을 확정했다.
 4. NestJS API 실행 환경과 공통 응답, 오류 처리, 입력 검증, Health Check를 구현했다.
+5. PostgreSQL 스키마, migration, 개발 퀴즈 seed와 DB 제약조건 검증을 구현했다.
 
-현재 프런트엔드는 아직 LocalStorage를 사용하며, NestJS 서버에는 데이터베이스·인증·세션 비즈니스 API가 연결되지 않았다.
+현재 프런트엔드는 아직 LocalStorage를 사용하며, PostgreSQL 구조는 준비됐지만 NestJS 기능 모듈에는 인증·세션 비즈니스 API가 연결되지 않았다.
 
 # 2. 출발점: 기존 MVP
 
@@ -267,6 +268,68 @@ http://127.0.0.1:3000/api/v1
 - [Health Check](../server/src/health/health.controller.ts)
 - [서버 통합 테스트](../server/test/app.e2e.test.ts)
 
+## 3.5 5번: PostgreSQL 데이터베이스 구성
+
+### 도구 선택
+
+- PostgreSQL 16
+- TypeORM 1.1과 NestJS 공식 TypeORM 통합 패키지
+- PostgreSQL `pg` driver
+- Docker Compose 기반 로컬 개발 DB
+
+`synchronize`는 사용하지 않고 SQL migration을 스키마 기준으로 삼았다. 아직 API에서 사용하지 않는 Entity와 repository는 미리 만들지 않고 6번 이후 실제 기능 모듈에서 필요한 범위만 추가한다.
+
+### 구현 구조
+
+다음 11개 테이블을 최초 migration에 추가했다.
+
+1. `users`
+2. `user_auth_accounts`
+3. `devices`
+4. `ai_sessions`
+5. `integration_events`
+6. `quests`
+7. `quest_questions`
+8. `quest_options`
+9. `quest_attempts`
+10. `quest_attempt_answers`
+11. `point_ledger`
+
+원래 계획의 핵심 테이블 외에 GitHub OAuth 식별, Codex 기기 인증, event 멱등성, 객관식 답안 관계를 실제로 보장하는 보조 테이블을 포함했다.
+
+### DB 불변 조건
+
+- 사용자당 활성 AI 세션 최대 1개
+- 사용자·provider·외부 turn key 중복 금지
+- 기기와 event ID 조합당 event 1건
+- event 사용자와 기기·세션 소유자 일치
+- 같은 code의 공개 퀘스트 version 최대 1개
+- 사용자와 퀘스트 version당 포인트 보상 1회
+- 포인트는 변경 가능한 잔액이 아니라 append-only 원장으로 저장
+- 프롬프트, 응답, 코드, 경로, 원본 hook payload 저장 컬럼 없음
+
+### 개발 seed
+
+100P 보상의 version 1 객관식 개발 퀴즈 5개를 추가했다.
+
+- TypeScript 타입 좁히기
+- HTTP 멱등성
+- PostgreSQL 유일성 제약
+- Git 안전한 이력 관리
+- 경계값 테스트
+
+seed는 반복 실행해도 중복되지 않으며 공개된 version의 내용을 덮어쓰지 않는다.
+
+### 검증
+
+- 빈 PostgreSQL DB에 전체 migration 적용
+- migration 재실행 시 변경 없음
+- migration 되돌리기 후 재적용
+- seed 두 번 실행 후 퀘스트 5개·문항 5개·선택지 20개 유지
+- 활성 세션, integration event, FK 소유권, 포인트 중복 제약 테스트
+
+관련 문서: [PostgreSQL 데이터베이스 구성](./DATABASE_SCHEMA.md)
+
 # 4. 현재 디렉터리 구조
 
 ```text
@@ -277,15 +340,17 @@ AISideQuest/
 │  │  ├─ bootstrap/             전역 API 설정
 │  │  ├─ common/http/           공통 성공·오류 응답
 │  │  ├─ config/                환경설정 검증
+│  │  ├─ database/              DataSource, migration, 개발 seed
 │  │  ├─ health/                Health Check
 │  │  ├─ app.module.ts
 │  │  └─ main.ts
-│  ├─ test/                     NestJS 통합 테스트
+│  ├─ test/                     NestJS·PostgreSQL 통합 테스트
 │  ├─ tsconfig.json
 │  └─ tsconfig.test.json
 ├─ plugins/
 │  └─ aisidequest-hook-poc/     Codex lifecycle hook PoC
 ├─ docs/                        기준 문서와 기술 검증 기록
+├─ compose.yaml                 PostgreSQL 16 로컬 개발 환경
 ├─ .env.example
 └─ package.json                 프런트·hook·서버 통합 명령
 ```
@@ -310,7 +375,14 @@ npm.cmd run dev
 npm.cmd run dev:server
 ```
 
-## 5.4 전체 검증
+## 5.4 PostgreSQL 실행
+
+```powershell
+npm.cmd run db:up
+npm.cmd run db:setup
+```
+
+## 5.5 전체 검증
 
 ```powershell
 npm.cmd test
@@ -318,14 +390,23 @@ npm.cmd run typecheck
 npm.cmd run build
 ```
 
-## 5.5 현재 검증 결과
+DB 통합 테스트는 초기화 가능한 test 전용 DB에서 실행한다.
+
+```powershell
+$env:TEST_DATABASE_URL='postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest_test'
+$env:ALLOW_DATABASE_RESET='true'
+npm.cmd run test:database
+```
+
+## 5.6 현재 검증 결과
 
 | 구분 | 결과 |
 |---|---:|
 | React 테스트 | 19개 통과 |
 | Codex hook 테스트 | 4개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
-| 전체 자동 테스트 | 27개 통과 |
+| PostgreSQL 통합 테스트 | 5개 통과 |
+| 전체 자동 테스트 | 32개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -334,32 +415,30 @@ npm.cmd run build
 
 # 6. 현재 제한사항
 
-- PostgreSQL 연결과 migration이 없다.
+- DB 스키마와 migration은 준비됐지만 NestJS 기능 모듈에는 아직 repository가 연결되지 않았다.
 - 사용자 로그인과 권한 검증이 없다.
 - 서버 세션 API는 설계만 있고 구현되지 않았다.
 - 프런트엔드 `SessionContext`는 여전히 LocalStorage를 사용한다.
 - 기존 LocalStorage 데이터 전환 정책은 구현되지 않았다.
 - Codex 플러그인은 로컬 PoC이며 서버로 event를 전송하지 않는다.
 - heartbeat, 오프라인 queue, 재전송은 설계만 있고 구현되지 않았다.
-- 퀘스트는 더미 데이터이며 서버 판정이 없다.
-- 포인트 원장과 중복 적립 방지가 서버에 구현되지 않았다.
+- DB에는 개발 퀘스트 seed가 있지만 프런트엔드는 여전히 더미 데이터를 사용하며 서버 판정이 없다.
+- 포인트 원장 테이블과 중복 제약은 있지만 적립 transaction 서비스가 없다.
 - 통계는 브라우저 데이터로 계산되며 다른 기기와 공유되지 않는다.
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: PostgreSQL 데이터베이스 구성
+# 7. 다음 작업: 사용자 로그인 구현
 
-5번 작업에서 다음 항목을 진행한다.
+6번 작업에서 다음 항목을 진행한다.
 
-1. NestJS 11 및 TypeScript 7과 호환되는 ORM·migration 도구 선정
-2. `users`, `ai_sessions`, `quests`, `quest_attempts`, `point_ledger` 설계
-3. integration event 멱등성 저장 구조 결정
-4. FK, UK, 인덱스, 사용자당 활성 세션 제약 작성
-5. 빈 DB에서 전체 구조를 생성하는 최초 migration 작성
-6. 개발용 퀘스트 seed 작성
-7. migration 적용·재실행·제약조건 통합 테스트
+1. GitHub OAuth callback과 사용자·OAuth 계정 연결 구현
+2. 서버 저장형 웹 인증 세션 구성
+3. `HttpOnly`, `Secure`, `SameSite` cookie와 OAuth `state`, CSRF 방어 적용
+4. 현재 사용자 조회, 인증 guard, logout과 세션 만료 구현
+5. 인증·소유권·만료 통합 테스트
 
-세션 상태와 event 제약은 [세션 상태와 데이터 흐름 설계](./SESSION_STATE_AND_DATA_FLOW.md)를 기준으로 한다.
+인증 구현에서도 DB 변경은 추가 migration으로 작성하고, 보안 검증은 17번까지 미루지 않고 함께 완료한다.
 
 # 8. 기준 문서
 
@@ -369,7 +448,8 @@ npm.cmd run build
 | [BETA_IMPLEMENTATION_PLAN.md](./BETA_IMPLEMENTATION_PLAN.md) | 20개 실사용 베타 작업과 진행 상태 |
 | [AUTO_DETECTION_POC.md](./AUTO_DETECTION_POC.md) | Codex 자동 감지 기술 검증과 라이브 결과 |
 | [SESSION_STATE_AND_DATA_FLOW.md](./SESSION_STATE_AND_DATA_FLOW.md) | 세션 상태, 장애 규칙, 책임 분리, API 계약 |
+| [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | PostgreSQL 테이블, 제약, migration, seed와 실행 방법 |
 
 ---
 
-현재 결론: **베타 범위, 자동 감지 가능성, 세션 계약, API 실행 기반까지 준비됐다. 다음 단계부터 실제 사용자 데이터를 저장하는 PostgreSQL 구조를 구현한다.**
+현재 결론: **베타 범위, 자동 감지, 세션 계약, API 실행 기반과 PostgreSQL 구조까지 준비됐다. 다음 단계에서는 GitHub OAuth 로그인과 서버 인증 세션을 구현한다.**

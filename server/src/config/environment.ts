@@ -1,13 +1,21 @@
+import {
+  readDatabaseEnvironment,
+  type DatabaseEnvironment,
+} from '../database/database-environment'
+
 export type NodeEnvironment = 'development' | 'test' | 'production'
 
-export interface AppEnvironment {
+export interface AppEnvironment extends DatabaseEnvironment {
   NODE_ENV: NodeEnvironment
   API_HOST: string
   API_PORT: number
   CORS_ORIGIN: string
 }
 
-const DEFAULT_ENVIRONMENT: AppEnvironment = {
+const DEFAULT_ENVIRONMENT: Pick<
+  AppEnvironment,
+  'NODE_ENV' | 'API_HOST' | 'API_PORT' | 'CORS_ORIGIN'
+> = {
   NODE_ENV: 'development',
   API_HOST: '127.0.0.1',
   API_PORT: 3000,
@@ -68,6 +76,7 @@ export function validateEnvironment(
 ): Record<string, unknown> & AppEnvironment {
   return {
     ...configuration,
+    ...readDatabaseEnvironment(configuration),
     NODE_ENV: parseNodeEnvironment(configuration.NODE_ENV),
     API_HOST: readNonEmptyString(
       configuration.API_HOST,

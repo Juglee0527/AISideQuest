@@ -58,11 +58,9 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 
 ## 리워드
 
-- 포인트 적립
-- 현금성 리워드
-- 기프티콘
-- 캐시백
-- 제휴 이벤트
+- 개발 퀴즈 성공 시 서비스 포인트 적립
+- 사용자와 퀘스트 version당 1회 적립
+- 베타 포인트는 현금 가치·환전·양도·구매 기능 없음
 
 ## 대시보드
 
@@ -87,12 +85,14 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 
 - Node.js 22
 - NestJS 11
-- PostgreSQL (다음 단계)
+- PostgreSQL 16
+- TypeORM 1.1
 
-## Extension (예정)
+## Codex 연동
 
-- Chrome Extension
-- VS Code Extension
+- Windows ChatGPT 데스크톱 앱용 AISideQuest Codex 플러그인
+- Codex lifecycle hook
+- 웹 일회성 연결 코드를 이용한 기기 연결
 
 ---
 
@@ -102,6 +102,7 @@ AISideQuest는 이러한 시간을 단순한 기다림이 아니라 **가치 있
 
 - Node.js 22 이상
 - npm
+- PostgreSQL 로컬 실행 시 Docker Desktop
 
 ## 의존성 설치
 
@@ -131,6 +132,15 @@ npm.cmd run dev:server
 GET http://127.0.0.1:3000/api/v1/health
 ```
 
+## PostgreSQL 실행
+
+```powershell
+npm.cmd run db:up
+npm.cmd run db:setup
+```
+
+테이블, 제약조건과 migration 기준은 [`docs/DATABASE_SCHEMA.md`](./docs/DATABASE_SCHEMA.md)를 확인합니다.
+
 ---
 
 # 🧪 테스트
@@ -158,6 +168,16 @@ npm.cmd run test:watch
 - API Health Check와 공통 성공 응답
 - 전역 입력 검증과 공통 오류 응답
 - API 환경설정 기본값과 잘못된 포트 차단
+- PostgreSQL migration 적용·되돌리기·재적용
+- 개발 퀴즈 seed 멱등성과 핵심 FK·UK 제약
+
+DB 통합 테스트는 초기화 가능한 test 전용 DB에서 실행합니다.
+
+```powershell
+$env:TEST_DATABASE_URL='postgresql://aisidequest:aisidequest@127.0.0.1:54329/aisidequest_test'
+$env:ALLOW_DATABASE_RESET='true'
+npm.cmd run test:database
+```
 
 ## 타입 검사
 
@@ -188,21 +208,16 @@ npm.cmd run preview
 
 ---
 
-# 👨‍💻 대상 사용자
+# 👨‍💻 최초 베타 대상 사용자
 
-- Codex 사용자
-- Cursor 사용자
-- GitHub Copilot 사용자
-- Claude Code 사용자
-- Windsurf 사용자
-
-즉, AI를 활용하는 모든 개발자를 위한 서비스입니다.
+- Windows 11에서 ChatGPT 데스크톱 앱의 Codex 작업을 사용하는 개발자
+- GitHub 계정으로 로그인할 수 있는 초대 기반 파일럿 사용자
 
 ---
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP와 NestJS API 기본 구성이 완료된 실사용 베타 개발 단계입니다.
+현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API 기반과 PostgreSQL 구조까지 완료된 실사용 베타 개발 단계입니다. 다음 작업은 GitHub OAuth 로그인입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -212,12 +227,11 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- AI 작업 시간 자동 감지
-- 브라우저 및 VS Code Extension 개발
-- 리워드 시스템 구축
-- 다양한 마이크로태스크 연동
-- AI 기반 개인 맞춤 퀘스트 추천
-- 생산성 분석 및 통계 제공
+- GitHub OAuth 로그인과 서버 인증 세션
+- AI 세션 API와 프런트엔드 서버 동기화
+- AISideQuest Codex 플러그인 정식 연동
+- 객관식 개발 퀴즈와 포인트 원장
+- 서버 통계와 운영 파일럿
 
 ---
 
