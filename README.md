@@ -253,7 +253,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, Codex 자동 감지 PoC, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 프런트엔드 서버 동기화까지 완료된 실사용 베타 개발 단계입니다. 기존 MVP LocalStorage 전환도 완료했으며 다음 작업은 AISideQuest Codex 플러그인 기본 구성입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API, 프런트엔드 서버 동기화와 AISideQuest Codex 플러그인 기본 구성을 완료한 실사용 베타 개발 단계입니다. 웹 일회용 연결 코드로 플러그인 기기를 연결하고 명시적 테스트 이벤트로 서버 사용자 식별을 확인할 수 있으며, 다음 작업은 lifecycle hook 이벤트의 자동 서버 연동입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -263,7 +263,7 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- AISideQuest Codex 플러그인 정식 연동
+- Codex lifecycle hook 이벤트 자동 연동과 장애 복구
 - 객관식 개발 퀴즈와 포인트 원장
 - 서버 통계와 운영 파일럿
 

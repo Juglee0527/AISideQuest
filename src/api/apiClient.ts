@@ -78,6 +78,50 @@ function parseError(response: Response, value: unknown) {
   return new ApiClientError(response.status, code, message)
 }
 
+function getCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  for (const part of document.cookie.split(';')) {
+    const separatorIndex = part.indexOf('=')
+
+    if (separatorIndex < 0) {
+      continue
+    }
+
+    const cookieName = part.slice(0, separatorIndex).trim()
+
+    if (cookieName === name) {
+      return decodeURIComponent(part.slice(separatorIndex + 1))
+    }
+  }
+
+  return null
+}
+
+function getCsrfToken() {
+  const token = getCookie('__Host-aisidequest_csrf')
+    ?? getCookie('aisidequest_csrf')
+
+  if (token === null || token === '') {
+    throw new ApiClientError(
+      401,
+      'AUTH_REQUIRED',
+      '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
+    )
+  }
+
+  return token
+}
+
+export function createMutationHeaders(idempotencyKey = crypto.randomUUID()) {
+  return {
+    'Idempotency-Key': idempotencyKey,
+    'x-csrf-token': getCsrfToken(),
+  }
+}
+
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
 
 export const API_BASE_URL = (

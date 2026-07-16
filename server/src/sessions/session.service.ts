@@ -9,6 +9,7 @@ import {
 import type { EntityManager } from 'typeorm'
 
 import { hashToken } from '../auth/auth-crypto'
+import { ApiIdempotencyService } from '../common/idempotency/api-idempotency.service'
 import { DatabaseService } from '../database/database.service'
 import type {
   IntegrationEventDto,
@@ -61,11 +62,6 @@ const INTEGRATION_EVENTS = new Set<IntegrationEventName>([
 const MAX_OBSERVED_AT_FUTURE_MS = 5 * 60 * 1_000
 const DEFERRED_EVENT_TTL_MS = 24 * 60 * 60 * 1_000
 
-interface StoredIdempotencyRow {
-  request_hash: string
-  response_body: unknown
-}
-
 interface StoredIntegrationEventRow {
   ai_session_id: string | null
   processing_result: IntegrationProcessingResult
@@ -96,7 +92,10 @@ interface AppliedEvent {
 
 @Injectable()
 export class SessionService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly apiIdempotencyService: ApiIdempotencyService,
+  ) {}
 
   async startManualSession(userId: string, idempotencyKey: string) {
     const requestHash = hashToken(
@@ -106,7 +105,7 @@ export class SessionService {
     return this.databaseService.transaction(async (manager) => {
       await this.lockUserSessions(manager, userId)
 
-      const storedResponse = await this.getIdempotentResponse<{
+      const storedResponse = await this.apiIdempotencyService.getResponse<{
         created: boolean
         session: SessionSnapshot
       }>(manager, userId, idempotencyKey, requestHash)
@@ -145,7 +144,7 @@ export class SessionService {
         session: this.toSnapshot(session, currentTime),
       }
 
-      await this.storeIdempotentResponse(
+      await this.apiIdempotencyService.storeResponse(
         manager,
         userId,
         idempotencyKey,
@@ -175,7 +174,7 @@ export class SessionService {
     return this.databaseService.transaction(async (manager) => {
       await this.lockUserSessions(manager, userId)
 
-      const storedResponse = await this.getIdempotentResponse<{
+      const storedResponse = await this.apiIdempotencyService.getResponse<{
         session: SessionSnapshot
       }>(manager, userId, idempotencyKey, requestHash)
 
@@ -229,7 +228,7 @@ export class SessionService {
         session: this.toSnapshot(session, currentTime),
       }
 
-      await this.storeIdempotentResponse(
+      await this.apiIdempotencyService.storeResponse(
         manager,
         userId,
         idempotencyKey,
@@ -856,62 +855,6 @@ export class SessionService {
     }
 
     return currentTime
-  }
-
-  private async getIdempotentResponse<T>(
-    manager: EntityManager,
-    userId: string,
-    idempotencyKey: string,
-    requestHash: string,
-  ): Promise<T | undefined> {
-    const rows = (await manager.query(
-      `
-        SELECT request_hash, response_body
-        FROM api_idempotency_keys
-        WHERE user_id = $1 AND idempotency_key = $2
-      `,
-      [userId, idempotencyKey],
-    )) as StoredIdempotencyRow[]
-    const stored = rows[0]
-
-    if (!stored) {
-      return undefined
-    }
-
-    if (stored.request_hash !== requestHash) {
-      throw new ConflictException({ code: 'IDEMPOTENCY_KEY_REUSED' })
-    }
-
-    return stored.response_body as T
-  }
-
-  private async storeIdempotentResponse(
-    manager: EntityManager,
-    userId: string,
-    idempotencyKey: string,
-    operation: 'SESSION_MANUAL_START' | 'SESSION_END',
-    requestHash: string,
-    response: unknown,
-  ) {
-    await manager.query(
-      `
-        INSERT INTO api_idempotency_keys (
-          user_id,
-          idempotency_key,
-          operation,
-          request_hash,
-          response_body
-        )
-        VALUES ($1, $2, $3, $4, $5::jsonb)
-      `,
-      [
-        userId,
-        idempotencyKey,
-        operation,
-        requestHash,
-        JSON.stringify(response),
-      ],
-    )
   }
 
   private toSnapshot(session: SessionRow, currentTime: Date): SessionSnapshot {

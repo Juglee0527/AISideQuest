@@ -1,4 +1,9 @@
-import { ApiClientError, requestApi, type ApiResult } from './apiClient'
+import {
+  ApiClientError,
+  createMutationHeaders,
+  requestApi,
+  type ApiResult,
+} from './apiClient'
 import type {
   Session,
   SessionHistoryPage,
@@ -110,49 +115,6 @@ function parseSessionHistoryPage(value: unknown): SessionHistoryPage {
   }
 }
 
-function getCookie(name: string) {
-  if (typeof document === 'undefined') {
-    return null
-  }
-
-  for (const part of document.cookie.split(';')) {
-    const separatorIndex = part.indexOf('=')
-
-    if (separatorIndex < 0) {
-      continue
-    }
-
-    const cookieName = part.slice(0, separatorIndex).trim()
-
-    if (cookieName === name) {
-      return decodeURIComponent(part.slice(separatorIndex + 1))
-    }
-  }
-
-  return null
-}
-
-function getCsrfToken() {
-  const token = getCookie('__Host-aisidequest_csrf') ?? getCookie('aisidequest_csrf')
-
-  if (token === null || token === '') {
-    throw new ApiClientError(
-      401,
-      'AUTH_REQUIRED',
-      '로그인 정보가 만료되었습니다. 다시 로그인해 주세요.',
-    )
-  }
-
-  return token
-}
-
-function mutationHeaders(idempotencyKey: string): HeadersInit {
-  return {
-    'Idempotency-Key': idempotencyKey,
-    'x-csrf-token': getCsrfToken(),
-  }
-}
-
 export function isActiveSession(session: Session | null): session is Session {
   return session !== null && ACTIVE_SESSION_STATUSES.includes(session.status)
 }
@@ -226,7 +188,7 @@ export async function startManualSession() {
     },
     {
       method: 'POST',
-      headers: mutationHeaders(crypto.randomUUID()),
+      headers: createMutationHeaders(),
     },
   )
 
@@ -246,7 +208,7 @@ export async function endManualSession(sessionId: string) {
     {
       method: 'POST',
       headers: {
-        ...mutationHeaders(crypto.randomUUID()),
+        ...createMutationHeaders(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ outcome: 'COMPLETED' }),

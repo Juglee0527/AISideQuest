@@ -1,5 +1,7 @@
 # AISideQuest Codex Hook PoC
 
+> 이 디렉터리는 2번 기술 검증 결과를 보존하기 위한 자료입니다. 실제 연동에는 정식 [`aisidequest`](../aisidequest/README.md) 플러그인을 사용합니다.
+
 Windows ChatGPT 데스크톱 앱에서 Codex 작업 lifecycle event를 감지할 수 있는지 검증하는 로컬 플러그인이다.
 
 ## 기록 이벤트

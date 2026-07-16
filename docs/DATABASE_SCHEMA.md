@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`
 
 ---
 
@@ -29,6 +29,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 | `oauth_login_states` | 1회용 OAuth state hash와 PKCE verifier |
 | `auth_sessions` | hash token 기반 웹 인증 세션 |
 | `api_idempotency_keys` | 사용자 변경 API의 request hash와 응답 snapshot |
+| `device_link_codes` | 10분 유효 일회성 연결 코드 hash와 소비 상태 |
 | `devices` | Codex 플러그인 연결 기기와 hash token |
 | `ai_sessions` | 자동·수동 AI 작업 세션과 상태 |
 | `integration_events` | 개인정보가 제거된 Codex lifecycle event |
@@ -53,6 +54,8 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `(user_id, idempotency_key)`는 유일하며 같은 key의 다른 request hash를 거부한다.
 - 멱등성 응답은 JSON object snapshot으로 저장해 재요청 시 논리 결과를 그대로 반환한다.
 - 기기 token 원문은 저장하지 않고 64자리 SHA-256 hash만 저장한다.
+- 연결 코드 원문도 저장하지 않고 64자리 SHA-256 hash만 저장하며 10분 안에 한 번만 소비한다.
+- 신규 기기 연결과 기존 기기 token 회전을 구분하고, 모든 변경 요청은 멱등하게 처리한다.
 - 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
 
 ## 3.2 AI 세션과 event
@@ -141,6 +144,8 @@ npm.cmd run test:database
 - 수동 세션 시작·종료 멱등성과 동시 시작 직렬화
 - cursor 이력, 세션 소유권과 Codex event 상태 전이
 - 의미 중복 event, 새 turn 대체와 역순 `Stop` 재처리
+- 연결 코드 1회 소비, 기기 token hash 저장, 소유권 격리
+- token 회전 후 구 token 차단과 연결 폐기 후 인증 차단
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
 - 기기별 event 중복 방지와 FK 소유권
@@ -152,6 +157,6 @@ npm.cmd run test:database
 
 - 6번 완료: GitHub OAuth, 웹 인증 세션과 인증 guard
 - 7번 완료: AI 세션과 integration event transaction
-- 10번: 일회성 기기 연결 코드와 token 발급·회전·해제
+- 10번 완료: 일회성 기기 연결 코드와 token 발급·회전·해제
 - 14번: 퀘스트 제출과 서버 판정
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction

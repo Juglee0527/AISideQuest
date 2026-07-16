@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config'
 import { AuthModule } from './auth/auth.module'
 import { validateEnvironment } from './config/environment'
 import { DatabaseModule } from './database/database.module'
+import { DeviceModule } from './devices/device.module'
 import { HealthModule } from './health/health.module'
 import { SessionModule } from './sessions/session.module'
 
@@ -16,6 +17,7 @@ import { SessionModule } from './sessions/session.module'
     }),
     DatabaseModule,
     AuthModule,
+    DeviceModule,
     SessionModule,
     HealthModule,
   ],

@@ -6,6 +6,7 @@ import { readDatabaseEnvironment } from './database-environment'
 import { InitialSchema1784160000000 } from './migrations/1784160000000-initial-schema'
 import { AddAuthentication1784163600000 } from './migrations/1784163600000-add-authentication'
 import { AddSessionApiIdempotency1784167200000 } from './migrations/1784167200000-add-session-api-idempotency'
+import { AddDeviceLinking1784170800000 } from './migrations/1784170800000-add-device-linking'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -22,6 +23,7 @@ export function createDataSourceOptions(
       InitialSchema1784160000000,
       AddAuthentication1784163600000,
       AddSessionApiIdempotency1784167200000,
+      AddDeviceLinking1784170800000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

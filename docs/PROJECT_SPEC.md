@@ -456,7 +456,8 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 7. [x] AI 세션 API 구현 - 상태 전이, 멱등성, 동시성 및 이력 조회 완료
 8. [x] 프런트엔드 세션 상태를 API로 전환 - polling, 시각 보정, 인증·오류 상태 완료
 9. [x] 기존 LocalStorage 데이터 처리 - 참고 요약·초기화, 손상·재실행 처리 완료
-10. [ ] AISideQuest Codex 플러그인 기본 구성 - 다음 작업
+10. [x] AISideQuest Codex 플러그인 기본 구성 - 연결 코드, 기기 token, 테스트 event 완료
+11. [ ] AI 작업 자동 감지 연동 - 다음 작업
 
 확정된 최초 베타 범위
 

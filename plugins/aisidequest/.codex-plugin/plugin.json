@@ -1,0 +1,20 @@
+{
+  "name": "aisidequest",
+  "version": "0.1.0",
+  "description": "Privacy-minimized Codex lifecycle tracking for AISideQuest.",
+  "author": {
+    "name": "AISideQuest"
+  },
+  "license": "MIT",
+  "keywords": ["codex", "productivity", "session-tracking"],
+  "interface": {
+    "displayName": "AISideQuest",
+    "shortDescription": "Connect Codex activity to AISideQuest safely.",
+    "longDescription": "Connects this Codex installation to an AISideQuest account and keeps privacy-filtered lifecycle events ready for session tracking.",
+    "developerName": "AISideQuest",
+    "category": "Productivity",
+    "capabilities": ["Hooks", "Device connection"],
+    "defaultPrompt": "AISideQuest 기기 연결 상태를 확인해 주세요.",
+    "brandColor": "#34D399"
+  }
+}
