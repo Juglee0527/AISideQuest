@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import { useQuestHistory } from '../contexts/QuestHistoryContext'
+import { useQuestCatalog } from '../contexts/QuestCatalogContext'
 import { useSession } from '../contexts/SessionContext'
-import { mockQuests } from '../data/mockQuests'
 import useElapsedTime from '../hooks/useElapsedTime'
 import { calculateActivityStatistics } from '../utils/statistics'
 import { formatDuration, formatSummaryDuration } from '../utils/time'
@@ -21,6 +21,7 @@ function HomePage() {
     getCurrentTime,
   } = useSession()
   const { questHistories } = useQuestHistory()
+  const { quests } = useQuestCatalog()
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const lastCompletedSession = completedSessions[0]
@@ -39,7 +40,7 @@ function HomePage() {
     activeSession,
     completedSessions,
     questHistories,
-    quests: mockQuests,
+    quests,
   })
 
   return (

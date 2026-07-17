@@ -3,8 +3,8 @@
 - 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~12번, 총 12개
-- 다음 작업: 13. 퀘스트 목록 API 구현
+- 완료: 1~13번, 총 13개
+- 다음 작업: 14. 실제 개발 퀴즈 구현
 
 ---
 
@@ -26,8 +26,9 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 10. 정식 Codex 플러그인, 일회성 연결 코드, hash 기기 token, 회전·폐기와 테스트 event를 구현했다.
 11. Codex lifecycle event 자동 전송, 서버 세션 상태 반영, 마지막 event 표시와 수동 fallback을 구현했다.
 12. 30초 heartbeat, durable FIFO queue, 재시도·dead-letter와 서버 세션 만료·late Stop 복구를 구현했다.
+13. 게시 퀘스트 목록·상세 API, 사용자별 최근 응시 상태와 cursor pagination을 구현하고 프런트엔드의 `mockQuests`를 제거했다.
 
-현재 React 프런트엔드는 GitHub 로그인 진입점과 PostgreSQL 기반 세션 API를 사용한다. 퀘스트 완료·예상 포인트만 13~15번 서버 전환 전까지 별도 브라우저 키에 임시 저장한다.
+현재 React 프런트엔드는 GitHub 로그인 진입점, PostgreSQL 기반 세션 API와 서버 퀘스트 catalog를 사용한다. 실제 응시·완료와 예상 포인트만 14~15번 서버 전환 전까지 별도 브라우저 키에 임시 저장한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -498,11 +499,11 @@ npm.cmd run test:database
 
 | 구분 | 결과 |
 |---|---:|
-| React 테스트 | 38개 통과 |
+| React 테스트 | 43개 통과 |
 | Codex 플러그인 테스트 | 9개 통과 |
-| NestJS 통합 테스트 | 4개 통과 |
-| 인증·PostgreSQL·세션 통합 테스트 | 25개 통과 |
-| 전체 자동 테스트 | 69개 통과 |
+| NestJS 비DB 테스트 | 6개 통과 |
+| 인증·PostgreSQL·세션·퀘스트 통합 테스트 | 29개 통과 |
+| 전체 자동 테스트 | 87개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -513,8 +514,8 @@ npm.cmd run test:database
 
 - GitHub 로그인 진입점은 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
 - 기존 참고 요약과 신규 임시 퀘스트 이력은 브라우저 로컬 데이터이며 다른 기기와 공유되지 않는다.
-- lifecycle hook event는 한 번 자동 전송하지만 heartbeat, 오프라인 queue와 재전송은 아직 구현되지 않았다.
-- DB에는 개발 퀘스트 seed가 있지만 프런트엔드는 여전히 더미 데이터를 사용하며 서버 판정이 없다.
+- lifecycle hook event와 heartbeat는 durable JSONL queue에서 FIFO로 전송·재시도하며 실패 이벤트는 dead-letter로 격리한다.
+- 퀘스트 catalog와 최근 응시 상태는 서버가 제공하지만 실제 문제 제공·답안 저장·서버 채점은 14번에서 구현한다.
 - 포인트 원장 테이블과 중복 제약은 있지만 적립 transaction 서비스가 없다.
 - 통계는 브라우저 데이터로 계산되며 다른 기기와 공유되지 않는다.
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
@@ -532,7 +533,21 @@ npm.cmd run test:database
 
 플러그인 9개, React 38개, NestJS 비DB 6개 테스트와 타입 검사·프로덕션 빌드를 통과했다. PostgreSQL 16에서는 migration 되돌리기·재적용, sequence 제약, 자동·수동 만료, orphan 정리와 late `Stop` 복구를 포함한 DB 통합 테스트 25개를 통과했다.
 
-# 8. 기준 문서
+# 8. 13번 구현 결과
+
+13번에서 다음 항목을 구현했다.
+
+1. `PUBLISHED` 상태의 콘텐츠 유효한 최신 퀘스트만 반환하는 인증 목록·상세 API
+2. 게시 시각·code·ID 기준의 안정적인 cursor pagination과 최대 50건 제한
+3. 현재 사용자의 최근 응시 상태와 완료 상태를 분리해 제공하는 응답 DTO
+4. 문제·선택지·정답·draft 내부 정보 비노출과 미게시 퀘스트 `404` 처리
+5. 불완전한 퀘스트 게시와 게시 퀘스트의 정답 선택지 삭제를 막는 DB 제약
+6. `mockQuests` 제거와 Home·Side Quest·Dashboard의 서버 catalog 전환
+7. loading·empty·인증 만료·error·retry·기존 데이터를 유지하는 refresh 상태
+
+React 43개, 플러그인 9개, NestJS 비DB 6개, PostgreSQL 통합 테스트 29개를 통과했다.
+
+# 9. 기준 문서
 
 | 문서 | 역할 |
 |---|---|
@@ -545,4 +560,4 @@ npm.cmd run test:database
 
 ---
 
-현재 결론: **heartbeat와 durable 재전송, 서버 만료·late Stop 복구 구현과 PostgreSQL 검증을 완료했다. 다음 작업은 13번 퀘스트 목록 API다.**
+현재 결론: **게시 퀘스트 목록·상세 API와 사용자별 최근 응시 상태, 프런트엔드 서버 catalog 전환을 완료했다. 다음 작업은 14번 실제 개발 퀴즈 구현이다.**

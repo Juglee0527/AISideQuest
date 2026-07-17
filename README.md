@@ -255,7 +255,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 자동 감지를 사용할 수 없을 때는 수동 모드를 유지합니다. 다음 기능 작업은 퀘스트 목록 API입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 DB에 게시된 퀘스트 목록·상세와 자신의 최근 응시 상태를 조회하며, 프런트엔드는 이 서버 catalog를 사용합니다. 다음 기능 작업은 실제 문제 제공·답안 저장·서버 채점을 포함한 개발 퀴즈 구현입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 

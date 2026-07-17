@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`
 
 ---
 
@@ -161,5 +161,6 @@ npm.cmd run test:database
 - 7번 완료: AI 세션과 integration event transaction
 - 10번 완료: 일회성 기기 연결 코드와 token 발급·회전·해제
 - 12번 구현 완료: integration event sequence, 세션 만료 정리와 late `Stop` 복구
+- 13번 구현 완료: 게시 퀘스트 콘텐츠 제약, 목록·상세 조회와 사용자별 최근 응시 상태
 - 14번: 퀘스트 제출과 서버 판정
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction

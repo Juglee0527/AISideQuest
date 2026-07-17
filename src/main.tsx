@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import LegacyDataMigrationGate from './components/LegacyDataMigrationGate'
 import { QuestHistoryProvider } from './contexts/QuestHistoryContext'
+import { QuestCatalogProvider } from './contexts/QuestCatalogContext'
 import { SessionProvider } from './contexts/SessionContext'
 import './index.css'
 
@@ -19,9 +20,11 @@ createRoot(rootElement).render(
     <BrowserRouter>
       <LegacyDataMigrationGate>
         <SessionProvider>
-          <QuestHistoryProvider>
-            <App />
-          </QuestHistoryProvider>
+          <QuestCatalogProvider>
+            <QuestHistoryProvider>
+              <App />
+            </QuestHistoryProvider>
+          </QuestCatalogProvider>
         </SessionProvider>
       </LegacyDataMigrationGate>
     </BrowserRouter>

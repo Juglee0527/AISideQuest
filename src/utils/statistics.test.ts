@@ -14,8 +14,16 @@ const toIso = (
 ) => new Date(year, month - 1, date, hour, minute).toISOString()
 
 const quests: readonly Quest[] = [
-  { id: 'quest-a', title: 'A', description: 'A', reward: 500, estimatedMinutes: 3 },
-  { id: 'quest-b', title: 'B', description: 'B', reward: 100, estimatedMinutes: 2 },
+  {
+    id: 'quest-a', code: 'quest-a', version: 1, title: 'A', description: 'A',
+    rewardPoints: 500, estimatedMinutes: 3, passScore: 100,
+    retryAllowed: true, completionStatus: 'NOT_STARTED', latestAttempt: null,
+  },
+  {
+    id: 'quest-b', code: 'quest-b', version: 1, title: 'B', description: 'B',
+    rewardPoints: 100, estimatedMinutes: 2, passScore: 100,
+    retryAllowed: true, completionStatus: 'NOT_STARTED', latestAttempt: null,
+  },
 ]
 
 function createSession({

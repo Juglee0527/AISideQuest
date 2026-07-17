@@ -3,17 +3,34 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { QuestCatalogProvider } from './contexts/QuestCatalogContext'
 import { QuestHistoryProvider } from './contexts/QuestHistoryContext'
 import { SessionProvider } from './contexts/SessionContext'
 import type { Session, SessionStatus } from './types/session'
+
+const questFixture = {
+  id: '00000000-0000-4000-8000-000000000020',
+  code: 'ai-workflow-survey',
+  version: 1,
+  title: 'AI 작업 경험 설문',
+  description: 'AI 도구 사용 경험을 돌아보는 간단한 설문입니다.',
+  estimatedMinutes: 3,
+  rewardPoints: 100,
+  passScore: 100,
+  retryAllowed: true,
+  completionStatus: 'NOT_STARTED',
+  latestAttempt: null,
+}
 
 function renderApp(initialPath = '/') {
   return render(
     <MemoryRouter initialEntries={[initialPath]}>
       <SessionProvider>
-        <QuestHistoryProvider>
-          <App />
-        </QuestHistoryProvider>
+        <QuestCatalogProvider>
+          <QuestHistoryProvider>
+            <App />
+          </QuestHistoryProvider>
+        </QuestCatalogProvider>
       </SessionProvider>
     </MemoryRouter>,
   )
@@ -101,6 +118,10 @@ describe('AISideQuest API session flow', () => {
         })
       }
 
+      if (url.pathname.endsWith('/quests')) {
+        return jsonResponse({ items: [questFixture], nextCursor: null })
+      }
+
       if (url.pathname.endsWith('/sessions/manual') && init?.method === 'POST') {
         activeSession ??= createSession(
           '00000000-0000-4000-8000-000000000001',
@@ -153,13 +174,13 @@ describe('AISideQuest API session flow', () => {
 
     fireEvent.click(screen.getByRole('link', { name: /사이드 퀘스트 둘러보기/ }))
     fireEvent.click(screen.getByRole('button', { name: 'AI 작업 경험 설문 완료하기' }))
-    expect(screen.getByText('현재 세션 1/5 완료')).toBeInTheDocument()
+    expect(screen.getByText('현재 세션 1/1 완료')).toBeInTheDocument()
 
     firstRender.unmount()
     const secondRender = renderApp('/quests')
     await flushRequests()
 
-    expect(screen.getByText('현재 세션 1/5 완료')).toBeInTheDocument()
+    expect(screen.getByText('현재 세션 1/1 완료')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'AI 작업 경험 설문 완료됨' })).toBeDisabled()
     fireEvent.click(screen.getByRole('link', { name: 'AISideQuest Home' }))
     expect(screen.getByRole('timer')).toHaveTextContent('01:10')
@@ -288,5 +309,79 @@ describe('AISideQuest API session flow', () => {
 
     expect(screen.getByText('자동 감지 이벤트 수신')).toBeInTheDocument()
     expect(screen.getByText(/^마지막 이벤트 .*활성 기기 1개$/)).toBeInTheDocument()
+  })
+
+  it('shows quest loading failure and retries without a page reload', async () => {
+    let questRequestFails = true
+
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/quests')) {
+        return questRequestFails
+          ? jsonResponse({ code: 'QUESTS_UNAVAILABLE', message: '목록 조회 실패' }, 503)
+          : jsonResponse({ items: [questFixture], nextCursor: null })
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    }))
+
+    renderApp('/quests')
+    await flushRequests()
+    expect(screen.getByRole('alert')).toHaveTextContent('목록 조회 실패')
+
+    questRequestFails = false
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    await flushRequests()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByText(questFixture.title)).toBeInTheDocument()
+  })
+
+  it('keeps the previous quest list visible when a refresh fails', async () => {
+    let questRequests = 0
+
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/quests')) {
+        questRequests += 1
+        return questRequests === 1
+          ? jsonResponse({ items: [questFixture], nextCursor: null })
+          : jsonResponse({ code: 'QUESTS_UNAVAILABLE', message: '갱신 실패' }, 503)
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    }))
+
+    renderApp('/quests')
+    await flushRequests()
+    expect(screen.getByText(questFixture.title)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '퀘스트 목록 새로고침' }))
+    await flushRequests()
+    expect(screen.getByRole('alert')).toHaveTextContent('갱신 실패')
+    expect(screen.getByText(questFixture.title)).toBeInTheDocument()
+  })
+
+  it('shows an empty state when the server has no published quests', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/quests')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    }))
+
+    renderApp('/quests')
+    await flushRequests()
+    expect(screen.getByText('현재 공개된 퀘스트가 없습니다.')).toBeInTheDocument()
   })
 })

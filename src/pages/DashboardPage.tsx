@@ -5,7 +5,7 @@ import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useSession } from '../contexts/SessionContext'
-import { mockQuests } from '../data/mockQuests'
+import { useQuestCatalog } from '../contexts/QuestCatalogContext'
 import useElapsedTime from '../hooks/useElapsedTime'
 import { loadLegacyReferenceSummary } from '../storage/appStorage'
 import {
@@ -25,6 +25,7 @@ function DashboardPage() {
   const [legacyReference] = useState(loadLegacyReferenceSummary)
   const { activeSession, completedSessions, getCurrentTime } = useSession()
   const { questHistories } = useQuestHistory()
+  const { quests } = useQuestCatalog()
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const currentTime = activeStartedAt === null
@@ -36,7 +37,7 @@ function DashboardPage() {
     activeSession,
     completedSessions,
     questHistories,
-    quests: mockQuests,
+    quests,
   })
   const selectedPeriodLabel = periods.find((period) => period.id === selectedPeriod)?.label ?? ''
   const hasActivity = statistics.waitDuration > 0 || statistics.completedQuestCount > 0

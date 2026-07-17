@@ -59,7 +59,7 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 - 인증 사용자 AI 작업 수동 시작·종료 API 연동
 - 서버 시각 보정 실시간 경과 시간 표시
 - 화면 이동 중 타이머 유지
-- 더미 퀘스트 5개 표시
+- DB에 게시된 개발 퀘스트 5개 목록·상세 표시
 - 활성 세션 내 퀘스트 완료 처리
 - 세션별 퀘스트 중복 완료 차단
 - 서버 세션 자동 저장, 새로고침·다른 인증 브라우저 복구
@@ -161,17 +161,17 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 - 브라우저가 비활성화되거나 새로고침되어도 실제 시작 시각을 기준으로 시간을 복구한다.
 - 예상 대기 시간은 산정 기준이 없으므로 표시하지 않는다.
 
-## 6.2 더미 퀘스트
+## 6.2 게시 퀘스트 catalog
 
-| ID | 제목 | 예상 시간 | 예상 보상 |
+| code | 제목 | 예상 시간 | 보상 |
 |---|---|---:|---:|
-| `survey-ai-workflow` | AI 작업 경험 설문 | 3분 | 500P |
-| `quiz-typescript-basics` | TypeScript 기본 퀴즈 | 2분 | 100P |
-| `learning-developer-words` | 개발 영어 단어 학습 | 4분 | 80P |
-| `news-ai-briefing` | AI·개발 뉴스 읽기 | 5분 | 50P |
-| `microtask-copy-review` | UI 문구 검토 | 7분 | 200P |
+| `typescript-type-narrowing` | TypeScript 타입 좁히기 | 2분 | 100P |
+| `http-idempotency` | HTTP 멱등성 | 2분 | 100P |
+| `postgresql-unique-constraint` | PostgreSQL 유일성 제약 | 2분 | 100P |
+| `git-safe-history` | Git 안전한 이력 관리 | 2분 | 100P |
+| `testing-boundary-values` | 경계값 테스트 | 2분 | 100P |
 
-`reward`는 실제 지급액이 아니라 MVP 검증을 위한 예상 포인트다.
+목록과 상세 API는 로그인 사용자에게만 제공하며 사용자의 최근 응시 상태를 포함한다. 문제·선택지·정답은 14번의 실제 응시 API 전까지 노출하지 않는다.
 
 ## 6.3 퀘스트 완료
 
@@ -346,7 +346,7 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 - TypeORM 1.1 SQL migration
 - 로컬 Docker Compose 실행 환경
 
-현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증과 AI 세션 API가 있다. 퀘스트·포인트 비즈니스 API는 후속 작업에서 구현한다.
+현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증, AI 세션 API와 게시 퀘스트 목록·상세 API가 있다. 실제 응시·채점과 포인트 비즈니스 API는 후속 작업에서 구현한다.
 
 ---
 
@@ -396,13 +396,13 @@ npm run build
 
 ## 12.4 현재 검증 결과
 
-2026-07-16 기준
+2026-07-18 기준
 
-- React 테스트 파일: 8개 통과
-- React 자동 테스트: 38개 통과
+- React 테스트 파일: 9개 통과
+- React 자동 테스트: 43개 통과
 - Codex 플러그인 테스트: 9개 통과
-- NestJS 통합 테스트: 4개 통과
-- DB·인증·기기·AI 세션 PostgreSQL 통합 테스트: 25개 통과
+- NestJS 비DB 테스트: 6개 통과
+- DB·인증·기기·AI 세션·퀘스트 PostgreSQL 통합 테스트: 29개 통과
 - TypeScript 타입 검사 통과
 - Vite 및 NestJS 프로덕션 빌드 통과
 - 실제 `GET /api/v1/health` HTTP 200 확인
@@ -422,7 +422,7 @@ npm run build
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
 - GitHub 로그인 진입 UI는 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
 - lifecycle event와 30초 heartbeat는 기기별 sequence를 가진 durable JSONL queue에서 FIFO로 재전송된다.
-- 세션만 PostgreSQL 데이터를 사용하며 퀘스트·포인트·통계 API 전환은 후속 작업이다.
+- 세션과 퀘스트 catalog는 PostgreSQL 데이터를 사용하며 실제 응시·포인트·통계 API 전환은 후속 작업이다.
 
 ---
 
@@ -446,7 +446,7 @@ npm run build
 
 MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md)를 기준으로 20개 작업을 순서대로 진행한다.
 
-2026-07-16 기준 진행 상태
+2026-07-18 기준 진행 상태
 
 1. [x] 실사용 베타 범위 확정
 2. [x] AI 작업 자동 감지 기술 검증 - 정상 turn 자동 감지 및 fallback 범위 확정
@@ -460,7 +460,8 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 10. [x] AISideQuest Codex 플러그인 기본 구성 - 연결 코드, 기기 token, 테스트 event 완료
 11. [x] AI 작업 자동 감지 연동 - lifecycle event 자동 전송, 웹 상태 반영과 수동 fallback 완료
 12. [x] Heartbeat와 장애 복구 구현 - PostgreSQL 통합 테스트 완료
-13. [ ] 퀘스트 목록 API 구현 - 다음 작업
+13. [x] 퀘스트 목록 API 구현 - 게시 catalog, 최근 응시 상태, pagination과 프런트엔드 전환 완료
+14. [ ] 실제 개발 퀴즈 구현 - 다음 작업
 
 확정된 최초 베타 범위
 

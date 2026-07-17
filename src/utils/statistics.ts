@@ -117,7 +117,7 @@ export function calculateActivityStatistics({
       completedAt <= currentTime
     )
   })
-  const rewardByQuestId = new Map(quests.map((quest) => [quest.id, quest.reward]))
+  const rewardByQuestId = new Map(quests.map((quest) => [quest.id, quest.rewardPoints]))
   const rewardPoints = completedQuestHistories.reduce(
     (total, history) => total + (rewardByQuestId.get(history.questId) ?? 0),
     0,

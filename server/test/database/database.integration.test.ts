@@ -91,6 +91,16 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [questListingReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quests'
+        AND column_name = 'retry_allowed'
+    `)) as Array<{ count: number }>
+    assert.equal(questListingReverted.count, 0)
+
+    await dataSource.undoLastMigration()
     const [heartbeatReverted] = (await dataSource.query(`
       SELECT count(*)::integer AS count
       FROM information_schema.columns
@@ -146,7 +156,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 5)
+    assert.equal(reappliedMigrations.length, 6)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

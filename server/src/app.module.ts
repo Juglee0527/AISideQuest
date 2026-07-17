@@ -6,6 +6,7 @@ import { validateEnvironment } from './config/environment'
 import { DatabaseModule } from './database/database.module'
 import { DeviceModule } from './devices/device.module'
 import { HealthModule } from './health/health.module'
+import { QuestModule } from './quests/quest.module'
 import { SessionModule } from './sessions/session.module'
 
 @Module({
@@ -19,6 +20,7 @@ import { SessionModule } from './sessions/session.module'
     AuthModule,
     DeviceModule,
     SessionModule,
+    QuestModule,
     HealthModule,
   ],
 })
