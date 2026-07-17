@@ -3,10 +3,10 @@
 > 브라우저 LocalStorage 기반 MVP를 실제 사용 가능한 폐쇄형 베타로 전환하기 위한 기준 문서
 
 - 작성일: 2026-07-15
-- 최종 보완일: 2026-07-16
+- 최종 보완일: 2026-07-18
 - 전체 작업: 20개
-- 현재 완료: 11개
-- 다음 작업: 12. Heartbeat와 장애 복구 구현
+- 현재 완료: 12개
+- 다음 작업: 13. 퀘스트 목록 API 구현
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -26,8 +26,8 @@
 | 9 | 기존 LocalStorage 데이터 처리 | 완료 (2026-07-16) |
 | 10 | AISideQuest Codex 플러그인 기본 구성 | 완료 (2026-07-16) |
 | 11 | AI 작업 자동 감지 연동 | 완료 (2026-07-16) |
-| 12 | Heartbeat와 장애 복구 구현 | 다음 작업 |
-| 13 | 퀘스트 목록 API 구현 | 대기 |
+| 12 | Heartbeat와 장애 복구 구현 | 완료 (2026-07-18) |
+| 13 | 퀘스트 목록 API 구현 | 다음 작업 |
 | 14 | 실제 개발 퀴즈 구현 | 대기 |
 | 15 | 포인트 원장 구현 | 대기 |
 | 16 | 통계 API와 대시보드 전환 | 대기 |
@@ -618,11 +618,15 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 
 ---
 
-# 13. 12번 작업 입력
+# 13. 12번 작업 결과
 
-다음 작업에서는 정상 종료 event가 오지 않는 상황에서도 세션 일관성을 회복한다.
+1. 활성 turn 상태를 원자적으로 저장하고 별도 단일 worker에서 30초 간격 heartbeat를 생성한다.
+2. 기기 단위 증가 sequence와 고정 event ID를 가진 append-only JSONL queue, 원자적 state·compaction과 FIFO single-flight worker를 구현했다.
+3. 네트워크·`408`·`429`·`5xx` 재시도, `Retry-After`, 지수 backoff·full jitter, 300회·24시간 제한과 7일 dead-letter를 구현했다.
+4. queue 손상, 48시간·10,000건·10MiB 제한과 인증 차단 진단을 구현했으며 lifecycle event를 제거할 때도 이유를 dead-letter에 남긴다.
+5. 다중 서버 인스턴스 경쟁을 advisory lock으로 막는 30초 정리 job을 구현하고 자동 세션은 마지막 활동 120초, 순수 수동 세션은 시작 12시간 경계로 `ABANDONED` 처리한다.
+6. 24시간 지난 deferred event를 `IGNORED_ORPHAN`으로 정리하고, 같은 기기·turn의 heartbeat 만료 세션만 24시간 내 late `Stop`으로 복구한다.
+7. 플러그인 테스트 9개, React 테스트 38개, NestJS 비DB 테스트 6개, TypeScript 타입 검사와 프로덕션 빌드를 통과했다.
+8. PostgreSQL 16에서 migration 되돌리기·재적용, sequence 제약, 자동·수동 만료, orphan 정리와 late `Stop` 복구를 포함한 DB 통합 테스트 25개를 통과했다.
 
-1. 작업 중 heartbeat 전송과 120초 만료 처리
-2. durable queue, 순서 보존, 지수 backoff와 동일 event ID 재전송
-3. 비정상 종료, 재시작과 late `Stop` 복구
-4. 완료 기준: 네트워크 단절과 Codex 재시작 후에도 세션 상태 일관성 유지
+판정: **12번 Heartbeat와 장애 복구 구현을 완료하고 다음 작업을 13번 퀘스트 목록 API로 전환한다.**

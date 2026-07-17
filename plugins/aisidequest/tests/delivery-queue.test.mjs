@@ -1,0 +1,132 @@
+import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+
+import {
+  enqueueEvent,
+  processNextEvent,
+  readDeliveryDiagnostic,
+} from '../scripts/delivery-queue.mjs'
+import { writeDeviceConfig } from '../scripts/device-config.mjs'
+
+function event(name, id = randomUUID()) {
+  return {
+    schemaVersion: 1,
+    eventId: id,
+    provider: 'CODEX',
+    event: name,
+    sessionKey: 'a'.repeat(64),
+    ...(name === 'SessionStart' ? {} : { turnKey: 'b'.repeat(64) }),
+    observedAt: '2026-07-18T00:00:00.000Z',
+  }
+}
+
+async function fixture() {
+  const directory = await mkdtemp(join(tmpdir(), 'aisidequest-queue-'))
+  const environment = { AISIDEQUEST_DATA_DIR: directory }
+  await writeDeviceConfig({
+    apiUrl: 'http://127.0.0.1:3000/api/v1',
+    deviceToken: 'test-device-token',
+    pluginVersion: '0.1.0',
+    device: { id: randomUUID(), name: 'Queue test' },
+  }, environment)
+  return { directory, environment }
+}
+
+function success(eventId) {
+  return new Response(JSON.stringify({
+    data: { eventId, result: 'APPLIED', session: null },
+    meta: { serverTime: '2026-07-18T00:00:00.000Z' },
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+}
+
+test('retries the same event id and drains events in FIFO sequence order', async () => {
+  const { directory, environment } = await fixture()
+  const first = event('UserPromptSubmit')
+  const second = event('Stop')
+  const received = []
+  let failOnce = true
+
+  try {
+    const queuedFirst = await enqueueEvent(first, { environment })
+    const queuedSecond = await enqueueEvent(second, { environment })
+    assert.equal(queuedFirst.sequence, 1)
+    assert.equal(queuedSecond.sequence, 2)
+
+    const fetchImpl = async (_url, options) => {
+      const body = JSON.parse(options.body)
+      received.push({ eventId: body.eventId, sequence: body.sequence })
+      if (failOnce) {
+        failOnce = false
+        throw new Error('offline')
+      }
+      return success(body.eventId)
+    }
+
+    const firstAttempt = await processNextEvent({ environment, fetchImpl, random: () => 0 })
+    assert.equal(firstAttempt.status, 'WAIT')
+    await processNextEvent({ environment, fetchImpl, random: () => 0 })
+    await processNextEvent({ environment, fetchImpl, random: () => 0 })
+
+    assert.deepEqual(received, [
+      { eventId: first.eventId, sequence: 1 },
+      { eventId: first.eventId, sequence: 1 },
+      { eventId: second.eventId, sequence: 2 },
+    ])
+    assert.equal((await readDeliveryDiagnostic(environment)).queueDepth, 0)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('moves permanent failures and corrupt queue records to dead letter storage', async () => {
+  const { directory, environment } = await fixture()
+
+  try {
+    await writeFile(join(directory, 'delivery-queue.jsonl'), '{partial-json\n', 'utf8')
+    const queued = await enqueueEvent(event('SessionStart'), { environment })
+    const result = await processNextEvent({
+      environment,
+      fetchImpl: async () => new Response(
+        JSON.stringify({ error: { code: 'VALIDATION_ERROR' } }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+      ),
+    })
+
+    assert.equal(result.status, 'DEAD_LETTERED')
+    const deadLetters = (await readFile(join(directory, 'dead-letter.jsonl'), 'utf8'))
+      .trim().split('\n').map((line) => JSON.parse(line))
+    assert.deepEqual(deadLetters.map((item) => item.reason), [
+      'CORRUPT_QUEUE_RECORD',
+      'PERMANENT_HTTP_ERROR',
+    ])
+    assert.equal(deadLetters[1].item.event.eventId, queued.eventId)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('stops automatic retries on authentication failures without acknowledging the event', async () => {
+  const { directory, environment } = await fixture()
+
+  try {
+    await enqueueEvent(event('Heartbeat'), { environment })
+    const result = await processNextEvent({
+      environment,
+      fetchImpl: async () => new Response(
+        JSON.stringify({ error: { code: 'DEVICE_AUTH_REQUIRED' } }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+      ),
+    })
+    const diagnostic = await readDeliveryDiagnostic(environment)
+
+    assert.equal(result.status, 'AUTH_BLOCKED')
+    assert.equal(diagnostic.status, 'AUTH_BLOCKED')
+    assert.equal(diagnostic.queueDepth, 1)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})

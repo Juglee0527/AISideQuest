@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -70,6 +71,15 @@ function runRecorder(payload, environment) {
     })
     child.stdin.end(JSON.stringify(payload))
   })
+}
+
+async function waitFor(predicate, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (predicate()) return
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error('Timed out waiting for plugin worker')
 }
 
 test('keeps only the server event contract and hashed identifiers', () => {
@@ -302,6 +312,58 @@ test('keeps a local event and exits successfully when no device is connected', a
     assert.equal(event.event, 'UserPromptSubmit')
     assert.doesNotMatch(log, /must not be persisted|prompt/)
   } finally {
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('emits heartbeats while a turn is active and stops after Stop', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = {
+    AISIDEQUEST_DATA_DIR: dataDirectory,
+    AISIDEQUEST_HEARTBEAT_INTERVAL_MS: '50',
+  }
+  const received = []
+  const api = await startApiServer(async (request, response) => {
+    const body = await readRequest(request)
+    received.push(body)
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({
+      data: request.url?.endsWith('/device-links/redeem')
+        ? { device: { id: randomUUID(), name: 'Heartbeat device' } }
+        : { eventId: body.eventId, result: 'APPLIED', session: null },
+      meta: { serverTime: new Date().toISOString() },
+    }))
+  })
+
+  try {
+    await connectDevice({
+      code: LINK_CODE,
+      apiUrl: api.apiUrl,
+      deviceName: 'Heartbeat device',
+      environment,
+    })
+    await runRecorder({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'heartbeat-session',
+      turn_id: 'heartbeat-turn',
+    }, environment)
+
+    await waitFor(() => received.some((body) => body.event === 'Heartbeat'))
+    await runRecorder({
+      hook_event_name: 'Stop',
+      session_id: 'heartbeat-session',
+      turn_id: 'heartbeat-turn',
+    }, environment)
+    const countAfterStop = received.filter((body) => body.event === 'Heartbeat').length
+    await new Promise((resolve) => setTimeout(resolve, 150))
+
+    assert.equal(received.some((body) => body.event === 'Heartbeat'), true)
+    assert.equal(
+      received.filter((body) => body.event === 'Heartbeat').length,
+      countAfterStop,
+    )
+  } finally {
+    await api.close()
     await rm(dataDirectory, { recursive: true, force: true })
   }
 })

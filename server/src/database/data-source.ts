@@ -7,6 +7,7 @@ import { InitialSchema1784160000000 } from './migrations/1784160000000-initial-s
 import { AddAuthentication1784163600000 } from './migrations/1784163600000-add-authentication'
 import { AddSessionApiIdempotency1784167200000 } from './migrations/1784167200000-add-session-api-idempotency'
 import { AddDeviceLinking1784170800000 } from './migrations/1784170800000-add-device-linking'
+import { AddHeartbeatRecovery1784174400000 } from './migrations/1784174400000-add-heartbeat-recovery'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -24,6 +25,7 @@ export function createDataSourceOptions(
       AddAuthentication1784163600000,
       AddSessionApiIdempotency1784167200000,
       AddDeviceLinking1784170800000,
+      AddHeartbeatRecovery1784174400000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

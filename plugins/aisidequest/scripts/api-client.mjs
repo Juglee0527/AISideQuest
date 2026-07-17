@@ -2,6 +2,31 @@ function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+export class ApiRequestError extends Error {
+  constructor(message, { status = null, code = 'NETWORK_ERROR', retryAfterMs = null } = {}) {
+    super(message)
+    this.name = 'ApiRequestError'
+    this.status = status
+    this.code = code
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+function parseRetryAfter(value, now = Date.now()) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return null
+  }
+
+  const seconds = Number(value)
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.round(seconds * 1_000)
+  }
+
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now) : null
+}
+
 export function normalizeApiUrl(value) {
   const apiUrl = new URL(value)
 
@@ -20,22 +45,37 @@ export async function postApi(
   fetchImpl = fetch,
   signal,
 ) {
-  const response = await fetchImpl(`${apiUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: JSON.stringify(body),
-    signal,
-  })
+  let response
+
+  try {
+    response = await fetchImpl(`${apiUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+  } catch (error) {
+    throw new ApiRequestError(
+      error instanceof Error ? error.message : 'AISideQuest API 네트워크 요청에 실패했습니다.',
+    )
+  }
   let payload
 
   try {
     payload = await response.json()
   } catch {
-    throw new Error(`AISideQuest API가 JSON이 아닌 응답을 반환했습니다. (${response.status})`)
+    throw new ApiRequestError(
+      `AISideQuest API가 JSON이 아닌 응답을 반환했습니다. (${response.status})`,
+      {
+        status: response.status,
+        code: 'INVALID_RESPONSE',
+        retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+      },
+    )
   }
 
   if (!response.ok) {
@@ -44,7 +84,14 @@ export async function postApi(
       ? payload.error.code
       : 'HTTP_ERROR'
 
-    throw new Error(`AISideQuest API 요청에 실패했습니다. (${response.status} ${code})`)
+    throw new ApiRequestError(
+      `AISideQuest API 요청에 실패했습니다. (${response.status} ${code})`,
+      {
+        status: response.status,
+        code,
+        retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+      },
+    )
   }
 
   if (!isRecord(payload) || !('data' in payload)) {

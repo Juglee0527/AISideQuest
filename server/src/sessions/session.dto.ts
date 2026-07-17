@@ -56,6 +56,13 @@ export class IntegrationEventDto {
   @IsUUID('4')
   eventId!: string
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  sequence?: number
+
   @Equals('CODEX')
   provider!: 'CODEX'
 

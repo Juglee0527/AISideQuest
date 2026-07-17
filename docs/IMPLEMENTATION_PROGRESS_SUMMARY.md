@@ -1,10 +1,10 @@
 # AISideQuest 개발 진행 요약
 
-- 작성일: 2026-07-16
+- 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~11번, 총 11개
-- 다음 작업: 12. Heartbeat와 장애 복구 구현
+- 완료: 1~12번, 총 12개
+- 다음 작업: 13. 퀘스트 목록 API 구현
 
 ---
 
@@ -25,6 +25,7 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 9. 기존 LocalStorage를 참고 요약 또는 초기화로 1회 처리하고 신규 데이터와 분리했다.
 10. 정식 Codex 플러그인, 일회성 연결 코드, hash 기기 token, 회전·폐기와 테스트 event를 구현했다.
 11. Codex lifecycle event 자동 전송, 서버 세션 상태 반영, 마지막 event 표시와 수동 fallback을 구현했다.
+12. 30초 heartbeat, durable FIFO queue, 재시도·dead-letter와 서버 세션 만료·late Stop 복구를 구현했다.
 
 현재 React 프런트엔드는 GitHub 로그인 진입점과 PostgreSQL 기반 세션 API를 사용한다. 퀘스트 완료·예상 포인트만 13~15번 서버 전환 전까지 별도 브라우저 키에 임시 저장한다.
 
@@ -498,9 +499,9 @@ npm.cmd run test:database
 | 구분 | 결과 |
 |---|---:|
 | React 테스트 | 38개 통과 |
-| Codex hook 테스트 | 5개 통과 |
+| Codex 플러그인 테스트 | 9개 통과 |
 | NestJS 통합 테스트 | 4개 통과 |
-| 인증·PostgreSQL·세션 통합 테스트 | 22개 통과 |
+| 인증·PostgreSQL·세션 통합 테스트 | 25개 통과 |
 | 전체 자동 테스트 | 69개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
@@ -519,14 +520,17 @@ npm.cmd run test:database
 - API 서버에는 운영 로그, 오류 추적, DB 백업이 아직 없다.
 - API 개발 명령은 서버를 빌드한 뒤 실행하며 hot reload는 제공하지 않는다.
 
-# 7. 다음 작업: Heartbeat와 장애 복구 구현
+# 7. 12번 구현 결과
 
-12번 작업에서 다음 항목을 진행한다.
+12번에서 다음 항목을 구현했다.
 
-1. 작업 중 heartbeat 전송과 120초 만료 처리
-2. 로컬 durable queue, 순서 보존, 지수 backoff와 중복 방지
-3. Codex 비정상 종료와 재시작 후 세션 자동 정리
-4. 24시간 안에 지연 도착한 `Stop` 복구
+1. 활성 turn의 30초 heartbeat와 프로세스 재시작 가능한 상태 파일
+2. append-only JSONL durable queue, 기기 sequence, FIFO single-flight 전송
+3. 지수 backoff·full jitter·`Retry-After`, 재시도 한도와 7일 dead-letter
+4. 자동 120초·순수 수동 12시간 만료와 24시간 orphan event 정리
+5. 동일 기기·turn heartbeat 만료에 한정한 late `Stop` 복구
+
+플러그인 9개, React 38개, NestJS 비DB 6개 테스트와 타입 검사·프로덕션 빌드를 통과했다. PostgreSQL 16에서는 migration 되돌리기·재적용, sequence 제약, 자동·수동 만료, orphan 정리와 late `Stop` 복구를 포함한 DB 통합 테스트 25개를 통과했다.
 
 # 8. 기준 문서
 
@@ -541,4 +545,4 @@ npm.cmd run test:database
 
 ---
 
-현재 결론: **Codex lifecycle event가 사용자 세션과 웹 화면에 자동 반영된다. 다음 단계에서는 heartbeat와 durable 재전송으로 네트워크 단절과 비정상 종료를 복구한다.**
+현재 결론: **heartbeat와 durable 재전송, 서버 만료·late Stop 복구 구현과 PostgreSQL 검증을 완료했다. 다음 작업은 13번 퀘스트 목록 API다.**

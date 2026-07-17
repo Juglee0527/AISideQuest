@@ -91,6 +91,16 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [heartbeatReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'integration_events'
+        AND column_name = 'sequence'
+    `)) as Array<{ count: number }>
+    assert.equal(heartbeatReverted.count, 0)
+
+    await dataSource.undoLastMigration()
     const [deviceLinkingReverted] = (await dataSource.query(`
       SELECT
         to_regclass('public.device_link_codes') AS device_link_codes_table,
@@ -136,7 +146,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 4)
+    assert.equal(reappliedMigrations.length, 5)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
@@ -234,25 +244,43 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'd'.repeat(64),
     ]
 
-    const insertEvent = () =>
+    const insertEvent = (sequence = 1) =>
       dataSource.query(
         `
           INSERT INTO integration_events (
-            event_id, device_id, user_id, event,
+            event_id, sequence, device_id, user_id, event,
             external_session_key, external_turn_key,
             observed_at, processing_result, request_hash
           )
           VALUES (
-            $1, $2, $3, 'UserPromptSubmit', $4, $5,
+            $1, $7, $2, $3, 'UserPromptSubmit', $4, $5,
             now(), 'APPLIED', $6
           )
         `,
-        eventParameters,
+        [...eventParameters, sequence],
       )
 
     await insertEvent()
     await assert.rejects(insertEvent(), (error: unknown) =>
       hasPostgresCode(error, '23505'),
+    )
+
+    await assert.rejects(
+      dataSource.query(
+        `
+          INSERT INTO integration_events (
+            event_id, sequence, device_id, user_id, event,
+            external_session_key, external_turn_key,
+            observed_at, processing_result, request_hash
+          )
+          VALUES (
+            $1, 1, $2, $3, 'UserPromptSubmit', $4, $5,
+            now(), 'APPLIED', $6
+          )
+        `,
+        [randomUUID(), ...eventParameters.slice(1)],
+      ),
+      (error: unknown) => hasPostgresCode(error, '23505'),
     )
 
     await assert.rejects(

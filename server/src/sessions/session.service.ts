@@ -73,6 +73,7 @@ interface DeferredEventRow {
   id: string
   event_id: string
   event: IntegrationEventName
+  device_id: string
   received_at: Date
 }
 
@@ -311,6 +312,7 @@ export class SessionService {
       JSON.stringify({
         schemaVersion: dto.schemaVersion,
         eventId: dto.eventId,
+        sequence: dto.sequence ?? null,
         provider: dto.provider,
         event,
         sessionKey: dto.sessionKey,
@@ -386,9 +388,26 @@ export class SessionService {
         }
       }
 
+      if (dto.sequence !== undefined) {
+        const sequenceEvents = (await manager.query(
+          `
+            SELECT event_id
+            FROM integration_events
+            WHERE device_id = $1 AND sequence = $2
+            LIMIT 1
+          `,
+          [deviceAuth.deviceId, dto.sequence],
+        )) as Array<{ event_id: string }>
+
+        if (sequenceEvents.length > 0) {
+          throw new ConflictException({ code: 'DEVICE_SEQUENCE_REUSED' })
+        }
+      }
+
       let applied = await this.applyIntegrationEvent(
         manager,
         deviceAuth.userId,
+        deviceAuth.deviceId,
         event,
         dto.sessionKey,
         dto.turnKey ?? null,
@@ -424,6 +443,7 @@ export class SessionService {
         `
           INSERT INTO integration_events (
             event_id,
+            sequence,
             device_id,
             user_id,
             ai_session_id,
@@ -438,12 +458,13 @@ export class SessionService {
             response_body
           )
           VALUES (
-            $1, $2, $3, $4, 'CODEX', $5, $6, $7,
-            $8, $9, $10, $11, $12::jsonb
+            $1, $2, $3, $4, $5, 'CODEX', $6, $7, $8,
+            $9, $10, $11, $12, $13::jsonb
           )
         `,
         [
           dto.eventId,
+          dto.sequence ?? null,
           deviceAuth.deviceId,
           deviceAuth.userId,
           applied.session?.id ?? null,
@@ -465,6 +486,7 @@ export class SessionService {
   private async applyIntegrationEvent(
     manager: EntityManager,
     userId: string,
+    deviceId: string,
     event: IntegrationEventName,
     sessionKey: string,
     turnKey: string | null,
@@ -499,7 +521,13 @@ export class SessionService {
       return { result: 'DEFERRED', session: null }
     }
 
-    return this.applySessionEvent(manager, session, event, receivedAt)
+    return this.applySessionEvent(
+      manager,
+      session,
+      deviceId,
+      event,
+      receivedAt,
+    )
   }
 
   private async applyTurnStart(
@@ -585,6 +613,7 @@ export class SessionService {
   private async applySessionEvent(
     manager: EntityManager,
     session: SessionRow,
+    deviceId: string,
     event: Exclude<
       IntegrationEventName,
       'SessionStart' | 'UserPromptSubmit'
@@ -595,10 +624,25 @@ export class SessionService {
       if (
         event === 'Stop' &&
         session.status === 'ABANDONED' &&
+        session.terminal_reason === 'HEARTBEAT_TIMEOUT' &&
         session.ended_at &&
         receivedAt.getTime() - session.ended_at.getTime() <=
           DEFERRED_EVENT_TTL_MS
       ) {
+        const priorDeviceEvents = (await manager.query(
+          `
+            SELECT 1
+            FROM integration_events
+            WHERE ai_session_id = $1 AND device_id = $2
+            LIMIT 1
+          `,
+          [session.id, deviceId],
+        )) as unknown[]
+
+        if (priorDeviceEvents.length === 0) {
+          return { result: 'IGNORED_TERMINAL', session }
+        }
+
         const [sessions] = (await manager.query(
           `
             UPDATE ai_sessions
@@ -667,7 +711,7 @@ export class SessionService {
   ) {
     const deferredEvents = (await manager.query(
       `
-        SELECT id, event_id, event, received_at
+        SELECT id, event_id, event, device_id, received_at
         FROM integration_events
         WHERE user_id = $1
           AND provider = 'CODEX'
@@ -692,6 +736,7 @@ export class SessionService {
         applied = await this.applySessionEvent(
           manager,
           session,
+          deferredEvent.device_id,
           deferredEvent.event as Exclude<
             IntegrationEventName,
             'SessionStart' | 'UserPromptSubmit'

@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`
 
 ---
 
@@ -149,6 +149,8 @@ npm.cmd run test:database
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
 - 기기별 event 중복 방지와 FK 소유권
+- 기기별 event sequence 중복 방지
+- 자동 120초·수동 12시간 만료, orphan 정리와 late `Stop` 복구
 - 사용자와 퀘스트 버전당 포인트 보상 1회
 
 # 8. 다음 작업 경계
@@ -158,5 +160,6 @@ npm.cmd run test:database
 - 6번 완료: GitHub OAuth, 웹 인증 세션과 인증 guard
 - 7번 완료: AI 세션과 integration event transaction
 - 10번 완료: 일회성 기기 연결 코드와 token 발급·회전·해제
+- 12번 구현 완료: integration event sequence, 세션 만료 정리와 late `Stop` 복구
 - 14번: 퀘스트 제출과 서버 판정
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction

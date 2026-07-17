@@ -540,5 +540,5 @@ Authorization: <user-session-cookie>
 
 - 기기 token을 발급하는 웹 연결 코드와 회전·해제는 10번에서 구현한다.
 - plugin의 실제 event 전송 연결은 11번에서 구현한다.
-- heartbeat 만료 스캔, 수동 12시간 만료, 오프라인 queue와 재전송은 12번에서 구현한다.
+- heartbeat 만료 스캔, 수동 12시간 만료, 오프라인 durable queue와 재전송은 12번에서 구현했다.
 - React `SessionContext`의 API 연결은 8번에서 구현한다.
