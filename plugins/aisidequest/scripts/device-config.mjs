@@ -1,5 +1,5 @@
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { resolveDataDirectory } from './event-recorder.mjs'
 
@@ -10,18 +10,21 @@ function isRecord(value) {
 }
 
 export function resolveConfigPath(environment = process.env) {
-  return join(resolveDataDirectory(environment), CONFIG_FILE_NAME)
+  return join(
+    resolveDataDirectory({ ...environment, PLUGIN_DATA: '' }),
+    CONFIG_FILE_NAME,
+  )
 }
 
-function resolveConnectionConfigPath(environment = process.env) {
-  return resolveConfigPath({ ...environment, PLUGIN_DATA: '' })
+function resolveLegacyPluginConfigPath(environment = process.env) {
+  return join(resolveDataDirectory(environment), CONFIG_FILE_NAME)
 }
 
 export async function writeDeviceConfig(config, environment = process.env) {
   const configPath = resolveConfigPath(environment)
   const temporaryPath = `${configPath}.${process.pid}.tmp`
 
-  await mkdir(resolveDataDirectory(environment), { recursive: true })
+  await mkdir(dirname(configPath), { recursive: true })
   await writeFile(temporaryPath, `${JSON.stringify(config, null, 2)}\n`, {
     encoding: 'utf8',
     mode: 0o600,
@@ -39,10 +42,10 @@ export async function writeDeviceConfig(config, environment = process.env) {
 
 export async function readDeviceConfig(environment = process.env) {
   const configPaths = [resolveConfigPath(environment)]
-  const connectionConfigPath = resolveConnectionConfigPath(environment)
+  const legacyPluginConfigPath = resolveLegacyPluginConfigPath(environment)
 
-  if (!configPaths.includes(connectionConfigPath)) {
-    configPaths.push(connectionConfigPath)
+  if (!configPaths.includes(legacyPluginConfigPath)) {
+    configPaths.push(legacyPluginConfigPath)
   }
 
   let parsed

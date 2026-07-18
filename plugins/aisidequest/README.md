@@ -34,7 +34,7 @@ AISideQuest 계정에 현재 Codex 설치를 연결하고, 개인정보가 제�
 node .\scripts\connect-device.mjs --code <연결-코드> --api-url https://example.com/api/v1
 ```
 
-연결 정보는 사용자 로컬 기본 데이터 위치에 한 번만 저장합니다. hook은 queue와 진단 파일에 Codex가 제공한 `PLUGIN_DATA`를 사용하고, 기기 인증 정보는 사용자 로컬 기본 위치에서 읽습니다. `device.json`을 plugin data directory로 복사하지 마세요.
+연결 정보는 사용자 로컬 기본 데이터 위치에 한 번만 저장합니다. hook은 queue와 진단 파일에 Codex가 제공한 `PLUGIN_DATA`를 사용하지만, 기기 인증 정보는 항상 사용자 로컬 기본 위치를 먼저 읽습니다. 과거 버전이 plugin data directory에 남긴 설정은 기본 위치에 연결 정보가 없을 때만 호환용으로 읽습니다. `device.json`을 plugin data directory로 복사하지 마세요.
 
 ## 현재 범위
 

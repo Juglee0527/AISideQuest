@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +13,11 @@ import {
   connectDevice,
   connectDeviceInBrowser,
 } from '../scripts/connect-device.mjs'
-import { readDeviceConfig, resolveConfigPath } from '../scripts/device-config.mjs'
+import {
+  readDeviceConfig,
+  resolveConfigPath,
+  writeDeviceConfig,
+} from '../scripts/device-config.mjs'
 import {
   hashIdentifier,
   sanitizeHookPayload,
@@ -165,6 +169,68 @@ test('connects with a generated token and stores only device credentials locally
     assert.deepEqual(hookConfig, config)
   } finally {
     await api.close()
+    await rm(localAppData, { recursive: true, force: true })
+  }
+})
+
+test('prefers canonical credentials over stale plugin data credentials', async () => {
+  const localAppData = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const pluginDataDirectory = join(localAppData, 'codex-plugin-data')
+  const environment = { LOCALAPPDATA: localAppData, PLUGIN_DATA: pluginDataDirectory }
+  const canonicalConfig = {
+    apiUrl: 'http://127.0.0.1:3000/api/v1',
+    deviceToken: 'current-device-token',
+    pluginVersion: '0.1.0',
+    device: { id: randomUUID(), name: 'Current device' },
+  }
+  const staleConfig = {
+    ...canonicalConfig,
+    deviceToken: 'stale-device-token',
+    device: { id: randomUUID(), name: 'Stale device' },
+  }
+
+  try {
+    await mkdir(pluginDataDirectory, { recursive: true })
+    await writeFile(
+      join(pluginDataDirectory, 'device.json'),
+      `${JSON.stringify(staleConfig)}\n`,
+      'utf8',
+    )
+    await writeDeviceConfig(canonicalConfig, environment)
+
+    const storedConfig = JSON.parse(
+      await readFile(resolveConfigPath(environment), 'utf8'),
+    )
+    const hookConfig = await readDeviceConfig(environment)
+
+    assert.deepEqual(storedConfig, canonicalConfig)
+    assert.deepEqual(hookConfig, canonicalConfig)
+  } finally {
+    await rm(localAppData, { recursive: true, force: true })
+  }
+})
+
+test('reads legacy plugin data credentials when canonical credentials are absent', async () => {
+  const localAppData = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const pluginDataDirectory = join(localAppData, 'codex-plugin-data')
+  const environment = { LOCALAPPDATA: localAppData, PLUGIN_DATA: pluginDataDirectory }
+  const legacyConfig = {
+    apiUrl: 'http://127.0.0.1:3000/api/v1',
+    deviceToken: 'legacy-device-token',
+    pluginVersion: '0.1.0',
+    device: { id: randomUUID(), name: 'Legacy device' },
+  }
+
+  try {
+    await mkdir(pluginDataDirectory, { recursive: true })
+    await writeFile(
+      join(pluginDataDirectory, 'device.json'),
+      `${JSON.stringify(legacyConfig)}\n`,
+      'utf8',
+    )
+
+    assert.deepEqual(await readDeviceConfig(environment), legacyConfig)
+  } finally {
     await rm(localAppData, { recursive: true, force: true })
   }
 })

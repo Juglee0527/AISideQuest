@@ -18,6 +18,7 @@ This is the compact English contract for routine AI-assisted changes. The longer
 - The default connection creates local verifier/token material, sends only their hashes, opens a 10-minute browser approval request, and stores the credential after approval.
 - A browser-authenticated single-use link code remains recovery-only for environments that cannot open the approval page.
 - The raw device token is stored only in the user's local `device.json`. The server stores a SHA-256 hash.
+- Hooks always prefer the canonical user-local `device.json`. A legacy copy under `PLUGIN_DATA` is read only when the canonical credential is absent, so a stale plugin-version credential cannot shadow a newer connection.
 - Rotation issues a new link flow and invalidates the previous credential after successful replacement.
 - Revocation is idempotent and blocks subsequent device authentication immediately.
 - Safe device metadata may include name, plugin version, last seen time, and bounded queue diagnostics; never raw queue content.
