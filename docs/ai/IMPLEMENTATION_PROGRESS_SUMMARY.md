@@ -146,9 +146,9 @@ UserPromptSubmit
 ### 관련 구현 및 문서
 
 - [자동 감지 PoC 결과](./AUTO_DETECTION_POC.md)
-- [플러그인 hook 설정](../plugins/aisidequest-hook-poc/hooks/hooks.json)
-- [개인정보 필터](../plugins/aisidequest-hook-poc/scripts/event-recorder.mjs)
-- [hook 테스트](../plugins/aisidequest-hook-poc/tests/event-recorder.test.mjs)
+- [플러그인 hook 설정](../../plugins/aisidequest-hook-poc/hooks/hooks.json)
+- [개인정보 필터](../../plugins/aisidequest-hook-poc/scripts/event-recorder.mjs)
+- [hook 테스트](../../plugins/aisidequest-hook-poc/tests/event-recorder.test.mjs)
 
 ## 3.3 3번: 세션 상태와 데이터 흐름 설계
 
@@ -268,14 +268,14 @@ http://localhost:3000/api/v1
 
 ### 관련 구현
 
-- [서버 진입점](../server/src/main.ts)
-- [애플리케이션 모듈](../server/src/app.module.ts)
-- [환경설정 검증](../server/src/config/environment.ts)
-- [애플리케이션 공통 설정](../server/src/bootstrap/configure-application.ts)
-- [공통 성공 응답](../server/src/common/http/api-response.interceptor.ts)
-- [공통 오류 응답](../server/src/common/http/api-exception.filter.ts)
-- [Health Check](../server/src/health/health.controller.ts)
-- [서버 통합 테스트](../server/test/app.e2e.test.ts)
+- [서버 진입점](../../server/src/main.ts)
+- [애플리케이션 모듈](../../server/src/app.module.ts)
+- [환경설정 검증](../../server/src/config/environment.ts)
+- [애플리케이션 공통 설정](../../server/src/bootstrap/configure-application.ts)
+- [공통 성공 응답](../../server/src/common/http/api-response.interceptor.ts)
+- [공통 오류 응답](../../server/src/common/http/api-exception.filter.ts)
+- [Health Check](../../server/src/health/health.controller.ts)
+- [서버 통합 테스트](../../server/test/app.e2e.test.ts)
 
 ## 3.5 5번: PostgreSQL 데이터베이스 구성
 

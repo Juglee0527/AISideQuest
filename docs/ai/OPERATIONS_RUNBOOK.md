@@ -90,4 +90,4 @@ OAuth 설정 변경, proxy hop 설정과 공격성 traffic을 확인한다. Rate
 
 ## 경보 검증
 
-규칙은 [`ops/prometheus-alerts.yml`](../ops/prometheus-alerts.yml)에 있다. staging에서 `AISideQuestAlertPipelineTest`를 `vector(1)`로 2분만 바꿔 beta-oncall 수신·ack 경로를 확인한 뒤 즉시 `vector(0)`으로 복구한다. 실제 지표 임계값을 낮춰 시험하지 않는다. webhook 자체는 `ALERT_TEST_WEBHOOK_URL`을 주입하고 `node scripts/send-test-alert.mjs`로 시험할 수 있으며 HTTPS가 아닌 외부 주소는 거부한다. 결과에는 수신 시각, 담당자, ack 시간만 남긴다.
+규칙은 [`ops/prometheus-alerts.yml`](../../ops/prometheus-alerts.yml)에 있다. staging에서 `AISideQuestAlertPipelineTest`를 `vector(1)`로 2분만 바꿔 beta-oncall 수신·ack 경로를 확인한 뒤 즉시 `vector(0)`으로 복구한다. 실제 지표 임계값을 낮춰 시험하지 않는다. webhook 자체는 `ALERT_TEST_WEBHOOK_URL`을 주입하고 `node scripts/send-test-alert.mjs`로 시험할 수 있으며 HTTPS가 아닌 외부 주소는 거부한다. 결과에는 수신 시각, 담당자, ack 시간만 남긴다.

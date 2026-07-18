@@ -436,7 +436,7 @@ Authorization: <user-session-cookie>
 
 # 12. 현재 MVP에서 변경되는 경계
 
-[`SessionContext.tsx`](../src/contexts/SessionContext.tsx)는 8번 작업에서 다음과 같은 API adapter로 전환했다.
+[`SessionContext.tsx`](../../src/contexts/SessionContext.tsx)는 8번 작업에서 다음과 같은 API adapter로 전환했다.
 
 - `SessionContext`는 서버 상태를 조회하고 요청하는 UI adapter가 된다.
 - `startSession`과 `endSession`은 API 호출 후 서버 응답으로 상태를 갱신한다.

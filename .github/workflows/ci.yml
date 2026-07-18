@@ -34,6 +34,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci --ignore-scripts
       - run: npm run lint
+      - run: npm run docs:check
       - run: npm run typecheck
       - run: npm run build
       - run: npm audit --audit-level=high

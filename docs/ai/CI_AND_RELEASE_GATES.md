@@ -1,6 +1,6 @@
 # CI와 릴리스 게이트
 
-AISideQuest의 PR 검사는 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)에서 실행한다. 모든 job은 `pull_request`의 신뢰되지 않은 코드를 전제로 `contents: read` 권한만 사용하며 OAuth, 운영 DB, 기기 token을 주입하지 않는다.
+AISideQuest의 PR 검사는 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)에서 실행한다. 모든 job은 `pull_request`의 신뢰되지 않은 코드를 전제로 `contents: read` 권한만 사용하며 OAuth, 운영 DB, 기기 token을 주입하지 않는다.
 
 ## 자동 검사
 
