@@ -6,6 +6,7 @@ import App from './App'
 import LegacyDataMigrationGate from './components/LegacyDataMigrationGate'
 import { QuestHistoryProvider } from './contexts/QuestHistoryContext'
 import { QuestCatalogProvider } from './contexts/QuestCatalogContext'
+import { PointProvider } from './contexts/PointContext'
 import { SessionProvider } from './contexts/SessionContext'
 import './index.css'
 
@@ -20,11 +21,13 @@ createRoot(rootElement).render(
     <BrowserRouter>
       <LegacyDataMigrationGate>
         <SessionProvider>
-          <QuestCatalogProvider>
-            <QuestHistoryProvider>
-              <App />
-            </QuestHistoryProvider>
-          </QuestCatalogProvider>
+          <PointProvider>
+            <QuestCatalogProvider>
+              <QuestHistoryProvider>
+                <App />
+              </QuestHistoryProvider>
+            </QuestCatalogProvider>
+          </PointProvider>
         </SessionProvider>
       </LegacyDataMigrationGate>
     </BrowserRouter>

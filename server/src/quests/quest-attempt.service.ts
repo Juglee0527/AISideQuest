@@ -14,6 +14,7 @@ import type {
   QuestAttemptQuestionRow,
   QuestAttemptRow,
   QuestAttemptSnapshot,
+  QuestAttemptSubmissionSnapshot,
 } from './quest-attempt.types'
 
 const ACTIVE_SESSION_STATUSES = new Set(['RUNNING', 'WAITING_FOR_USER'])
@@ -48,6 +49,7 @@ const ATTEMPT_COLUMNS = `
 interface IdRow { id: string }
 interface DatabaseTimeRow { current_time: Date }
 interface CorrectCountRow { correct_count: number }
+interface PointAwardRow { id: string; points: number }
 
 @Injectable()
 export class QuestAttemptService {
@@ -281,9 +283,12 @@ export class QuestAttemptService {
         [`AISIDEQUEST:IDEMPOTENCY:${userId}:${idempotencyKey}`],
       )
 
-      const stored = await this.apiIdempotencyService.getResponse<{
-        attempt: QuestAttemptSnapshot
-      }>(manager, userId, idempotencyKey, requestHash)
+      const stored = await this.apiIdempotencyService.getResponse<QuestAttemptSubmissionSnapshot>(
+        manager,
+        userId,
+        idempotencyKey,
+        requestHash,
+      )
       if (stored) return stored
 
       attempt = await this.expireAttemptIfNeeded(manager, attempt, currentTime)
@@ -293,6 +298,7 @@ export class QuestAttemptService {
       if (['COMPLETED', 'FAILED'].includes(attempt.attempt_status)) {
         const response = {
           attempt: await this.toSnapshot(manager, attempt, currentTime),
+          pointAward: await this.findPointAward(manager, userId, attempt.id),
         }
         await this.apiIdempotencyService.storeResponse(
           manager,
@@ -380,10 +386,28 @@ export class QuestAttemptService {
         ],
       )
 
+      if (passed) {
+        await manager.query(
+          `INSERT INTO point_ledger (
+             user_id, quest_id, quest_attempt_id,
+             entry_type, points, description, created_at
+           ) VALUES ($1, $2, $3, 'QUEST_REWARD', $4, $5, $6)`,
+          [
+            userId,
+            attempt.quest_id,
+            attempt.id,
+            attempt.reward_points,
+            `First pass reward for ${attempt.code} v${attempt.version}`,
+            currentTime,
+          ],
+        )
+      }
+
       attempt = await this.findAttempt(manager, userId, attemptId, false)
       if (!attempt) throw new Error('Failed to reload submitted quest attempt')
       const response = {
         attempt: await this.toSnapshot(manager, attempt, currentTime),
+        pointAward: await this.findPointAward(manager, userId, attempt.id),
       }
       await this.apiIdempotencyService.storeResponse(
         manager,
@@ -395,6 +419,24 @@ export class QuestAttemptService {
       )
       return response
     })
+  }
+
+  private async findPointAward(
+    manager: EntityManager,
+    userId: string,
+    attemptId: string,
+  ) {
+    const rows = (await manager.query(
+      `SELECT id, points
+       FROM point_ledger
+       WHERE user_id = $1 AND quest_attempt_id = $2
+       LIMIT 1`,
+      [userId, attemptId],
+    )) as PointAwardRow[]
+    const award = rows[0]
+    return award
+      ? { ledgerEntryId: award.id, points: award.points }
+      : null
   }
 
   private async findActiveAttempt(

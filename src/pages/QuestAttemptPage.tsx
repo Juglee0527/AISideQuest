@@ -23,6 +23,7 @@ import {
 import { getQuest } from '../api/questApi'
 import PageHeader from '../components/PageHeader'
 import { useQuestCatalog } from '../contexts/QuestCatalogContext'
+import { usePoints } from '../contexts/PointContext'
 import { useSession } from '../contexts/SessionContext'
 import type { Quest, QuestAttempt } from '../types/quest'
 
@@ -53,6 +54,7 @@ function QuestAttemptPage() {
   const navigate = useNavigate()
   const { activeSession } = useSession()
   const { refresh: refreshCatalog } = useQuestCatalog()
+  const { refresh: refreshPoints } = usePoints()
   const [quest, setQuest] = useState<Quest | null>(null)
   const [attempt, setAttempt] = useState<QuestAttempt | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
@@ -172,7 +174,7 @@ function QuestAttemptPage() {
       const result = await submitQuestAttempt(attempt.id)
       setAttempt(result.data.attempt)
       setConfirming(false)
-      await refreshCatalog()
+      await Promise.allSettled([refreshCatalog(), refreshPoints()])
     } catch (submitError) {
       setError(errorMessage(submitError))
     } finally {

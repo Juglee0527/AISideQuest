@@ -131,8 +131,20 @@ function parseStarted(value: unknown) {
 }
 
 function parseSubmitted(value: unknown) {
-  if (!isRecord(value) || !('attempt' in value)) return invalid()
-  return { attempt: parseAttempt(value.attempt) }
+  if (!isRecord(value) || !('attempt' in value) || !('pointAward' in value)) return invalid()
+  let pointAward: { ledgerEntryId: string; points: number } | null = null
+  if (value.pointAward !== null) {
+    if (
+      !isRecord(value.pointAward)
+      || typeof value.pointAward.ledgerEntryId !== 'string'
+      || !Number.isInteger(value.pointAward.points)
+    ) return invalid()
+    pointAward = {
+      ledgerEntryId: value.pointAward.ledgerEntryId,
+      points: value.pointAward.points as number,
+    }
+  }
+  return { attempt: parseAttempt(value.attempt), pointAward }
 }
 
 export function startQuestAttempt(code: string, idempotencyKey = crypto.randomUUID()) {

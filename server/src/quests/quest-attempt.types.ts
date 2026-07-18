@@ -76,3 +76,13 @@ export interface QuestAttemptSnapshot {
     answerReview: null
   }
 }
+
+export interface PointAwardSnapshot {
+  ledgerEntryId: string
+  points: number
+}
+
+export interface QuestAttemptSubmissionSnapshot {
+  attempt: QuestAttemptSnapshot
+  pointAward: PointAwardSnapshot | null
+}

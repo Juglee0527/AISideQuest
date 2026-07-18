@@ -6,6 +6,7 @@ import StatCard from '../components/StatCard'
 import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useSession } from '../contexts/SessionContext'
 import { useQuestCatalog } from '../contexts/QuestCatalogContext'
+import { usePoints } from '../contexts/PointContext'
 import useElapsedTime from '../hooks/useElapsedTime'
 import { loadLegacyReferenceSummary } from '../storage/appStorage'
 import {
@@ -26,6 +27,7 @@ function DashboardPage() {
   const { activeSession, completedSessions, getCurrentTime } = useSession()
   const { questHistories } = useQuestHistory()
   const { quests } = useQuestCatalog()
+  const { balance, ledger, status: pointStatus, errorMessage: pointError, refresh: refreshPoints } = usePoints()
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const currentTime = activeStartedAt === null
@@ -92,9 +94,9 @@ function DashboardPage() {
           accent="violet"
         />
         <StatCard
-          label="누적 포인트"
-          value={`${statistics.rewardPoints.toLocaleString('ko-KR')}P`}
-          helper="실제 지급이 아닌 예상 포인트"
+          label="포인트 잔액"
+          value={pointStatus === 'loading' ? '불러오는 중' : `${balance.toLocaleString('ko-KR')}P`}
+          helper="서버 포인트 원장 기준"
           icon={Coins}
           accent="amber"
         />
@@ -117,6 +119,39 @@ function DashboardPage() {
           </p>
         </aside>
       ) : null}
+
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8" aria-labelledby="point-ledger-title">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-300">POINT LEDGER</p>
+            <h2 id="point-ledger-title" className="mt-2 text-xl font-bold text-white">최근 포인트 적립</h2>
+          </div>
+          {pointStatus === 'error' ? (
+            <button type="button" onClick={() => void refreshPoints()} className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-amber-300/40">
+              다시 시도
+            </button>
+          ) : null}
+        </div>
+        {pointStatus === 'loading' ? (
+          <p className="mt-6 text-sm text-slate-400" role="status">포인트 원장을 불러오는 중입니다.</p>
+        ) : pointStatus === 'error' ? (
+          <p className="mt-6 text-sm text-rose-300" role="alert">{pointError}</p>
+        ) : ledger.length === 0 ? (
+          <p className="mt-6 text-sm text-slate-500">아직 적립된 포인트가 없습니다.</p>
+        ) : (
+          <ul className="mt-6 divide-y divide-slate-800">
+            {ledger.map((entry) => (
+              <li key={entry.id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
+                <div>
+                  <p className="font-semibold text-slate-200">{entry.quest.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">v{entry.quest.version} · {new Date(entry.createdAt).toLocaleString('ko-KR')}</p>
+                </div>
+                <span className="font-bold text-amber-300">+{entry.points.toLocaleString('ko-KR')}P</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8" aria-labelledby="activity-title">
         <div className="flex items-center justify-between gap-4">

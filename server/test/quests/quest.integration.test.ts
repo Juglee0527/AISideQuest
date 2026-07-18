@@ -100,6 +100,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
   })
 
   beforeEach(async () => {
+    await databaseService.query('DELETE FROM point_ledger')
     await databaseService.query('DELETE FROM quest_attempts')
   })
 

@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
 import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useQuestCatalog } from '../contexts/QuestCatalogContext'
+import { usePoints } from '../contexts/PointContext'
 import { useSession } from '../contexts/SessionContext'
 import useElapsedTime from '../hooks/useElapsedTime'
 import { calculateActivityStatistics } from '../utils/statistics'
@@ -22,6 +23,7 @@ function HomePage() {
   } = useSession()
   const { questHistories } = useQuestHistory()
   const { quests } = useQuestCatalog()
+  const { balance, status: pointStatus } = usePoints()
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const lastCompletedSession = completedSessions[0]
@@ -155,9 +157,9 @@ function HomePage() {
             accent="violet"
           />
           <StatCard
-            label="예상 리워드"
-            value={`${todayStatistics.rewardPoints.toLocaleString('ko-KR')}P`}
-            helper="실제 지급이 아닌 예상 포인트입니다."
+            label="포인트 잔액"
+            value={pointStatus === 'loading' ? '불러오는 중' : `${balance.toLocaleString('ko-KR')}P`}
+            helper="퀘스트 최초 통과 시 서버 원장에 100P가 적립됩니다."
             icon={Coins}
             accent="amber"
           />

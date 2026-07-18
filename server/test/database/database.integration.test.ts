@@ -91,6 +91,60 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [legacyLedgerIndex] = (await dataSource.query(`
+      SELECT indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'ix_point_ledger_user_created'
+    `)) as Array<{ indexdef: string }>
+    assert.doesNotMatch(legacyLedgerIndex.indexdef, /id DESC/)
+
+    await seedDevelopmentQuests(dataSource)
+    const [migrationUser] = (await dataSource.query(`
+      INSERT INTO users (display_name)
+      VALUES ('Point migration user')
+      RETURNING id
+    `)) as Array<{ id: string }>
+    const [migrationSession] = (await dataSource.query(`
+      INSERT INTO ai_sessions (
+        user_id, status, origin, ended_at, terminal_reason
+      ) VALUES ($1, 'COMPLETED', 'MANUAL', now(), 'MANUAL_COMPLETED')
+      RETURNING id
+    `, [migrationUser.id])) as Array<{ id: string }>
+    const [migrationQuest] = (await dataSource.query(`
+      SELECT id FROM quests WHERE code = 'typescript-type-narrowing'
+    `)) as Array<{ id: string }>
+    const [migrationAttempt] = (await dataSource.query(`
+      INSERT INTO quest_attempts (
+        user_id, quest_id, ai_session_id, status,
+        submitted_at, completed_at, score, passed, reward_points_snapshot
+      ) VALUES ($1, $2, $3, 'COMPLETED', now(), now(), 100, true, 100)
+      RETURNING id
+    `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
+
+    const pointMigrations = await dataSource.runMigrations()
+    assert.equal(pointMigrations.length, 1)
+    const [backfill] = (await dataSource.query(`
+      SELECT points, quest_attempt_id
+      FROM point_ledger
+      WHERE user_id = $1
+    `, [migrationUser.id])) as Array<{ points: number; quest_attempt_id: string }>
+    assert.deepEqual(backfill, { points: 100, quest_attempt_id: migrationAttempt.id })
+    const [ledgerIndex] = (await dataSource.query(`
+      SELECT indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'ix_point_ledger_user_created'
+    `)) as Array<{ indexdef: string }>
+    assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
+
+    await dataSource.undoLastMigration()
+    await dataSource.query('DELETE FROM point_ledger')
+    await dataSource.query('DELETE FROM quest_attempts WHERE id = $1', [migrationAttempt.id])
+    await dataSource.query('DELETE FROM ai_sessions WHERE id = $1', [migrationSession.id])
+    await dataSource.query('DELETE FROM users WHERE id = $1', [migrationUser.id])
+
+    await dataSource.undoLastMigration()
     const [attemptFlowReverted] = (await dataSource.query(`
       SELECT is_nullable
       FROM information_schema.columns
@@ -166,7 +220,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 7)
+    assert.equal(reappliedMigrations.length, 8)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

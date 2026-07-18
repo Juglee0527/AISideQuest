@@ -461,7 +461,13 @@ describe('AISideQuest API session flow', () => {
       }
       if (url.pathname.endsWith(`/quest-attempts/${attemptId}/submissions`)) {
         submitted = true
-        return jsonResponse({ attempt: attempt() })
+        return jsonResponse({
+          attempt: attempt(),
+          pointAward: {
+            ledgerEntryId: '00000000-0000-4000-8000-000000000040',
+            points: 100,
+          },
+        })
       }
       if (url.pathname.endsWith(`/quest-attempts/${attemptId}`)) {
         return jsonResponse(attempt())
