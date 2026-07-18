@@ -92,7 +92,7 @@ stateDiagram-v2
 
 Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그인 hook에는 쓰기 가능한 `PLUGIN_DATA`를 제공한다. 플러그인은 원본 식별자를 서버로 보내지 않고 기존 PoC와 동일하게 SHA-256 hash로 변환한다.
 
-기기 연결 CLI는 Codex 밖에서도 실행할 수 있으므로 사용자 로컬 기본 데이터 위치에 `device.json`을 저장한다. hook 실행 시에는 queue와 진단 파일에 `PLUGIN_DATA`를 우선 사용하되, 그 위치에 기기 설정이 없으면 연결 CLI의 사용자 로컬 기본 위치를 읽는다. 기기 token을 두 위치에 복제하지 않는다.
+기기 연결은 플러그인 스킬이 로컬 verifier와 기기 token을 만들고 브라우저 승인 화면을 자동으로 여는 방식이 기본이다. 서버에는 verifier challenge와 기기 token hash만 전송하며 원문은 플러그인 프로세스 밖으로 내보내지 않는다. 승인 후 플러그인은 사용자 로컬 기본 데이터 위치에 `device.json`을 저장한다. hook 실행 시에는 queue와 진단 파일에 `PLUGIN_DATA`를 우선 사용하되, 그 위치에 기기 설정이 없으면 사용자 로컬 기본 위치를 읽는다. 기기 token을 두 위치에 복제하지 않는다. 기존 일회용 연결 코드는 브라우저를 열 수 없는 환경의 복구용으로만 유지한다.
 
 | Hook 또는 내부 event | 대상 상태 | 서버 처리 |
 |---|---|---|

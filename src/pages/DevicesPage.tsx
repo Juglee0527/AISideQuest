@@ -197,27 +197,18 @@ function DevicesPage() {
         title="기기 연동"
         description="Codex 플러그인을 현재 계정에 연결하고, 기기 토큰을 재발급하거나 즉시 폐기할 수 있습니다."
         action={(
-          <button
-            type="button"
-            disabled={loadStatus !== 'ready' || mutationId !== null}
-            onClick={() => void issueLink(null)}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {mutationId === 'new' ? (
-              <LoaderCircle className="animate-spin" size={17} aria-hidden="true" />
-            ) : (
-              <Cable size={17} aria-hidden="true" />
-            )}
-            새 기기 연결
-          </button>
+          <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/5 px-4 py-2.5 text-sm font-bold text-emerald-200">
+            <Cable size={17} aria-hidden="true" />
+            Codex에서 “AISideQuest 연결해줘”
+          </span>
         )}
       />
 
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          ['1', '웹에서 일회용 연결 코드를 발급합니다.'],
-          ['2', '플러그인에서 연결 명령을 한 번 실행합니다.'],
-          ['3', '테스트 이벤트로 사용자 식별을 확인합니다.'],
+          ['1', 'Codex에 “AISideQuest 연결해줘”라고 요청합니다.'],
+          ['2', '자동으로 열린 브라우저에서 이 기기 연결을 승인합니다.'],
+          ['3', '연결과 테스트 이벤트가 자동으로 확인됩니다.'],
         ].map(([step, description]) => (
           <div key={step} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
             <span className="grid size-8 place-items-center rounded-full bg-emerald-400/10 text-sm font-bold text-emerald-300">{step}</span>
@@ -225,6 +216,28 @@ function DevicesPage() {
           </div>
         ))}
       </section>
+
+      <details className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-400">
+        <summary className="cursor-pointer font-bold text-slate-300">
+          브라우저 연결이 안 될 때만: 복구용 연결 코드
+        </summary>
+        <p className="mt-3 leading-6">
+          일반 연결에는 필요하지 않습니다. 브라우저를 열 수 없는 환경에서만 일회용 코드를 발급하세요.
+        </p>
+        <button
+          type="button"
+          disabled={loadStatus !== 'ready' || mutationId !== null}
+          onClick={() => void issueLink(null)}
+          className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 font-bold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {mutationId === 'new' ? (
+            <LoaderCircle className="animate-spin" size={17} aria-hidden="true" />
+          ) : (
+            <KeyRound size={17} aria-hidden="true" />
+          )}
+          복구용 코드 발급
+        </button>
+      </details>
 
       <section className={`flex items-start gap-3 rounded-2xl border p-5 ${autoDetectionContent.className}`} aria-live="polite">
         <Activity className="mt-0.5 shrink-0" size={21} aria-hidden="true" />
@@ -243,7 +256,7 @@ function DevicesPage() {
             <KeyRound className="mt-0.5 shrink-0 text-emerald-300" size={21} aria-hidden="true" />
             <div className="min-w-0 flex-1">
               <h2 className="font-bold text-emerald-100">
-                {pendingLink.purpose === 'CONNECT' ? '기기 연결 코드' : '기기 재연결 코드'}
+                {pendingLink.purpose === 'CONNECT' ? '복구용 기기 연결 코드' : '복구용 기기 재연결 코드'}
               </h2>
               <p className="mt-1 text-sm text-emerald-100/70">
                 {formatDate(pendingLink.expiresAt)}까지 한 번만 사용할 수 있습니다.

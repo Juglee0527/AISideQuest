@@ -62,6 +62,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'api_idempotency_keys',
       'auth_sessions',
       'device_link_codes',
+      'device_link_requests',
       'devices',
       'integration_events',
       'oauth_login_states',
@@ -90,6 +91,20 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [browserLinkingReverted] = (await dataSource.query(`
+      SELECT
+        to_regclass('public.device_link_requests') AS request_table,
+        (SELECT count(*)::integer
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'oauth_login_states'
+           AND column_name = 'return_path') AS return_path_column
+    `)) as Array<{ request_table: string | null; return_path_column: number }>
+    assert.deepEqual(browserLinkingReverted, {
+      request_table: null,
+      return_path_column: 0,
+    })
 
     await dataSource.undoLastMigration()
     const [diagnosticsReverted] = (await dataSource.query(`
@@ -159,7 +174,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 4)
+    assert.equal(pointMigrations.length, 5)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -182,6 +197,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     await dataSource.query('DELETE FROM ai_sessions WHERE id = $1', [migrationSession.id])
     await dataSource.query('DELETE FROM users WHERE id = $1', [migrationUser.id])
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     const [attemptFlowReverted] = (await dataSource.query(`
@@ -259,7 +275,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 11)
+    assert.equal(reappliedMigrations.length, 12)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

@@ -21,15 +21,19 @@ Base path: `/api/v1`
 | `GET /health`, `/health/live` | public | process liveness |
 | `GET /health/ready` | public | DB connectivity and zero pending migrations |
 | `GET /health/metrics` | metrics bearer token | Prometheus metrics |
-| `GET /auth/github` | public, rate-limited | begin GitHub OAuth with state + PKCE |
+| `GET /auth/github` | public, rate-limited | begin GitHub OAuth with state + PKCE; optional same-origin `returnTo` |
 | `GET /auth/github/callback` | OAuth state cookie | complete or cancel OAuth |
 | `GET /auth/me` | browser session | current user |
 | `PATCH /auth/me/time-zone` | session + CSRF | save validated IANA time zone |
 | `POST /auth/logout` | session + CSRF | revoke current session |
 | `POST /auth/me/export` | session + CSRF + recent auth | export owned data |
 | `DELETE /auth/me` | session + CSRF + recent auth | delete account transactionally |
-| `POST /device-links` | session + CSRF + idempotency | create a 10-minute single-use link code |
-| `POST /device-links/redeem` | link code + idempotency | issue device token once |
+| `POST /device-link-requests` | public + idempotency + rate limit | create a 10-minute browser approval request from verifier/token hashes |
+| `GET /device-link-requests/:id` | browser session | read safe pending request metadata |
+| `POST /device-link-requests/:id/approve` | session + CSRF + idempotency | approve the request and bind its hash-only device credential |
+| `POST /device-link-requests/:id/complete` | verifier proof + rate limit | poll pending state or finish local connection after approval |
+| `POST /device-links` | session + CSRF + idempotency | recovery-only: create a 10-minute single-use link code |
+| `POST /device-links/redeem` | link code + idempotency | recovery-only: issue device token once |
 | `GET /devices` | browser session | list owned safe device metadata |
 | `POST /devices/:id/rotation-links` | session + CSRF + ownership | begin token rotation |
 | `POST /devices/:id/revoke` | session + CSRF + ownership | revoke device idempotently |
@@ -50,4 +54,3 @@ Base path: `/api/v1`
 | `GET /stats/activity` | browser session | cursor-paginated mixed activity |
 
 For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md). For session event semantics, use [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md).
-

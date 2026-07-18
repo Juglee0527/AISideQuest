@@ -1,5 +1,5 @@
 import { AlertCircle, BarChart3, Compass, House, LoaderCircle, LogIn, Plug, RefreshCw, Sparkles } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { useSession } from '../contexts/SessionContext'
 import { getGithubLoginUrl } from '../api/apiClient'
@@ -21,7 +21,11 @@ const getNavLinkClassName = ({ isActive }: { isActive: boolean }) =>
 
 function AppLayout() {
   const { activeSession, loadStatus, errorMessage, retry } = useSession()
+  const location = useLocation()
   const isWaitingForUser = activeSession?.status === 'WAITING_FOR_USER'
+  const loginReturnPath = location.pathname.startsWith('/devices/connect/')
+    ? location.pathname
+    : undefined
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -90,7 +94,7 @@ function AppLayout() {
               </div>
             </div>
             <a
-              href={getGithubLoginUrl()}
+              href={getGithubLoginUrl(loginReturnPath)}
               data-testid="github-login"
               className="inline-flex shrink-0 items-center justify-center rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-200"
             >

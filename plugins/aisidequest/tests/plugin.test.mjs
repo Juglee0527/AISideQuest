@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -8,7 +8,10 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
-import { connectDevice } from '../scripts/connect-device.mjs'
+import {
+  connectDevice,
+  connectDeviceInBrowser,
+} from '../scripts/connect-device.mjs'
 import { readDeviceConfig, resolveConfigPath } from '../scripts/device-config.mjs'
 import {
   hashIdentifier,
@@ -159,6 +162,94 @@ test('connects with a generated token and stores only device credentials locally
       PLUGIN_DATA: pluginDataDirectory,
     })
     assert.deepEqual(hookConfig, config)
+  } finally {
+    await api.close()
+    await rm(localAppData, { recursive: true, force: true })
+  }
+})
+
+test('connects through browser approval without exposing a raw device token', async () => {
+  const localAppData = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = { LOCALAPPDATA: localAppData }
+  const requests = []
+  const openedUrls = []
+  let completionAttempts = 0
+  const requestIdPattern = /^[0-9a-f-]{36}$/
+  const api = await startApiServer(async (request, response) => {
+    const body = await readRequest(request)
+    requests.push({ url: request.url, headers: request.headers, body })
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+
+    if (request.url === '/api/v1/device-link-requests') {
+      response.end(JSON.stringify({
+        data: {
+          request: {
+            id: body.requestId,
+            status: 'PENDING',
+            verificationUrl: `http://localhost:5173/devices/connect/${body.requestId}`,
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          },
+        },
+        meta: { serverTime: new Date().toISOString() },
+      }))
+      return
+    }
+
+    completionAttempts += 1
+    response.end(JSON.stringify({
+      data: completionAttempts === 1
+        ? {
+            request: { status: 'PENDING' },
+            retryAfterMs: 250,
+          }
+        : {
+            request: { status: 'APPROVED' },
+            device: {
+              id: '123e4567-e89b-42d3-a456-426614174009',
+              name: 'Browser approved device',
+            },
+          },
+      meta: { serverTime: new Date().toISOString() },
+    }))
+  })
+
+  try {
+    await connectDeviceInBrowser({
+      apiUrl: api.apiUrl,
+      deviceName: 'Browser approved device',
+      environment,
+      openBrowserImpl: async (url) => openedUrls.push(url),
+      waitImpl: async () => undefined,
+    })
+
+    const createRequest = requests[0]
+    const completeRequest = requests[1]
+    assert.equal(createRequest.url, '/api/v1/device-link-requests')
+    assert.match(createRequest.body.requestId, requestIdPattern)
+    assert.equal(
+      createRequest.headers['idempotency-key'],
+      createRequest.body.requestId,
+    )
+    assert.match(createRequest.body.verifierChallenge, /^[A-Za-z0-9_-]{43}$/)
+    assert.match(createRequest.body.deviceTokenHash, /^[0-9a-f]{64}$/)
+    assert.equal('deviceToken' in createRequest.body, false)
+    assert.equal(
+      createHash('sha256')
+        .update(completeRequest.body.verifier, 'utf8')
+        .digest('base64url'),
+      createRequest.body.verifierChallenge,
+    )
+    assert.deepEqual(openedUrls, [
+      `http://localhost:5173/devices/connect/${createRequest.body.requestId}`,
+    ])
+
+    const config = JSON.parse(
+      await readFile(resolveConfigPath(environment), 'utf8'),
+    )
+    assert.equal(
+      createHash('sha256').update(config.deviceToken, 'utf8').digest('hex'),
+      createRequest.body.deviceTokenHash,
+    )
   } finally {
     await api.close()
     await rm(localAppData, { recursive: true, force: true })

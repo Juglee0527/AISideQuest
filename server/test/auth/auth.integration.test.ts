@@ -173,7 +173,11 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
   test('GitHub OAuth uses state and PKCE, then creates hash-only cookies', async () => {
     const agent = request.agent(app.getHttpServer())
-    const startResponse = await agent.get('/api/v1/auth/github').expect(302)
+    const returnPath = '/devices/connect/123e4567-e89b-42d3-a456-426614174000'
+    const startResponse = await agent
+      .get('/api/v1/auth/github')
+      .query({ returnTo: returnPath })
+      .expect(302)
     const authorizationUrl = new URL(startResponse.headers.location)
     const state = authorizationUrl.searchParams.get('state')
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge')
@@ -207,7 +211,10 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .query({ code: 'temporary-github-code', state })
       .expect(302)
 
-    assert.equal(callbackResponse.headers.location, 'http://localhost:5173/')
+    assert.equal(
+      callbackResponse.headers.location,
+      `http://localhost:5173${returnPath}`,
+    )
     assert.match(callbackCodeVerifier ?? '', /^[A-Za-z0-9_-]{43}$/)
 
     const sessionSetCookie = getSetCookie(
@@ -358,6 +365,13 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       response.headers.location,
       'http://localhost:5173/?authError=github_oauth_failed',
     )
+  })
+
+  test('OAuth return path rejects external redirects', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/github')
+      .query({ returnTo: '//evil.example/steal' })
+      .expect(400)
   })
 
   test('user export excludes secrets and account deletion removes owned server data', async () => {

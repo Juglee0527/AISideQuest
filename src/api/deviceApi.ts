@@ -3,7 +3,11 @@ import {
   createMutationHeaders,
   requestApi,
 } from './apiClient'
-import type { Device, DeviceLink } from '../types/device'
+import type {
+  BrowserDeviceLinkRequest,
+  Device,
+  DeviceLink,
+} from '../types/device'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -87,8 +91,76 @@ function parseDeviceResponse(value: unknown) {
   return { device: parseDevice(value.device) }
 }
 
+function parseBrowserDeviceLinkRequest(
+  value: unknown,
+): BrowserDeviceLinkRequest {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    !['PENDING', 'APPROVED', 'EXPIRED'].includes(String(value.status)) ||
+    typeof value.deviceName !== 'string' ||
+    typeof value.pluginVersion !== 'string' ||
+    !isIsoDate(value.expiresAt) ||
+    !(value.approvedAt === null || isIsoDate(value.approvedAt)) ||
+    typeof value.verificationUrl !== 'string'
+  ) {
+    return invalidDeviceResponse()
+  }
+
+  return {
+    id: value.id,
+    status: value.status as BrowserDeviceLinkRequest['status'],
+    deviceName: value.deviceName,
+    pluginVersion: value.pluginVersion,
+    expiresAt: value.expiresAt,
+    approvedAt: value.approvedAt,
+    verificationUrl: value.verificationUrl,
+  }
+}
+
+function parseBrowserLinkResponse(value: unknown) {
+  if (!isRecord(value)) {
+    return invalidDeviceResponse()
+  }
+
+  return { request: parseBrowserDeviceLinkRequest(value.request) }
+}
+
+function parseBrowserApprovalResponse(value: unknown) {
+  if (!isRecord(value)) {
+    return invalidDeviceResponse()
+  }
+
+  return {
+    request: parseBrowserDeviceLinkRequest(value.request),
+    device: parseDevice(value.device),
+  }
+}
+
 export function getDevices(signal?: AbortSignal) {
   return requestApi('/devices', parseDeviceList, { signal })
+}
+
+export function getBrowserDeviceLinkRequest(
+  requestId: string,
+  signal?: AbortSignal,
+) {
+  return requestApi(
+    `/device-link-requests/${encodeURIComponent(requestId)}`,
+    parseBrowserLinkResponse,
+    { signal },
+  )
+}
+
+export function approveBrowserDeviceLinkRequest(requestId: string) {
+  return requestApi(
+    `/device-link-requests/${encodeURIComponent(requestId)}/approve`,
+    parseBrowserApprovalResponse,
+    {
+      method: 'POST',
+      headers: createMutationHeaders(),
+    },
+  )
 }
 
 export function createDeviceLink(code: string) {

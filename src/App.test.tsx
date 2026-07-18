@@ -307,6 +307,78 @@ describe('AISideQuest API session flow', () => {
     expect(screen.getByText(/^마지막 이벤트 .*활성 기기 1개$/)).toBeInTheDocument()
   })
 
+  it('approves a browser device connection without showing a connection code', async () => {
+    const requestId = '123e4567-e89b-42d3-a456-426614174050'
+    let approved = false
+    const fetchMock = vi.fn(async (
+      input: string | URL | Request,
+      _init?: RequestInit,
+    ) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/quests')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith(`/device-link-requests/${requestId}/approve`)) {
+        approved = true
+        return jsonResponse({
+          request: {
+            id: requestId,
+            status: 'APPROVED',
+            deviceName: 'Browser Codex',
+            pluginVersion: '0.2.0',
+            expiresAt: '2026-07-15T00:10:00.000Z',
+            approvedAt: '2026-07-15T00:00:01.000Z',
+            verificationUrl: `http://localhost:5173/devices/connect/${requestId}`,
+          },
+          device: {
+            id: '123e4567-e89b-42d3-a456-426614174051',
+            name: 'Browser Codex',
+            pluginVersion: '0.2.0',
+            lastSeenAt: null,
+            expiresAt: '2026-10-15T00:00:00.000Z',
+            revokedAt: null,
+            createdAt: '2026-07-15T00:00:01.000Z',
+          },
+        })
+      }
+      if (url.pathname.endsWith(`/device-link-requests/${requestId}`)) {
+        return jsonResponse({
+          request: {
+            id: requestId,
+            status: approved ? 'APPROVED' : 'PENDING',
+            deviceName: 'Browser Codex',
+            pluginVersion: '0.2.0',
+            expiresAt: '2026-07-15T00:10:00.000Z',
+            approvedAt: approved ? '2026-07-15T00:00:01.000Z' : null,
+            verificationUrl: `http://localhost:5173/devices/connect/${requestId}`,
+          },
+        })
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp(`/devices/connect/${requestId}`)
+    await flushRequests()
+
+    expect(screen.getByText('이 기기를 연결할까요?')).toBeInTheDocument()
+    expect(screen.getByText('Browser Codex')).toBeInTheDocument()
+    expect(screen.queryByText(/--code/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이 기기 연결 승인' }))
+    await flushRequests()
+
+    expect(screen.getByText('연결 승인 완료')).toBeInTheDocument()
+    const approvalCall = fetchMock.mock.calls.find(([input]) => (
+      new URL(typeof input === 'string' ? input : input.toString()).pathname
+        .endsWith(`/device-link-requests/${requestId}/approve`)
+    ))
+    expect(approvalCall?.[1]?.body).toBeUndefined()
+  })
+
   it('shows quest loading failure and retries without a page reload', async () => {
     let questRequestFails = true
 

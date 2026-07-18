@@ -23,6 +23,7 @@ AISideQuest는 Codex가 작업하는 동안 생기는 대기 시간을 짧은 �
 - 사용자·퀘스트 버전별 최초 통과 100P 원장
 - IANA time zone 기반 오늘·주·월·사용자 지정 통계
 - GitHub OAuth, CSRF, 소유권, Rate Limit, 데이터 내보내기·삭제
+- 연결 코드 복사 없이 Codex 요청과 브라우저 승인만으로 끝나는 기기 연결
 - Docker 운영 배포, migration-first rollout, rollback, metrics·alerts
 
 ## 빠른 실행
@@ -52,7 +53,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-마지막 전체 검증에서는 React 47개, Codex plugin 10개, 운영 도구 11개, 서버 비DB 19개, PostgreSQL 통합 45개 등 총 132개 테스트를 통과했습니다.
+마지막 전체 검증에서는 React 49개, Codex plugin 11개, 운영 도구 12개, 서버 비DB 19개, PostgreSQL 통합 47개 등 총 138개 테스트를 통과했습니다.
 
 ## 현재 상태
 

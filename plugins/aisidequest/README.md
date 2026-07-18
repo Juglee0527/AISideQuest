@@ -8,29 +8,29 @@ AISideQuest 계정에 현재 Codex 설치를 연결하고, 개인정보가 제�
 - 저장하지 않음: 프롬프트, 응답, 소스 코드, 파일 경로, transcript, 도구 입력/출력
 - GitHub OAuth 자격 증명은 플러그인에 전달하거나 저장하지 않습니다.
 - 기기 토큰 원문은 사용자 로컬의 `device.json`에만 저장하고 서버에는 SHA-256 해시만 저장합니다.
+- 브라우저 연결 verifier 원문은 로컬 연결 프로세스에만 존재하고 서버에는 S256 challenge만 저장합니다.
 
 ## 기기 연결
 
 1. 저장소의 로컬 marketplace에서 `aisidequest` 플러그인을 설치하고 활성화합니다.
 2. Codex 앱이 lifecycle hook 신뢰를 요청하면 이벤트명과 실행 명령을 확인한 뒤 승인합니다.
-3. AISideQuest 웹의 `Devices` 화면에서 연결 코드를 발급합니다.
-4. 플러그인 디렉터리에서 아래 명령을 실행합니다.
+3. Codex에 `AISideQuest 연결해줘`라고 요청합니다.
+4. 자동으로 열린 브라우저에서 GitHub 로그인을 확인하고 **이 기기 연결 승인**을 누릅니다.
+5. 플러그인이 연결 정보를 로컬에 저장하고 테스트 이벤트까지 확인하면 완료됩니다.
+
+사용자가 연결 코드를 복사하거나 PowerShell 명령을 실행할 필요가 없습니다. 브라우저 승인 요청은 10분 후 만료되고, 기기 토큰은 90일 후 만료되며 웹 Devices에서 즉시 폐기할 수 있습니다.
+
+API가 로컬 기본값과 다른 개발·운영 bundle은 `AISIDEQUEST_API_URL` 환경 또는 배포된 plugin 설정으로 API 주소를 제공해야 합니다.
+
+### 복구용 연결 코드
+
+브라우저를 열 수 없는 환경에서만 웹 Devices의 **복구용 연결 코드**를 발급하고 다음 명령을 사용합니다.
 
 ```powershell
-node .\scripts\connect-device.mjs --code <연결-코드>
+node .\scripts\connect-device.mjs --code <연결-코드> --api-url https://example.com/api/v1
 ```
 
-API가 로컬 기본값과 다르면 `--api-url https://example.com/api/v1`을 추가합니다.
-
-연결 명령은 Codex 외부에서도 실행할 수 있도록 사용자 로컬 기본 데이터 위치에 기기 인증 정보를 저장합니다. hook은 queue와 진단 파일에 Codex가 제공한 `PLUGIN_DATA`를 사용하고, 기기 인증 정보는 사용자 로컬 기본 위치에서 읽습니다. `device.json`을 plugin data directory로 복사하지 마세요.
-
-5. 연결 후 테스트 이벤트를 명시적으로 전송해 연결을 확인합니다.
-
-```powershell
-node .\scripts\send-test-event.mjs
-```
-
-연결 코드는 한 번만 사용할 수 있고 10분 후 만료됩니다. 기기 토큰은 90일 후 만료되며 웹 화면에서 재연결하거나 즉시 폐기할 수 있습니다.
+연결 정보는 사용자 로컬 기본 데이터 위치에 한 번만 저장합니다. hook은 queue와 진단 파일에 Codex가 제공한 `PLUGIN_DATA`를 사용하고, 기기 인증 정보는 사용자 로컬 기본 위치에서 읽습니다. `device.json`을 plugin data directory로 복사하지 마세요.
 
 ## 현재 범위
 

@@ -130,8 +130,9 @@ export const API_BASE_URL = (
     : configuredApiBaseUrl
 ).replace(/\/+$/, '')
 
-export function getGithubLoginUrl() {
-  return `${API_BASE_URL}/auth/github`
+export function getGithubLoginUrl(returnTo?: string) {
+  const suffix = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''
+  return `${API_BASE_URL}/auth/github${suffix}`
 }
 
 export async function requestApi<T>(

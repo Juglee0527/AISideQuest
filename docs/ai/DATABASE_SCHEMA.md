@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784196000000-add-operational-diagnostics`까지 11개
+- 기준 migration: `1784160000000`부터 `1784199600000-add-browser-device-linking`까지 12개
 
 ---
 
@@ -26,10 +26,11 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 |---|---|
 | `users` | 사용자 기본 정보와 시간대 |
 | `user_auth_accounts` | GitHub OAuth 계정 식별 정보 |
-| `oauth_login_states` | 1회용 OAuth state hash와 PKCE verifier |
+| `oauth_login_states` | 1회용 OAuth state hash, PKCE verifier와 같은 origin 복귀 경로 |
 | `auth_sessions` | hash token 기반 웹 인증 세션 |
 | `api_idempotency_keys` | 사용자 변경 API의 request hash와 응답 snapshot |
 | `device_link_codes` | 10분 유효 일회성 연결 코드 hash와 소비 상태 |
+| `device_link_requests` | 10분 유효 브라우저 승인 요청, verifier challenge와 기기 token hash |
 | `devices` | Codex 플러그인 연결 기기와 hash token |
 | `ai_sessions` | 자동·수동 AI 작업 세션과 상태 |
 | `integration_events` | 개인정보가 제거된 Codex lifecycle event |
@@ -54,6 +55,8 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `(user_id, idempotency_key)`는 유일하며 같은 key의 다른 request hash를 거부한다.
 - 멱등성 응답은 JSON object snapshot으로 저장해 재요청 시 논리 결과를 그대로 반환한다.
 - 기기 token 원문은 저장하지 않고 64자리 SHA-256 hash만 저장한다.
+- 브라우저 연결 verifier 원문은 저장하지 않고 43자리 S256 challenge만 저장한다.
+- 브라우저 연결 요청은 승인 전에는 사용자와 기기가 없고, 승인 transaction에서 둘을 함께 확정한다.
 - 연결 코드 원문도 저장하지 않고 64자리 SHA-256 hash만 저장하며 10분 안에 한 번만 소비한다.
 - 신규 기기 연결과 기존 기기 token 회전을 구분하고, 모든 변경 요청은 멱등하게 처리한다.
 - 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
@@ -150,6 +153,7 @@ npm.cmd run test:database
 - cursor 이력, 세션 소유권과 Codex event 상태 전이
 - 의미 중복 event, 새 turn 대체와 역순 `Stop` 재처리
 - 연결 코드 1회 소비, 기기 token hash 저장, 소유권 격리
+- 브라우저 승인 요청의 verifier challenge, token hash, 만료, 승인 소유권과 완료 polling
 - token 회전 후 구 token 차단과 연결 폐기 후 인증 차단
 - 개발 seed 반복 실행
 - 사용자당 활성 세션 1개
@@ -172,3 +176,4 @@ npm.cmd run test:database
 - 16번 구현 완료: 미검증 UTC와 IANA time zone 저장, 세션 구간·통과 응시 index, 서버 기간 통계
 - 17번 구현 완료: endpoint 보안 matrix, 공유 Rate Limit과 개인정보 보호
 - 18번 구현 완료: queue 진단 컬럼, advisory-lock migration runner와 readiness 검증
+- 연결 UX 개선 완료: 브라우저 승인 요청과 OAuth 승인 화면 복귀 경로

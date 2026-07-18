@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  approveBrowserDeviceLinkRequest,
   createDeviceLink,
+  getBrowserDeviceLinkRequest,
   getDevices,
   revokeDevice,
 } from './deviceApi'
@@ -75,5 +77,44 @@ describe('device API client', () => {
     const [, init] = fetchMock.mock.calls[0]
     expect(init?.method).toBe('POST')
     expect(init?.body).toBeUndefined()
+  })
+
+  it('loads and approves a browser device link request', async () => {
+    const requestId = '123e4567-e89b-42d3-a456-426614174010'
+    const linkRequest = {
+      id: requestId,
+      status: 'PENDING',
+      deviceName: 'Browser Codex',
+      pluginVersion: '0.2.0',
+      expiresAt: '2026-07-16T00:10:00.000Z',
+      approvedAt: null,
+      verificationUrl: `http://localhost:5173/devices/connect/${requestId}`,
+    }
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => response(init?.method === 'POST'
+      ? {
+          request: {
+            ...linkRequest,
+            status: 'APPROVED',
+            approvedAt: serverTime,
+          },
+          device,
+        }
+      : { request: linkRequest }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const loaded = await getBrowserDeviceLinkRequest(requestId)
+    const approved = await approveBrowserDeviceLinkRequest(requestId)
+
+    expect(loaded.data.request).toEqual(linkRequest)
+    expect(approved.data.request.status).toBe('APPROVED')
+    const [approvalUrl, approvalInit] = fetchMock.mock.calls[1]
+    expect(approvalUrl).toBe(
+      `http://localhost:3000/api/v1/device-link-requests/${requestId}/approve`,
+    )
+    expect(approvalInit?.body).toBeUndefined()
+    expect(new Headers(approvalInit?.headers).get('x-csrf-token')).toBe('csrf-token')
   })
 })

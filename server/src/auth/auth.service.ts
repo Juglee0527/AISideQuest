@@ -19,6 +19,7 @@ import { GithubOAuthClient } from './github-oauth.client'
 
 interface OAuthStateRow {
   code_verifier: string
+  return_path: string | null
 }
 
 interface UserRow {
@@ -46,6 +47,7 @@ export interface CompletedLogin {
   sessionToken: string
   csrfToken: string
   expiresAt: Date
+  redirectUrl: string
 }
 
 @Injectable()
@@ -56,7 +58,7 @@ export class AuthService {
     private readonly configService: ConfigService<AppEnvironment, true>,
   ) {}
 
-  async beginGithubLogin() {
+  async beginGithubLogin(returnPath?: string) {
     this.githubOAuthClient.assertConfigured()
 
     const state = createRandomToken()
@@ -68,11 +70,11 @@ export class AuthService {
     await this.databaseService.query(
       `
         INSERT INTO oauth_login_states (
-          state_hash, code_verifier, expires_at
+          state_hash, code_verifier, return_path, expires_at
         )
-        VALUES ($1, $2, now() + interval '10 minutes')
+        VALUES ($1, $2, $3, now() + interval '10 minutes')
       `,
-      [hashToken(state), codeVerifier],
+      [hashToken(state), codeVerifier, returnPath ?? null],
     )
 
     return {
@@ -93,14 +95,14 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'OAUTH_CALLBACK_INVALID' })
     }
 
-    const codeVerifier = await this.consumeOAuthState(
+    const oauthState = await this.consumeOAuthState(
       returnedState,
       stateCookie,
     )
 
     const profile = await this.githubOAuthClient.getAuthenticatedUser(
       code,
-      codeVerifier,
+      oauthState.codeVerifier,
     )
     const sessionToken = createRandomToken()
     const csrfToken = createRandomToken()
@@ -138,6 +140,7 @@ export class AuthService {
         sessionToken,
         csrfToken,
         expiresAt: session.expires_at,
+        redirectUrl: this.resolveSuccessRedirect(oauthState.returnPath),
       }
     })
   }
@@ -393,7 +396,7 @@ export class AuthService {
         DELETE FROM oauth_login_states
         WHERE state_hash = $1
           AND expires_at > now()
-        RETURNING code_verifier
+        RETURNING code_verifier, return_path
       `,
       [hashToken(returnedState)],
     )
@@ -403,6 +406,22 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'OAUTH_STATE_INVALID' })
     }
 
-    return oauthState.code_verifier
+    return {
+      codeVerifier: oauthState.code_verifier,
+      returnPath: oauthState.return_path,
+    }
+  }
+
+  private resolveSuccessRedirect(returnPath: string | null) {
+    if (!returnPath) {
+      return this.successRedirectUrl
+    }
+
+    const origin = this.configService.getOrThrow('CORS_ORIGIN')
+    const redirectUrl = new URL(returnPath, origin)
+
+    return redirectUrl.origin === origin
+      ? redirectUrl.toString()
+      : this.successRedirectUrl
   }
 }

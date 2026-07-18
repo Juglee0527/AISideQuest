@@ -14,6 +14,7 @@ import { AddPointLedger1784185200000 } from './migrations/1784185200000-add-poin
 import { AddServerStatistics1784188800000 } from './migrations/1784188800000-add-server-statistics'
 import { AddSecurityControls1784192400000 } from './migrations/1784192400000-add-security-controls'
 import { AddOperationalDiagnostics1784196000000 } from './migrations/1784196000000-add-operational-diagnostics'
+import { AddBrowserDeviceLinking1784199600000 } from './migrations/1784199600000-add-browser-device-linking'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -38,6 +39,7 @@ export function createDataSourceOptions(
       AddServerStatistics1784188800000,
       AddSecurityControls1784192400000,
       AddOperationalDiagnostics1784196000000,
+      AddBrowserDeviceLinking1784199600000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

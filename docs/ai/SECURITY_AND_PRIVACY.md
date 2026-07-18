@@ -24,6 +24,10 @@
 | `POST /auth/logout` | 웹 세션 | 예 | 현재 세션 | body 없음 | 없음 |
 | `POST /auth/me/export` | 웹 세션+15분 내 인증 | 예 | 본인 | 빈 DTO | 사용자+IP 10회/시간 |
 | `DELETE /auth/me` | 웹 세션+15분 내 인증 | 예 | 본인 | `confirmation=DELETE` | 사용자+IP 5회/시간 |
+| `POST /device-link-requests` | 공개 | 아니오 | 없음 | UUID, verifier challenge, token hash, 이름·버전, Idem | IP 20회/10분 |
+| `GET /device-link-requests/:id` | 웹 세션 | 아니오 | 승인 전 URL 보유, 승인 후 소유자 | UUID | 없음 |
+| `POST /device-link-requests/:id/approve` | 웹 세션 | 예 | 승인 사용자에게 귀속 | body 없음, Idem | 사용자+IP 20회/10분 |
+| `POST /device-link-requests/:id/complete` | verifier 증명 | 아니오 | verifier challenge 일치 | verifier 43자 | IP 720회/10분 |
 | `POST /device-links` | 웹 세션 | 예 | 본인 | UUID, Idem | 사용자+IP 20회/10분 |
 | `POST /device-links/redeem` | 연결 code | 아니오 | code가 지정한 사용자 | token/name/version 제한, Idem | IP+code 30회/10분 |
 | `GET /devices` | 웹 세션 | 아니오 | 본인 기기만 | body 없음 | 없음 |
@@ -66,7 +70,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 - 원본 lifecycle hook payload
 - OAuth access token, 웹 session·CSRF token, 기기 token, 연결 code
 
-식별이 필요한 외부 session·turn, token, idempotency 본문은 SHA-256 hash만 저장한다. 예외 로그는 stack과 요청 원문 대신 redaction된 오류 종류와 메시지만 남긴다.
+식별이 필요한 외부 session·turn, token, idempotency 본문은 SHA-256 hash만 저장한다. 브라우저 연결 verifier도 원문 대신 S256 challenge만 저장하고, 기기 token은 플러그인이 로컬에서 만든 뒤 hash만 연결 요청으로 전송한다. 예외 로그는 stack과 요청 원문 대신 redaction된 오류 종류와 메시지만 남긴다.
 
 ## 5. 데이터 내보내기와 계정 삭제
 
@@ -78,7 +82,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 2. 퀘스트 응시와 cascade 답안
 3. integration event
 4. AI 세션
-5. 기기 연결 code와 기기
+5. 승인된 브라우저 연결 요청, 기기 연결 code와 기기
 6. idempotency record
 7. 웹 인증 세션과 OAuth 연결
 8. 사용자
@@ -89,7 +93,8 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 | 데이터 | 보존 기간 | 계정 삭제 시 처리 |
 |---|---|---|
-| OAuth state, 기기 연결 code | 10분 | 즉시 삭제 |
+| OAuth state, 미승인 브라우저 연결 요청, 기기 연결 code | 승인 가능 시간 10분 | 사용자 연결 전에는 소유 데이터가 아님 |
+| 승인된 브라우저 연결 요청 | 연결 기기 보존 기간 | 기기·계정 삭제 cascade |
 | 웹 인증 세션 | 설정값 1~720시간, 기본 168시간 | 즉시 삭제 |
 | 기기 token hash·metadata | 만료 90일 | 즉시 삭제 |
 | AI 세션, allowlist integration event | 계정 유지 중 90일을 beta 운영 기준으로 사용 | 즉시 삭제 |

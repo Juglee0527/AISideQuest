@@ -24,20 +24,20 @@ GitHub access token은 사용자 식별을 위한 `GET /user` 요청에만 사�
 # 2. 인증 흐름
 
 1. 브라우저가 `GET /api/v1/auth/github`로 이동한다.
-2. 서버는 무작위 `state`와 PKCE verifier를 만들고, `state` hash와 verifier를 10분 동안 DB에 저장한다.
+2. 서버는 무작위 `state`와 PKCE verifier를 만들고, `state` hash와 verifier를 10분 동안 DB에 저장한다. 기기 승인 화면에서 시작한 로그인은 검증된 같은 origin 상대 `returnTo`도 함께 저장한다.
 3. 원본 `state`는 `HttpOnly` cookie에 저장하고 브라우저를 GitHub로 이동시킨다.
 4. GitHub callback에서 query의 `state`, cookie의 `state`, DB의 hash와 만료를 모두 검증한다.
 5. 유효한 state는 성공·거부 여부와 관계없이 한 번만 소비한다.
 6. authorization code와 PKCE verifier로 GitHub access token을 교환하고 `GET /user`로 숫자 ID를 확인한다.
 7. `(provider, provider_account_id)` 기준으로 사용자와 GitHub 계정을 생성하거나 최신 프로필로 갱신한다.
 8. 로그인마다 새 인증 세션과 CSRF token을 만들고 원문 대신 SHA-256 hash만 DB에 저장한다.
-9. 인증 cookie를 발급한 뒤 설정된 프런트엔드 주소로 이동한다.
+9. 인증 cookie를 발급한 뒤 기본 프런트엔드 주소 또는 검증된 기기 승인 `returnTo`로 이동한다. `//host`나 외부 origin은 입력 검증에서 거부한다.
 
 # 3. API 계약
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| `GET` | `/api/v1/auth/github` | 불필요 | GitHub 로그인 시작 |
+| `GET` | `/api/v1/auth/github?returnTo=/devices/connect/...` | 불필요 | GitHub 로그인 시작, 선택적으로 같은 origin 승인 화면 복귀 |
 | `GET` | `/api/v1/auth/github/callback` | OAuth state | GitHub callback 처리 |
 | `GET` | `/api/v1/auth/me` | 세션 cookie | 현재 로그인 사용자 조회 |
 | `PATCH` | `/api/v1/auth/me/time-zone` | 세션 cookie + CSRF | 검증된 IANA time zone 저장 |
@@ -101,7 +101,7 @@ DB 장애처럼 인증 실패가 아닌 서버 오류에는 cookie를 삭제하�
 
 | 테이블 | 저장 내용 |
 |---|---|
-| `oauth_login_states` | state hash, PKCE verifier, 10분 만료 시각 |
+| `oauth_login_states` | state hash, PKCE verifier, 선택적 같은 origin 복귀 경로, 10분 만료 시각 |
 | `auth_sessions` | 사용자, 세션·CSRF token hash, 만료·폐기·마지막 사용 시각 |
 
 세션 token과 CSRF token 원문은 DB에 저장하지 않는다. `auth_sessions.token_hash`는 unique이며 사용자 삭제 시 관련 세션도 삭제된다.
@@ -160,5 +160,6 @@ npm.cmd run test:database
 - CSRF 없는 logout 거부와 정상 logout 후 세션 재사용 차단
 - 만료된 세션 차단
 - GitHub 승인 거부 callback 처리
+- 기기 승인 상대 경로 복귀와 외부 redirect 입력 거부
 
 실제 GitHub 로그인은 개인 OAuth App의 client ID와 secret을 설정한 환경에서 별도로 확인해야 한다.

@@ -35,3 +35,32 @@ export interface DeviceLinkSnapshot {
   deviceId: string | null
   expiresAt: string
 }
+
+export type BrowserDeviceLinkRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'EXPIRED'
+
+export interface BrowserDeviceLinkRequestRow {
+  id: string
+  request_hash: string
+  verifier_challenge: string
+  device_token_hash: string
+  device_name: string
+  plugin_version: string
+  user_id: string | null
+  device_id: string | null
+  expires_at: Date
+  approved_at: Date | null
+  is_active: boolean
+}
+
+export interface BrowserDeviceLinkRequestSnapshot {
+  id: string
+  status: BrowserDeviceLinkRequestStatus
+  deviceName: string
+  pluginVersion: string
+  expiresAt: string
+  approvedAt: string | null
+  verificationUrl: string
+}

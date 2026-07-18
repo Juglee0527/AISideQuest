@@ -14,7 +14,7 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { Equals, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { Equals, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 
 import { AuthCookieService } from './auth-cookie.service'
 import { AuthService } from './auth.service'
@@ -57,6 +57,14 @@ class GithubCallbackQueryDto {
   error_uri?: string
 }
 
+class GithubStartQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^\/(?!\/)[^\r\n]*$/)
+  returnTo?: string
+}
+
 class UpdateTimeZoneDto {
   @IsString()
   @IsNotEmpty()
@@ -80,8 +88,11 @@ export class AuthController {
   @Get('github')
   @RateLimit({ scope: 'OAUTH_START', limit: 10, windowSeconds: 600, identity: 'IP' })
   @UseGuards(RateLimitGuard)
-  async startGithubLogin(@Res() response: Response) {
-    const login = await this.authService.beginGithubLogin()
+  async startGithubLogin(
+    @Query() query: GithubStartQueryDto,
+    @Res() response: Response,
+  ) {
+    const login = await this.authService.beginGithubLogin(query.returnTo)
 
     this.authCookieService.setOauthState(response, login.state)
     response.redirect(HttpStatus.FOUND, login.authorizationUrl)
@@ -126,7 +137,7 @@ export class AuthController {
       login.csrfToken,
       login.expiresAt,
     )
-    response.redirect(HttpStatus.FOUND, this.authService.successRedirectUrl)
+    response.redirect(HttpStatus.FOUND, login.redirectUrl)
   }
 
   @Get('me')
