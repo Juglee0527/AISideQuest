@@ -14,6 +14,7 @@ import { writeDeviceConfig } from './device-config.mjs'
 const DEFAULT_API_URL = 'http://localhost:3000/api/v1'
 const DEFAULT_POLL_INTERVAL_MS = 1_000
 const DEFAULT_MAX_WAIT_MS = 10 * 60 * 1_000
+const VERIFICATION_PAGE_TIMEOUT_MS = 5_000
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function parseArguments(args) {
@@ -173,11 +174,44 @@ function isRetryablePollingError(error) {
   )
 }
 
+function isLocalUrl(value) {
+  const hostname = new URL(value).hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1'
+}
+
+function unavailableMessage(kind, url) {
+  const localHint = isLocalUrl(url)
+    ? ' 프로젝트 루트에서 npm.cmd run dev:local을 실행한 뒤 다시 연결하세요.'
+    : ' 잠시 후 다시 연결하세요.'
+  return `AISideQuest ${kind}에 연결할 수 없습니다.${localHint}`
+}
+
+export async function assertVerificationPageAvailable(
+  verificationUrl,
+  fetchImpl = fetch,
+) {
+  let response
+
+  try {
+    response = await fetchImpl(verificationUrl, {
+      headers: { Accept: 'text/html' },
+      signal: AbortSignal.timeout(VERIFICATION_PAGE_TIMEOUT_MS),
+    })
+  } catch {
+    throw new Error(unavailableMessage('승인 웹', verificationUrl))
+  }
+
+  if (!response.ok) {
+    throw new Error(unavailableMessage('승인 웹', verificationUrl))
+  }
+}
+
 export async function connectDeviceInBrowser({
   apiUrl = DEFAULT_API_URL,
   deviceName = hostname(),
   environment = process.env,
   fetchImpl = fetch,
+  verificationFetchImpl = fetch,
   openBrowserImpl = openBrowser,
   waitImpl = wait,
   maxWaitMs = DEFAULT_MAX_WAIT_MS,
@@ -194,19 +228,28 @@ export async function connectDeviceInBrowser({
   const deviceTokenHash = createHash('sha256')
     .update(deviceToken, 'utf8')
     .digest('hex')
-  const created = await postApi(
-    '/device-link-requests',
-    {
-      requestId,
-      verifierChallenge,
-      deviceTokenHash,
-      deviceName: normalizedDeviceName,
-      pluginVersion,
-    },
-    { 'Idempotency-Key': requestId },
-    normalizedApiUrl,
-    fetchImpl,
-  )
+  let created
+
+  try {
+    created = await postApi(
+      '/device-link-requests',
+      {
+        requestId,
+        verifierChallenge,
+        deviceTokenHash,
+        deviceName: normalizedDeviceName,
+        pluginVersion,
+      },
+      { 'Idempotency-Key': requestId },
+      normalizedApiUrl,
+      fetchImpl,
+    )
+  } catch (error) {
+    if (error instanceof ApiRequestError && error.status === null) {
+      throw new Error(unavailableMessage('API', normalizedApiUrl))
+    }
+    throw error
+  }
   const linkRequest = created?.request
 
   if (
@@ -219,6 +262,10 @@ export async function connectDeviceInBrowser({
     throw new Error('브라우저 연결 요청 응답 형식이 올바르지 않습니다.')
   }
 
+  await assertVerificationPageAvailable(
+    linkRequest.verificationUrl,
+    verificationFetchImpl,
+  )
   await openBrowserImpl(linkRequest.verificationUrl)
 
   const expiresAt = Date.parse(linkRequest.expiresAt)

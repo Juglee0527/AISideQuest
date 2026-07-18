@@ -10,6 +10,7 @@ Tasks 1–19 are implemented. Task 20 has repository implementation and a local 
 
 Implemented:
 
+- Developer-operated, local-first distribution with one-command PostgreSQL, migration/seed, API, and web startup via `npm run dev:local`.
 - GitHub OAuth with state, PKCE, server-side hashed sessions, secure cookies, and CSRF.
 - Device linking, rotation, revocation, and hash-only token storage.
 - Manual and Codex-hook AI sessions with heartbeat, durable FIFO queue, recovery, and expiration.
@@ -20,7 +21,7 @@ Implemented:
 - CI, PostgreSQL integration, migration/upgrade, Chromium core flow, immutable deployment image workflow.
 - Staging/production deployment templates, validation, migration-first deploy, smoke, rollback, kill switches, and pilot evaluator.
 
-Externally pending:
+Optional external deployment remains unverified:
 
 - real staging and production domains, hosts, PostgreSQL databases, and distinct GitHub OAuth Apps;
 - live HTTPS and browser verification with real credentials;
@@ -32,12 +33,12 @@ Externally pending:
 
 | Suite | Passed |
 |---|---:|
-| React | 47 |
-| Codex plugin | 10 |
-| operations scripts | 11 |
+| React | 49 |
+| Codex plugin | 12 |
+| operations and local startup scripts | 17 |
 | server non-database | 19 |
-| PostgreSQL integration | 45 |
-| total | 132 |
+| PostgreSQL integration | 47 |
+| total | 144 |
 
 Also passed: lint, client/server typecheck, client/server production build, Docker API/web builds, 11 migrations, idempotent migration rerun (`applied: []`), and 10 deployment smoke checks.
 
@@ -57,6 +58,8 @@ Also passed: lint, client/server typecheck, client/server production build, Dock
 | turn event limit | 500 persisted events |
 | plugin active queue | 10,000 records or 10 MiB, maximum 48 hours |
 | plugin dead letter | 7 days |
+| primary runtime | developer-owned local repository and services |
+| integrated local start | `npm run dev:local` |
 
 ## Kill switches
 
@@ -66,5 +69,4 @@ Also passed: lint, client/server typecheck, client/server production build, Dock
 
 ## Immediate next action
 
-Do not add more product scope by default. The next milestone is external deployment and pilot execution using [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md).
-
+Keep the default product path free and local-first for developers. Improve clone-to-run and local connection reliability before adding product scope. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) are optional unless the product direction changes again; never mark task 20 complete without its real evidence.

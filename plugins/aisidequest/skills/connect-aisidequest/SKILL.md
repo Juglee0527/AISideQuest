@@ -5,7 +5,7 @@ description: Connect or reconnect the installed AISideQuest Codex plugin to the 
 
 # Connect AISideQuest
 
-Connect without asking the user to copy a code or run a terminal command. The script creates local-only credentials, opens the AISideQuest approval page, waits for approval, and stores the device configuration.
+Connect without asking the user to copy a code or run another connection command. AISideQuest is local-first, so the developer must already have the repository's `npm.cmd run dev:local` process running. The script creates local-only credentials, verifies the approval web is reachable, opens it, waits for approval, and stores the device configuration.
 
 ## Workflow
 
@@ -14,7 +14,7 @@ Connect without asking the user to copy a code or run a terminal command. The sc
 3. Run `node "<plugin-root>/scripts/connect-device.mjs"` from the plugin root. Do not add `--code` unless the user explicitly requests the legacy recovery flow.
 4. Wait for the command to finish. Do not print, copy, summarize, or request the verifier, device token, request body, or local configuration contents.
 5. After a successful connection, run `node "<plugin-root>/scripts/send-test-event.mjs"` once to verify device authentication and delivery.
-6. Report that the connection and test event succeeded. If the browser cannot open or the request expires, report the concise script error and retry the same workflow once with a fresh request.
+6. Report that the connection and test event succeeded. If the script says the local API or approval web is unavailable, tell the user to keep `npm.cmd run dev:local` running and retry once. If the browser cannot open or the request expires, report the concise script error and retry the same workflow once with a fresh request.
 
 ## Safety
 

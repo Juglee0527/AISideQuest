@@ -10,7 +10,7 @@
 | `server/test/` | non-DB and PostgreSQL contract tests |
 | `plugins/aisidequest/` | Codex hook plugin, privacy filter, queue, worker, device connection |
 | `deploy/` | API/web images, Caddy, Compose, environment templates, pilot sample |
-| `scripts/` | backup/restore, alert, deploy, rollback, smoke, environment and pilot tools |
+| `scripts/` | integrated local startup plus backup/restore, alert, deploy, rollback, smoke, environment and pilot tools |
 | `e2e/` | Chromium core user-flow test |
 | `ops/` | Prometheus alert rules |
 | `.github/workflows/` | CI and immutable image release workflows |
@@ -56,4 +56,4 @@ API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts
 | schema | new migration; never edit applied migration casually | migration + all PostgreSQL tests |
 | deployment | `deploy/`, `scripts/deploy-release.ps1` | env tests + Docker rehearsal + smoke |
 | privacy/logging | plugin filter, DTOs, observability sanitizer | forbidden-data and redaction tests |
-
+| local startup | `scripts/dev-local.mjs`, root `package.json` | operations tests + local readiness smoke |

@@ -126,12 +126,10 @@ AUTH_FAILURE_REDIRECT_URL=http://localhost:5173/?authError=github_oauth_failed
 AUTH_SESSION_TTL_HOURS=168
 ```
 
-DB migration을 적용하고 API를 실행한다.
+로컬 통합 환경을 실행한다. 이 명령이 DB 시작, migration·seed, API와 웹을 함께 처리한다.
 
 ```powershell
-npm.cmd run db:up
-npm.cmd run db:migrate
-npm.cmd run dev:server
+npm.cmd run dev:local
 ```
 
 로그인은 브라우저에서 다음 주소로 시작한다.

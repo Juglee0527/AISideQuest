@@ -15,7 +15,8 @@ This is the compact English contract for routine AI-assisted changes. The longer
 
 ## Devices
 
-- A browser-authenticated user creates a single-use link code; the plugin redeems it once for a device token.
+- The default connection creates local verifier/token material, sends only their hashes, opens a 10-minute browser approval request, and stores the credential after approval.
+- A browser-authenticated single-use link code remains recovery-only for environments that cannot open the approval page.
 - The raw device token is stored only in the user's local `device.json`. The server stores a SHA-256 hash.
 - Rotation issues a new link flow and invalidates the previous credential after successful replacement.
 - Revocation is idempotent and blocks subsequent device authentication immediately.
@@ -109,8 +110,11 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 
 ## Deployment and pilot
 
+- The primary product runtime is a developer-owned local clone. `npm run dev:local` starts local PostgreSQL, applies migrations and seed data, starts API and web, and verifies readiness.
+- The local Codex plugin defaults to `http://localhost:3000/api/v1`; the developer keeps the integrated local process running while using the product.
+- Hosted staging/production is optional and is not required for the local-first product path.
 - Build API and web once from one commit, publish digest-pinned images, verify in staging, then promote the same digests to production.
 - Deploy order: backup evidence → one-shot migration → API readiness → web → HTTPS/CORS/OAuth/SPA smoke.
 - Pilot hard-stop events: forbidden-data exposure, auth/ownership bypass, duplicate point award, or unrecoverable data loss.
 - Final pilot gate: at least 10 full-flow users, 7 days, 100 eligible automatic sessions, detection ≥95%, reflection p95 ≤5s, zero unrecoverable loss, zero duplicate sessions/points, API 5xx <1%.
-
+- Retaining optional deployment tooling does not satisfy the pilot gate; task 20 remains incomplete without real external evidence.

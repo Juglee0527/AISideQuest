@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import {
+  assertVerificationPageAvailable,
   connectDevice,
   connectDeviceInBrowser,
 } from '../scripts/connect-device.mjs'
@@ -218,6 +219,7 @@ test('connects through browser approval without exposing a raw device token', as
       apiUrl: api.apiUrl,
       deviceName: 'Browser approved device',
       environment,
+      verificationFetchImpl: async () => ({ ok: true }),
       openBrowserImpl: async (url) => openedUrls.push(url),
       waitImpl: async () => undefined,
     })
@@ -254,6 +256,16 @@ test('connects through browser approval without exposing a raw device token', as
     await api.close()
     await rm(localAppData, { recursive: true, force: true })
   }
+})
+
+test('explains how to start the local stack when the approval web is unavailable', async () => {
+  await assert.rejects(
+    assertVerificationPageAvailable(
+      'http://localhost:5173/devices/connect/request-id',
+      async () => { throw new Error('connection refused') },
+    ),
+    /npm\.cmd run dev:local/,
+  )
 })
 
 test('sends an explicit privacy-filtered test event with device authentication', async () => {

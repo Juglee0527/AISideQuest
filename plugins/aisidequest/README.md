@@ -2,6 +2,8 @@
 
 AISideQuest 계정에 현재 Codex 설치를 연결하고, 개인정보가 제거된 라이프사이클 이벤트를 기록하는 플러그인입니다.
 
+기본 대상은 AISideQuest 저장소를 내려받아 로컬에서 무료로 실행하는 개발자입니다. 연결 전에 프로젝트 루트에서 `npm.cmd run dev:local`을 실행해 API와 승인 웹을 함께 준비합니다.
+
 ## 개인정보 처리 원칙
 
 - 저장: 이벤트명, UUID 이벤트 ID, 기기별 증가 sequence, 해시된 세션/턴 식별자, 관측 시각
@@ -20,7 +22,9 @@ AISideQuest 계정에 현재 Codex 설치를 연결하고, 개인정보가 제�
 
 사용자가 연결 코드를 복사하거나 PowerShell 명령을 실행할 필요가 없습니다. 브라우저 승인 요청은 10분 후 만료되고, 기기 토큰은 90일 후 만료되며 웹 Devices에서 즉시 폐기할 수 있습니다.
 
-API가 로컬 기본값과 다른 개발·운영 bundle은 `AISIDEQUEST_API_URL` 환경 또는 배포된 plugin 설정으로 API 주소를 제공해야 합니다.
+로컬 API 또는 승인 웹이 꺼져 있으면 연결 명령은 브라우저 오류 화면을 열지 않고 `npm.cmd run dev:local`을 실행하라는 진단을 반환합니다.
+
+선택적으로 외부 서버를 사용하는 bundle만 `AISIDEQUEST_API_URL` 환경 또는 배포된 plugin 설정으로 API 주소를 제공합니다. 기본값은 `http://localhost:3000/api/v1`입니다.
 
 ### 복구용 연결 코드
 

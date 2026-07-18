@@ -2,6 +2,12 @@
 
 작성일: 2026-07-18 · 목표 `RPO ≤ 24시간`, `RTO ≤ 4시간`
 
+## 로컬 우선 실행
+
+기본 사용자는 저장소를 소유한 개발자이며 외부 운영 서버는 필요하지 않다. 루트 `.env`와 GitHub OAuth 값을 준비한 뒤 `npm.cmd run dev:local` 하나로 Docker PostgreSQL, migration·seed, API, 웹을 실행한다. 이 명령은 API readiness와 웹 응답을 확인한 뒤 준비 완료를 표시한다. 사용 중에는 터미널을 열어 두고 `Ctrl+C`로 API와 웹을 함께 종료한다. DB 컨테이너는 데이터를 유지하며 필요할 때 `npm.cmd run db:down`으로 별도 중지한다.
+
+연결 시 로컬 API나 승인 웹이 꺼져 있으면 플러그인은 브라우저의 연결 거부 화면을 열지 않고 통합 실행 명령을 안내한다. 개별 `db:up`, `db:setup`, `dev:server`, `dev` 명령은 통합 실행 장애를 진단할 때만 사용한다.
+
 ## 관측 계약
 
 API는 유효한 `X-Request-ID`를 그대로 사용하고 없거나 형식이 잘못되면 UUID를 생성한다. 같은 ID가 응답 header, 성공·오류 envelope의 `meta.requestId`, JSON 요청 로그와 `error_tracking_event`에 기록된다. 로그에는 배포 환경, service version, method, route template, status, latency, 오류 code만 남으며 URL/query/body/cookie/Authorization와 사용자·기기·hash 식별자는 기록하지 않는다.
