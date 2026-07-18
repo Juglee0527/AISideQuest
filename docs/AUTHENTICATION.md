@@ -3,7 +3,7 @@
 - 작성일: 2026-07-16
 - 로그인 방식: GitHub OAuth Web Application Flow
 - 세션 방식: PostgreSQL 서버 저장형 세션 + cookie
-- 기준 migration: `1784163600000-add-authentication`
+- 기준 migration: `1784163600000-add-authentication`, `1784188800000-add-server-statistics`의 time zone 검증 상태
 
 ---
 
@@ -40,6 +40,7 @@ GitHub access token은 사용자 식별을 위한 `GET /user` 요청에만 사�
 | `GET` | `/api/v1/auth/github` | 불필요 | GitHub 로그인 시작 |
 | `GET` | `/api/v1/auth/github/callback` | OAuth state | GitHub callback 처리 |
 | `GET` | `/api/v1/auth/me` | 세션 cookie | 현재 로그인 사용자 조회 |
+| `PATCH` | `/api/v1/auth/me/time-zone` | 세션 cookie + CSRF | 검증된 IANA time zone 저장 |
 | `POST` | `/api/v1/auth/logout` | 세션 cookie + CSRF | 현재 세션 폐기 |
 
 `GET /api/v1/auth/me`의 `data` 예시는 다음과 같다.
@@ -49,11 +50,15 @@ GitHub access token은 사용자 식별을 위한 `GET /user` 요청에만 사�
   "id": "34ff1c3e-0c5d-4b67-978f-8cb8556de132",
   "displayName": "AISideQuest User",
   "avatarUrl": "https://avatars.githubusercontent.com/u/123456",
-  "githubLogin": "aisidequest-user"
+  "githubLogin": "aisidequest-user",
+  "timeZone": "Asia/Seoul",
+  "timeZoneVerified": true
 }
 ```
 
-인증이 없거나 만료·폐기된 세션이면 `401`을 반환한다. logout 요청은 CSRF cookie 값을 `x-csrf-token` header에도 동일하게 보내야 하며, 누락 또는 불일치 시 `403`을 반환한다.
+신규·기존 사용자는 16번 migration 이후 미검증 `UTC`에서 시작한다. 브라우저가 `Intl.DateTimeFormat().resolvedOptions().timeZone`으로 확인한 IANA ID를 명시적으로 저장한 뒤 `timeZoneVerified=true`가 된다. 서버가 지원하지 않는 ID는 `INVALID_TIME_ZONE`으로 거부하며 기존 값을 조용히 변경하지 않는다.
+
+인증이 없거나 만료·폐기된 세션이면 `401`을 반환한다. logout과 time zone 변경 요청은 CSRF cookie 값을 `x-csrf-token` header에도 동일하게 보내야 하며, 누락 또는 불일치 시 `403`을 반환한다.
 
 ```ts
 const csrfToken = readCookie('aisidequest_csrf')

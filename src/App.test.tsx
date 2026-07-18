@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import { QuestCatalogProvider } from './contexts/QuestCatalogContext'
-import { QuestHistoryProvider } from './contexts/QuestHistoryContext'
 import { SessionProvider } from './contexts/SessionContext'
 import type { Session, SessionStatus } from './types/session'
 
@@ -27,9 +26,7 @@ function renderApp(initialPath = '/') {
     <MemoryRouter initialEntries={[initialPath]}>
       <SessionProvider>
         <QuestCatalogProvider>
-          <QuestHistoryProvider>
-            <App />
-          </QuestHistoryProvider>
+          <App />
         </QuestCatalogProvider>
       </SessionProvider>
     </MemoryRouter>,

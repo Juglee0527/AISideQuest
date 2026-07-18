@@ -26,7 +26,7 @@
     "test:plugin": "node --test plugins/aisidequest/tests/*.test.mjs",
     "test:hooks": "npm run test:plugin",
     "test:server": "tsc -p server/tsconfig.test.json && node --test server/dist-test/test/app.e2e.test.js server/dist-test/test/sessions/session-recovery.unit.test.js server/dist-test/test/quests/quest-attempt.unit.test.js",
-    "test:database": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js server/dist-test/test/auth/auth.integration.test.js server/dist-test/test/devices/device.integration.test.js server/dist-test/test/sessions/session.integration.test.js server/dist-test/test/quests/quest.integration.test.js server/dist-test/test/quests/quest-attempt.integration.test.js",
+    "test:database": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js server/dist-test/test/auth/auth.integration.test.js server/dist-test/test/devices/device.integration.test.js server/dist-test/test/sessions/session.integration.test.js server/dist-test/test/quests/quest.integration.test.js server/dist-test/test/quests/quest-attempt.integration.test.js server/dist-test/test/statistics/statistics.integration.test.js",
     "test:watch": "vitest",
     "preview": "vite preview"
   },

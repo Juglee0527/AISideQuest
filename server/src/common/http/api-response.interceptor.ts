@@ -18,14 +18,15 @@ export class ApiResponseInterceptor<T>
   implements NestInterceptor<T, ApiSuccessResponse<T>>
 {
   intercept(
-    _context: ExecutionContext,
+    context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<ApiSuccessResponse<T>> {
+    const request = context.switchToHttp().getRequest<{ responseServerTime?: string }>()
     return next.handle().pipe(
       map((data) => ({
         data: data === undefined ? null : data,
         meta: {
-          serverTime: new Date().toISOString(),
+          serverTime: request.responseServerTime ?? new Date().toISOString(),
         },
       })),
     )

@@ -12,6 +12,8 @@ export interface AuthUser {
   displayName: string
   avatarUrl: string | null
   githubLogin: string
+  timeZone: string
+  timeZoneVerified: boolean
 }
 
 export interface AuthSessionContext {
@@ -22,4 +24,5 @@ export interface AuthSessionContext {
 
 export interface AuthenticatedRequest extends Request {
   auth: AuthSessionContext
+  responseServerTime?: string
 }

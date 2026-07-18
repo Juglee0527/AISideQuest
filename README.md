@@ -191,6 +191,7 @@ npm.cmd run test:watch
 - API 기반 AI 작업 세션 시작, polling, 복구, 종료
 - 실제 개발 퀴즈 시작, 답안 저장·복구와 서버 채점
 - 최초 통과 100P 적립, 포인트 잔액과 원장 이력 조회
+- IANA 시간대 기준 오늘·주·월·직접 선택 서버 통계와 Dashboard
 - 기존 LocalStorage 감지, 참고 요약·초기화, 손상 데이터 처리
 - 인증 만료, 네트워크 오류 재시도, 서버 시각 보정
 - 일간, 주간, 월간 활동 통계
@@ -257,7 +258,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 활성 AI 세션에서 실제 개발 퀴즈를 시작하고, 서버에 답안을 저장해 새로고침 후 복구하며, 최초 통과 transaction에서 100P를 한 번만 적립받습니다. 잔액과 최근 원장 이력은 서버 API를 기준으로 표시합니다. 다음 기능 작업은 통계 API와 대시보드의 완전한 서버 집계 전환입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 실제 개발 퀴즈 최초 통과 transaction에서 100P를 한 번만 적립받고, 저장된 IANA 시간대와 동일한 서버 기준 시각으로 오늘·주·월·직접 선택 통계를 확인합니다. 다음 기능 작업은 보안과 개인정보 보호 최종 점검입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 

@@ -3,12 +3,9 @@ import { Link } from 'react-router-dom'
 
 import PageHeader from '../components/PageHeader'
 import StatCard from '../components/StatCard'
-import { useQuestHistory } from '../contexts/QuestHistoryContext'
-import { useQuestCatalog } from '../contexts/QuestCatalogContext'
-import { usePoints } from '../contexts/PointContext'
 import { useSession } from '../contexts/SessionContext'
 import useElapsedTime from '../hooks/useElapsedTime'
-import { calculateActivityStatistics } from '../utils/statistics'
+import { useStatisticsSummary } from '../hooks/useStatisticsSummary'
 import { formatDuration, formatSummaryDuration } from '../utils/time'
 
 function HomePage() {
@@ -21,9 +18,7 @@ function HomePage() {
     endSession,
     getCurrentTime,
   } = useSession()
-  const { questHistories } = useQuestHistory()
-  const { quests } = useQuestCatalog()
-  const { balance, status: pointStatus } = usePoints()
+  const statistics = useStatisticsSummary({ period: 'today' })
   const activeStartedAt = activeSession?.startedAt ?? null
   const elapsedMilliseconds = useElapsedTime(activeStartedAt, getCurrentTime)
   const lastCompletedSession = completedSessions[0]
@@ -33,17 +28,7 @@ function HomePage() {
   const displayedDuration = isRunning
     ? elapsedMilliseconds
     : (lastCompletedSession?.durationMs ?? 0)
-  const currentTime = activeStartedAt === null
-    ? getCurrentTime()
-    : Date.parse(activeStartedAt) + elapsedMilliseconds
-  const todayStatistics = calculateActivityStatistics({
-    period: 'today',
-    currentTime,
-    activeSession,
-    completedSessions,
-    questHistories,
-    quests,
-  })
+  const todayStatistics = statistics.summary
 
   return (
     <div className="space-y-10">
@@ -144,22 +129,22 @@ function HomePage() {
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
           <StatCard
             label="오늘 대기 시간"
-            value={formatSummaryDuration(todayStatistics.waitDuration)}
-            helper="진행 중인 AI 작업을 포함합니다."
+            value={statistics.status === 'loading' ? '불러오는 중' : formatSummaryDuration(todayStatistics?.ai.waitDurationMs ?? 0)}
+            helper="서버 시각과 저장된 시간대 기준입니다."
             icon={Clock3}
             accent="sky"
           />
           <StatCard
             label="오늘 완료한 퀘스트"
-            value={`${todayStatistics.completedQuestCount}개`}
-            helper="퀘스트 완료 시각을 기준으로 계산합니다."
+            value={statistics.status === 'loading' ? '불러오는 중' : `${todayStatistics?.quests.completedCount ?? 0}개`}
+            helper="최초 통과 원장 생성 시각 기준입니다."
             icon={Trophy}
             accent="violet"
           />
           <StatCard
-            label="포인트 잔액"
-            value={pointStatus === 'loading' ? '불러오는 중' : `${balance.toLocaleString('ko-KR')}P`}
-            helper="퀘스트 최초 통과 시 서버 원장에 100P가 적립됩니다."
+            label="오늘 획득 포인트"
+            value={statistics.status === 'loading' ? '불러오는 중' : `${(todayStatistics?.points.earned ?? 0).toLocaleString('ko-KR')}P`}
+            helper="오늘 생성된 서버 포인트 원장 합계입니다."
             icon={Coins}
             accent="amber"
           />

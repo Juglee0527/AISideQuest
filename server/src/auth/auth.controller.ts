@@ -4,6 +4,8 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Patch,
+  Body,
   Query,
   Req,
   Res,
@@ -47,6 +49,13 @@ class GithubCallbackQueryDto {
   @IsString()
   @MaxLength(2_048)
   error_uri?: string
+}
+
+class UpdateTimeZoneDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  timeZone!: string
 }
 
 @Controller('auth')
@@ -108,6 +117,15 @@ export class AuthController {
   @UseGuards(SessionAuthGuard)
   getCurrentUser(@Req() request: AuthenticatedRequest) {
     return request.auth.user
+  }
+
+  @Patch('me/time-zone')
+  @UseGuards(SessionAuthGuard, CsrfGuard)
+  updateTimeZone(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateTimeZoneDto,
+  ) {
+    return this.authService.updateTimeZone(request.auth.user.id, body.timeZone)
   }
 
   @Post('logout')

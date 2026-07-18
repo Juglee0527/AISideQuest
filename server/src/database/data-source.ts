@@ -11,6 +11,7 @@ import { AddHeartbeatRecovery1784174400000 } from './migrations/1784174400000-ad
 import { AddQuestListing1784178000000 } from './migrations/1784178000000-add-quest-listing'
 import { AddQuestAttemptFlow1784181600000 } from './migrations/1784181600000-add-quest-attempt-flow'
 import { AddPointLedger1784185200000 } from './migrations/1784185200000-add-point-ledger'
+import { AddServerStatistics1784188800000 } from './migrations/1784188800000-add-server-statistics'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -32,6 +33,7 @@ export function createDataSourceOptions(
       AddQuestListing1784178000000,
       AddQuestAttemptFlow1784181600000,
       AddPointLedger1784185200000,
+      AddServerStatistics1784188800000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

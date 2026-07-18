@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 플랫폼
 
-- 현재 상태: 실사용 베타 1~15번 완료, 서버 채점 퀴즈와 포인트 원장 구현
+- 현재 상태: 실사용 베타 1~16번 완료, 서버 통계와 Dashboard 전환 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-18
 
@@ -241,7 +241,7 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 | `aisidequest.questHistories` | 구형 퀘스트 이력, 9번 전환 후 삭제 |
 | `aisidequest.legacyMigration` | 초기화 또는 참고 보관 1회 완료 marker |
 | `aisidequest.legacyReference` | 통계·포인트에 미반영하는 구형 참고 요약 |
-| `aisidequest.questHistories.v2` | 13~14번 서버 전환 전까지 사용하는 신규 임시 퀘스트 이력 |
+| `aisidequest.questHistories.v2` | 16번 runtime 제거 이전의 임시 이력, 서버 통계에는 미반영 |
 
 ## 8.2 저장 형식
 
@@ -268,7 +268,7 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 - 구형 활성 세션, 예상 포인트와 개별 퀘스트 보상은 이전하지 않는다.
 - 참고 보관은 완료 세션 수, 총 시간, 퀘스트 완료 수만 이 브라우저에 남긴다.
 
-참고 요약과 임시 퀘스트 이력은 현재 브라우저 프로필에만 저장되며 서버 데이터가 아니다.
+참고 요약과 남아 있는 임시 퀘스트 이력은 현재 브라우저 프로필에만 저장되며 서버 데이터와 통계에 사용하지 않는다.
 
 ---
 
@@ -276,24 +276,24 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 
 ## 9.1 기간 기준
 
-- `meta.serverTime`으로 보정한 현재 시각을 사용하고 오늘·주·월 경계는 브라우저 time zone을 사용한다.
+- 통계 요청의 DB `transaction_timestamp()`를 응답 `meta.serverTime`과 모든 집계의 단일 기준 시각으로 사용한다.
+- 오늘·주·월 경계는 사용자가 서버에 저장한 검증된 IANA time zone을 사용하고 미검증 상태는 `UTC`와 수정 안내를 제공한다.
 - 오늘은 로컬 자정부터 다음 자정 직전까지다.
 - 이번 주는 월요일 00:00부터 다음 월요일 직전까지다.
 - 이번 달은 매월 1일 00:00부터 다음 달 1일 직전까지다.
 
 ## 9.2 AI 대기 시간
 
-- 완료 세션과 진행 중 세션을 포함한다.
-- 진행 중 세션은 현재 시각까지만 계산한다.
-- 기간 경계를 넘는 세션은 선택 기간과 실제로 겹치는 시간만 합산한다.
-- 잘못된 날짜나 미래 구간은 `0`으로 안전 처리한다.
+- 상태와 관계없이 완료·실패·복구·진행 중 세션을 포함한다.
+- 진행 중 세션은 같은 응답의 `meta.serverTime`까지만 계산한다.
+- 기간 경계를 넘는 세션은 서버가 선택 기간과 실제로 겹치는 `[startedAt, endedAt)` 구간만 합산한다.
+- `DEGRADED` timing 세션 수를 별도 반환해 복구된 시간을 정확한 측정치와 구분한다.
 
-## 9.3 완료 퀘스트와 예상 포인트
+## 9.3 완료 퀘스트와 포인트
 
-- `completedAt`이 선택 기간에 포함되고 현재 시각보다 미래가 아닌 이력만 집계한다.
-- 완료 퀘스트 수는 유효한 완료 이력 수다.
-- 예상 포인트는 완료 이력의 `questId`로 현재 퀘스트 보상을 찾아 합산한다.
-- 현재 목록에 없는 퀘스트 ID는 완료 수에는 포함하지만 예상 포인트는 `0P`로 처리한다.
+- 최초 통과 transaction에서 생성된 `point_ledger.created_at`이 반열린 기간에 포함될 때만 집계한다.
+- 완료 퀘스트 수는 사용자·quest version별 최초 통과 원장 수다.
+- 포인트는 같은 원장의 `points` 합계이며 LocalStorage 참고 이력은 포함하지 않는다.
 
 ## 9.4 예상 절약 시간
 
@@ -304,12 +304,10 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 # 10. 상태 구조와 데이터 흐름
 
 - `SessionContext`가 세션 API를 통해 활성 세션과 cursor 이력을 관리한다.
-- `QuestHistoryContext`가 퀘스트 완료 이력을 관리한다.
-- `QuestHistoryContext`는 현재 활성 세션을 확인한 후 완료 이력을 생성한다.
 - `SessionContext`는 5초 polling과 focus·visibility 복귀 시 서버 활성 세션을 다시 조회한다.
 - `LegacyDataMigrationGate`가 Context 마운트 전에 구형 LocalStorage를 처리한다.
-- `QuestHistoryContext`만 v2 LocalStorage를 임시 사용하며 13~14번 작업에서 서버 API로 전환한다.
-- Home과 Dashboard는 통계 결과를 별도 저장하지 않고 세션과 완료 이력에서 계산한다.
+- `useStatisticsSummary`가 서버의 기간 통계와 IANA time zone 초기 저장·변경 상태를 관리한다.
+- Home과 Dashboard는 LocalStorage나 기기 시계로 통계를 다시 계산하지 않는다.
 - 애플리케이션 전용 상태 관리 라이브러리는 사용하지 않는다.
 
 ---
@@ -465,7 +463,8 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 13. [x] 퀘스트 목록 API 구현 - 게시 catalog, 최근 응시 상태, pagination과 프런트엔드 전환 완료
 14. [x] 실제 개발 퀴즈 구현 - 답안 복구, 서버 채점, 멱등 제출과 만료·재응시 완료
 15. [x] 포인트 원장 구현 - 최초 통과 100P transaction, 잔액·cursor 이력과 중복 적립 방어 완료
-16. [ ] 통계 API와 대시보드 전환 - 다음 작업
+16. [x] 통계 API와 대시보드 전환 - IANA 기간 경계, 서버 집계와 저품질 세션 표시 완료
+17. [ ] 보안과 개인정보 보호 최종 점검 - 다음 작업
 
 확정된 최초 베타 범위
 

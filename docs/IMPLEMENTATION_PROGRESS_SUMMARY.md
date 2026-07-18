@@ -3,8 +3,8 @@
 - 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~15번, 총 15개
-- 다음 작업: 16. 통계 API와 대시보드 전환
+- 완료: 1~16번, 총 16개
+- 다음 작업: 17. 보안과 개인정보 보호 최종 점검
 
 ---
 
@@ -29,7 +29,7 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 13. 게시 퀘스트 목록·상세 API, 사용자별 최근 응시 상태와 cursor pagination을 구현하고 프런트엔드의 `mockQuests`를 제거했다.
 14. 활성 AI 세션 기반 실제 퀴즈, 답안 저장·복구, 서버 채점, 제출 멱등성과 만료·재응시 정책을 구현했다.
 
-현재 React 프런트엔드는 GitHub 로그인 진입점, PostgreSQL 기반 세션 API, 서버 퀘스트 catalog와 실제 응시·채점 API를 사용한다. 포인트와 기간 통계는 15~16번 서버 전환 전까지 기존 표시 방식을 유지한다.
+현재 React 프런트엔드는 GitHub 로그인, PostgreSQL 기반 세션·퀘스트·채점·포인트·기간 통계 API를 사용한다. 기간 통계는 저장된 IANA time zone과 응답의 동일한 서버 기준 시각으로만 표시한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -576,7 +576,20 @@ React 44개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 3
 
 React 46개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 37개를 통과했다.
 
-# 11. 기준 문서
+# 11. 16번 구현 결과
+
+16번에서 다음 항목을 구현했다.
+
+1. 오늘·주·월·최대 366일 custom 서버 통계와 cursor 활동 이력 API
+2. IANA time zone 검증·저장, 미확인 UTC fallback과 Dashboard 수정 안내
+3. 동일 `meta.serverTime`을 사용하는 반열린 기간 경계와 활성 세션 overlap 집계
+4. 최초 통과 수·point 원장 합계, `DEGRADED` 세션 수와 소유권 격리
+5. LocalStorage 통계 계산 제거와 Home·Dashboard 서버 집계 전환
+6. DST·월·연도 경계, cursor, 대량 fixture 실행 계획과 loading·error UI 검증
+
+React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 41개를 통과했다.
+
+# 12. 기준 문서
 
 | 문서 | 역할 |
 |---|---|
@@ -589,4 +602,4 @@ React 46개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 3
 
 ---
 
-현재 결론: **최초 통과 채점과 100P 적립을 하나의 transaction으로 묶고 잔액·원장 이력과 중복 적립 방어를 완료했다. 다음 작업은 16번 통계 API와 대시보드 전환이다.**
+현재 결론: **IANA 시간대와 동일한 서버 시각을 사용하는 기간 통계와 Dashboard 전환을 완료했다. 다음 작업은 17번 보안과 개인정보 보호 최종 점검이다.**

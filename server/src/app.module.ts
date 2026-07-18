@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module'
 import { PointModule } from './points/point.module'
 import { QuestModule } from './quests/quest.module'
 import { SessionModule } from './sessions/session.module'
+import { StatisticsModule } from './statistics/statistics.module'
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SessionModule } from './sessions/session.module'
     SessionModule,
     QuestModule,
     PointModule,
+    StatisticsModule,
     HealthModule,
   ],
 })

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { EntityManager } from 'typeorm'
 
@@ -26,6 +26,8 @@ interface UserRow {
   display_name: string
   avatar_url: string | null
   provider_login: string
+  time_zone: string
+  time_zone_verified: boolean
 }
 
 interface AuthSessionRow extends UserRow {
@@ -159,6 +161,8 @@ export class AuthService {
           users.id,
           users.display_name,
           users.avatar_url,
+          users.time_zone,
+          users.time_zone_verified,
           user_auth_accounts.provider_login
         FROM auth_sessions
         JOIN users ON users.id = auth_sessions.user_id
@@ -213,6 +217,39 @@ export class AuthService {
     )
   }
 
+  async updateTimeZone(userId: string, timeZone: string) {
+    if (
+      timeZone.length > 100
+      || !/^[A-Za-z0-9._+-]+(?:\/[A-Za-z0-9._+-]+)*$/.test(timeZone)
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_TIME_ZONE',
+        message: '유효한 IANA time zone ID를 입력해 주세요.',
+      })
+    }
+
+    const zones = await this.databaseService.query<Array<{ name: string }>>(
+      'SELECT name FROM pg_timezone_names WHERE name = $1 LIMIT 1',
+      [timeZone],
+    )
+    if (!zones[0]) {
+      throw new BadRequestException({
+        code: 'INVALID_TIME_ZONE',
+        message: '서버에서 지원하는 IANA time zone ID가 아닙니다.',
+      })
+    }
+
+    await this.databaseService.query(
+      `UPDATE users
+       SET time_zone = $2,
+           time_zone_verified = true,
+           updated_at = now()
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [userId, zones[0].name],
+    )
+    return { timeZone: zones[0].name, timeZoneVerified: true }
+  }
+
   get successRedirectUrl() {
     return this.configService.getOrThrow('AUTH_SUCCESS_REDIRECT_URL')
   }
@@ -236,6 +273,8 @@ export class AuthService {
           users.id,
           users.display_name,
           users.avatar_url,
+          users.time_zone,
+          users.time_zone_verified,
           user_auth_accounts.provider_login
         FROM user_auth_accounts
         JOIN users ON users.id = user_auth_accounts.user_id
@@ -256,7 +295,7 @@ export class AuthService {
               updated_at = now()
           WHERE id = $1
             AND deleted_at IS NULL
-          RETURNING id, display_name, avatar_url
+          RETURNING id, display_name, avatar_url, time_zone, time_zone_verified
         `,
         [existingUser.id, displayName, profile.avatarUrl],
       )) as Array<Omit<UserRow, 'provider_login'>>
@@ -281,6 +320,8 @@ export class AuthService {
         displayName,
         avatarUrl: profile.avatarUrl,
         githubLogin: profile.login,
+        timeZone: existingUser.time_zone,
+        timeZoneVerified: existingUser.time_zone_verified,
       }
     }
 
@@ -288,7 +329,7 @@ export class AuthService {
       `
         INSERT INTO users (display_name, avatar_url)
         VALUES ($1, $2)
-        RETURNING id, display_name, avatar_url
+        RETURNING id, display_name, avatar_url, time_zone, time_zone_verified
       `,
       [displayName, profile.avatarUrl],
     )) as Array<Omit<UserRow, 'provider_login'>>
@@ -313,6 +354,8 @@ export class AuthService {
       displayName: user.display_name,
       avatarUrl: user.avatar_url,
       githubLogin: profile.login,
+      timeZone: user.time_zone,
+      timeZoneVerified: user.time_zone_verified,
     }
   }
 
@@ -322,6 +365,8 @@ export class AuthService {
       displayName: row.display_name,
       avatarUrl: row.avatar_url,
       githubLogin: row.provider_login,
+      timeZone: row.time_zone,
+      timeZoneVerified: row.time_zone_verified,
     }
   }
 

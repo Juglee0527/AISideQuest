@@ -236,6 +236,29 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       displayName: 'Octo Cat',
       avatarUrl: 'https://avatars.githubusercontent.com/u/123456',
       githubLogin: 'octocat',
+      timeZone: 'UTC',
+      timeZoneVerified: false,
+    })
+
+    await agent.patch('/api/v1/auth/me/time-zone').send({ timeZone: 'Asia/Seoul' }).expect(403)
+    await agent
+      .patch('/api/v1/auth/me/time-zone')
+      .set('x-csrf-token', csrfToken)
+      .send({ timeZone: 'Invalid/Nowhere' })
+      .expect(400)
+      .expect(({ body }) => assert.equal(body.error.code, 'INVALID_TIME_ZONE'))
+    await agent
+      .patch('/api/v1/auth/me/time-zone')
+      .set('x-csrf-token', csrfToken)
+      .send({ timeZone: 'Asia/Seoul' })
+      .expect(200)
+      .expect(({ body }) => assert.deepEqual(body.data, {
+        timeZone: 'Asia/Seoul',
+        timeZoneVerified: true,
+      }))
+    await agent.get('/api/v1/auth/me').expect(200).expect(({ body }) => {
+      assert.equal(body.data.timeZone, 'Asia/Seoul')
+      assert.equal(body.data.timeZoneVerified, true)
     })
 
     const [storedSession] = await databaseService.query<

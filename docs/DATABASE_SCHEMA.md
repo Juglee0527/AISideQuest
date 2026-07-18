@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`, `1784181600000-add-quest-attempt-flow`, `1784185200000-add-point-ledger`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`, `1784181600000-add-quest-attempt-flow`, `1784185200000-add-point-ledger`, `1784188800000-add-server-statistics`
 
 ---
 
@@ -57,6 +57,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - 연결 코드 원문도 저장하지 않고 64자리 SHA-256 hash만 저장하며 10분 안에 한 번만 소비한다.
 - 신규 기기 연결과 기존 기기 token 회전을 구분하고, 모든 변경 요청은 멱등하게 처리한다.
 - 기기는 만료와 해제를 삭제 대신 시각으로 기록한다.
+- 사용자 time zone은 미검증 `UTC`에서 시작하며 PostgreSQL `pg_timezone_names`로 확인된 IANA ID만 `time_zone_verified=true`로 저장한다.
 
 ## 3.2 AI 세션과 event
 
@@ -167,4 +168,5 @@ npm.cmd run test:database
 - 13번 구현 완료: 게시 퀘스트 콘텐츠 제약, 목록·상세 조회와 사용자별 최근 응시 상태
 - 14번 구현 완료: 응시·답안 복구, 서버 채점, `EXPIRED`, 제출 멱등성과 5분 grace
 - 15번 구현 완료: 퀘스트 완료·포인트 원장 기록 transaction, 기존 통과 backfill, 잔액·cursor 이력 API
-- 16번: 서버 기간 통계와 대시보드 전환
+- 16번 구현 완료: 미검증 UTC와 IANA time zone 저장, 세션 구간·통과 응시 index, 서버 기간 통계
+- 17번: endpoint 보안 matrix와 개인정보 보호 최종 점검

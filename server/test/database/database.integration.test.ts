@@ -91,6 +91,26 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [statisticsReverted] = (await dataSource.query(`
+      SELECT
+        (SELECT count(*)::integer
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users'
+           AND column_name = 'time_zone_verified') AS verified_column,
+        to_regclass('public.ix_ai_sessions_user_interval') AS session_index,
+        to_regclass('public.ix_quest_attempts_user_completed_passed') AS attempt_index
+    `)) as Array<{
+      verified_column: number
+      session_index: string | null
+      attempt_index: string | null
+    }>
+    assert.deepEqual(statisticsReverted, {
+      verified_column: 0,
+      session_index: null,
+      attempt_index: null,
+    })
+
+    await dataSource.undoLastMigration()
     const [legacyLedgerIndex] = (await dataSource.query(`
       SELECT indexdef
       FROM pg_indexes
@@ -123,7 +143,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 1)
+    assert.equal(pointMigrations.length, 2)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -144,6 +164,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     await dataSource.query('DELETE FROM ai_sessions WHERE id = $1', [migrationSession.id])
     await dataSource.query('DELETE FROM users WHERE id = $1', [migrationUser.id])
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     const [attemptFlowReverted] = (await dataSource.query(`
       SELECT is_nullable
@@ -220,7 +241,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 8)
+    assert.equal(reappliedMigrations.length, 9)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
