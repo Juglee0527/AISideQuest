@@ -2,24 +2,13 @@ import { AlertCircle, CircleDollarSign, ListTodo, LoaderCircle, RefreshCw } from
 
 import PageHeader from '../components/PageHeader'
 import QuestCard from '../components/QuestCard'
-import { useQuestHistory } from '../contexts/QuestHistoryContext'
 import { useQuestCatalog } from '../contexts/QuestCatalogContext'
 import { useSession } from '../contexts/SessionContext'
 
 function SideQuestPage() {
   const { activeSession } = useSession()
-  const { questHistories, completeQuest } = useQuestHistory()
   const { quests, status, isRefreshing, errorMessage, refresh } = useQuestCatalog()
-  const completedQuestIds = new Set(
-    activeSession === null
-      ? []
-      : questHistories
-          .filter((history) => history.sessionId === activeSession.id && history.completed)
-          .map((history) => history.questId),
-  )
-  const completedCount = quests.filter(
-    (quest) => quest.completionStatus === 'PASSED' || completedQuestIds.has(quest.id),
-  ).length
+  const completedCount = quests.filter((quest) => quest.completionStatus === 'PASSED').length
 
   return (
     <div className="space-y-10">
@@ -97,9 +86,6 @@ function SideQuestPage() {
             key={quest.id}
             quest={quest}
             sequence={index + 1}
-            isSessionActive={activeSession !== null}
-            isCompleted={quest.completionStatus === 'PASSED' || completedQuestIds.has(quest.id)}
-            onComplete={() => completeQuest(quest.id)}
           />
         ))}
         </section>

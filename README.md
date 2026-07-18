@@ -189,7 +189,7 @@ npm.cmd run test:watch
 현재 자동 테스트는 다음 영역을 검증합니다.
 
 - API 기반 AI 작업 세션 시작, polling, 복구, 종료
-- 사이드 퀘스트 완료 및 중복 완료 방지
+- 실제 개발 퀴즈 시작, 답안 저장·복구와 서버 채점
 - 기존 LocalStorage 감지, 참고 요약·초기화, 손상 데이터 처리
 - 인증 만료, 네트워크 오류 재시도, 서버 시각 보정
 - 일간, 주간, 월간 활동 통계
@@ -205,6 +205,7 @@ npm.cmd run test:watch
 - 현재 사용자 조회, CSRF logout, 세션 만료·폐기
 - AI 세션 수동 시작·종료, 활성 조회와 cursor 이력
 - 동시 요청 멱등성, Codex event 상태 전이와 역순 event 복구
+- 퀴즈 제출 멱등성·동시성, 5분 grace, 만료·재응시와 정답 비노출
 
 DB 통합 테스트는 초기화 가능한 test 전용 DB에서 실행합니다.
 
@@ -255,7 +256,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 DB에 게시된 퀘스트 목록·상세와 자신의 최근 응시 상태를 조회하며, 프런트엔드는 이 서버 catalog를 사용합니다. 다음 기능 작업은 실제 문제 제공·답안 저장·서버 채점을 포함한 개발 퀴즈 구현입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 활성 AI 세션에서 실제 개발 퀴즈를 시작하고, 서버에 답안을 저장해 새로고침 후 복구하며, 서버 채점 결과와 재응시 상태를 확인할 수 있습니다. 다음 기능 작업은 최초 통과 시 100P를 안전하게 적립하는 포인트 원장 구현입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 

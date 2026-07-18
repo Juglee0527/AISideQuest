@@ -3,6 +3,7 @@ export type QuestAttemptStatus =
   | 'SUBMITTED'
   | 'COMPLETED'
   | 'FAILED'
+  | 'EXPIRED'
 
 export type QuestCompletionStatus =
   | 'NOT_STARTED'

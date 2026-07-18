@@ -155,7 +155,11 @@ export class QuestService {
       || row.attempt_status === 'SUBMITTED'
     ) {
       completionStatus = 'IN_PROGRESS'
-    } else if (row.attempt_status === 'COMPLETED' || row.attempt_status === 'FAILED') {
+    } else if (
+      row.attempt_status === 'COMPLETED'
+      || row.attempt_status === 'FAILED'
+      || row.attempt_status === 'EXPIRED'
+    ) {
       completionStatus = 'FAILED'
     }
 

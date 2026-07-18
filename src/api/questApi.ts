@@ -10,6 +10,7 @@ const ATTEMPT_STATUSES = new Set<QuestAttemptStatus>([
   'SUBMITTED',
   'COMPLETED',
   'FAILED',
+  'EXPIRED',
 ])
 const COMPLETION_STATUSES = new Set<QuestCompletionStatus>([
   'NOT_STARTED',

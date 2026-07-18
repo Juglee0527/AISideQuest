@@ -101,7 +101,6 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
   beforeEach(async () => {
     await databaseService.query('DELETE FROM quest_attempts')
-    await databaseService.query('UPDATE quests SET retry_allowed = true')
   })
 
   after(async () => app?.close())
@@ -201,7 +200,16 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       ],
     )
     await databaseService.query(
-      `UPDATE quests SET retry_allowed = false WHERE code = 'http-idempotency'`,
+      `UPDATE quests SET status = 'ARCHIVED'
+       WHERE code = 'http-idempotency'`,
+    )
+    await databaseService.query(
+      `UPDATE quests SET retry_allowed = false
+       WHERE code = 'http-idempotency'`,
+    )
+    await databaseService.query(
+      `UPDATE quests SET status = 'PUBLISHED'
+       WHERE code = 'http-idempotency'`,
     )
 
     const passed = await authenticated('/api/v1/quests/typescript-type-narrowing').expect(200)

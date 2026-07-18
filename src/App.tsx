@@ -4,6 +4,7 @@ import AppLayout from './components/AppLayout'
 import DashboardPage from './pages/DashboardPage'
 import DevicesPage from './pages/DevicesPage'
 import HomePage from './pages/HomePage'
+import QuestAttemptPage from './pages/QuestAttemptPage'
 import SideQuestPage from './pages/SideQuestPage'
 
 function App() {
@@ -12,6 +13,8 @@ function App() {
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />
         <Route path="quests" element={<SideQuestPage />} />
+        <Route path="quests/:code" element={<QuestAttemptPage />} />
+        <Route path="quest-attempts/:attemptId" element={<QuestAttemptPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="devices" element={<DevicesPage />} />
       </Route>

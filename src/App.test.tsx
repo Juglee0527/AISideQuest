@@ -173,15 +173,14 @@ describe('AISideQuest API session flow', () => {
     expect(screen.getAllByText('Codex 확인 필요')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('link', { name: /사이드 퀘스트 둘러보기/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'AI 작업 경험 설문 완료하기' }))
-    expect(screen.getByText('현재 세션 1/1 완료')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'AI 작업 경험 설문 퀴즈 시작' })).toBeInTheDocument()
+    expect(screen.getByText('현재 세션 0/1 완료')).toBeInTheDocument()
 
     firstRender.unmount()
     const secondRender = renderApp('/quests')
     await flushRequests()
 
-    expect(screen.getByText('현재 세션 1/1 완료')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'AI 작업 경험 설문 완료됨' })).toBeDisabled()
+    expect(screen.getByText('현재 세션 0/1 완료')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'AISideQuest Home' }))
     expect(screen.getByRole('timer')).toHaveTextContent('01:10')
 
@@ -383,5 +382,123 @@ describe('AISideQuest API session flow', () => {
     renderApp('/quests')
     await flushRequests()
     expect(screen.getByText('현재 공개된 퀘스트가 없습니다.')).toBeInTheDocument()
+  })
+
+  it('starts, saves, restores and submits a server-graded quest attempt', async () => {
+    const activeSession = createSession(
+      '00000000-0000-4000-8000-000000000001',
+      'RUNNING',
+      '2026-07-15T00:00:00.000Z',
+    )
+    const attemptId = '00000000-0000-4000-8000-000000000030'
+    const questionId = '00000000-0000-4000-8000-000000000031'
+    const optionId = '00000000-0000-4000-8000-000000000032'
+    let attemptStarted = false
+    let selectedOptionId: string | null = null
+    let submitted = false
+
+    const attempt = () => ({
+      id: attemptId,
+      aiSessionId: activeSession.id,
+      status: submitted ? 'COMPLETED' : 'IN_PROGRESS',
+      startedAt: '2026-07-15T00:00:10.000Z',
+      submittedAt: submitted ? '2026-07-15T00:00:20.000Z' : null,
+      completedAt: submitted ? '2026-07-15T00:00:20.000Z' : null,
+      submissionDeadline: null,
+      canSubmit: !submitted,
+      canRetry: false,
+      quest: {
+        id: questFixture.id,
+        code: questFixture.code,
+        version: 1,
+        title: questFixture.title,
+        passScore: 100,
+        rewardPoints: 100,
+        retryAllowed: true,
+      },
+      questions: [{
+        id: questionId,
+        position: 1,
+        prompt: '서버에서만 채점되는 문제입니다.',
+        selectedOptionId,
+        options: [{ id: optionId, position: 1, label: '선택지 A' }],
+      }],
+      result: submitted
+        ? { score: 100, passed: true, retryAllowed: true, answerReview: null }
+        : null,
+    })
+
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(activeSession)
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [activeSession], nextCursor: null })
+      }
+      if (url.pathname.endsWith(`/quests/${questFixture.code}/attempts`)) {
+        attemptStarted = true
+        return jsonResponse({ created: true, attempt: attempt() })
+      }
+      if (url.pathname.endsWith(`/quests/${questFixture.code}`)) {
+        return jsonResponse({
+          ...questFixture,
+          completionStatus: submitted ? 'PASSED' : attemptStarted ? 'IN_PROGRESS' : 'NOT_STARTED',
+          latestAttempt: attemptStarted ? {
+            id: attemptId,
+            status: submitted ? 'COMPLETED' : 'IN_PROGRESS',
+            score: submitted ? 100 : null,
+            passed: submitted ? true : null,
+            startedAt: '2026-07-15T00:00:10.000Z',
+            completedAt: submitted ? '2026-07-15T00:00:20.000Z' : null,
+          } : null,
+        })
+      }
+      if (url.pathname.endsWith(`/quest-attempts/${attemptId}/answers`)) {
+        const payload = JSON.parse(String(init?.body)) as {
+          answers: Array<{ selectedOptionId: string }>
+        }
+        selectedOptionId = payload.answers[0].selectedOptionId
+        return jsonResponse(attempt())
+      }
+      if (url.pathname.endsWith(`/quest-attempts/${attemptId}/submissions`)) {
+        submitted = true
+        return jsonResponse({ attempt: attempt() })
+      }
+      if (url.pathname.endsWith(`/quest-attempts/${attemptId}`)) {
+        return jsonResponse(attempt())
+      }
+      if (url.pathname.endsWith('/quests')) {
+        return jsonResponse({ items: [{
+          ...questFixture,
+          completionStatus: submitted ? 'PASSED' : attemptStarted ? 'IN_PROGRESS' : 'NOT_STARTED',
+          latestAttempt: attemptStarted ? {
+            id: attemptId,
+            status: submitted ? 'COMPLETED' : 'IN_PROGRESS',
+            score: submitted ? 100 : null,
+            passed: submitted ? true : null,
+            startedAt: '2026-07-15T00:00:10.000Z',
+            completedAt: submitted ? '2026-07-15T00:00:20.000Z' : null,
+          } : null,
+        }], nextCursor: null })
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    }))
+
+    const firstRender = renderApp(`/quests/${questFixture.code}`)
+    await flushRequests()
+    fireEvent.click(screen.getByRole('button', { name: '퀴즈 시작' }))
+    await flushRequests()
+    fireEvent.click(screen.getByLabelText('선택지 A'))
+    await flushRequests()
+    expect(screen.getByText('모든 선택이 서버에 저장됨')).toBeInTheDocument()
+
+    firstRender.unmount()
+    renderApp(`/quest-attempts/${attemptId}`)
+    await flushRequests()
+    expect(screen.getByLabelText('선택지 A')).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: '답안 제출' }))
+    fireEvent.click(screen.getByRole('button', { name: '최종 제출' }))
+    await flushRequests()
+    expect(screen.getByText('퀘스트를 통과했습니다!')).toBeInTheDocument()
+    expect(screen.getByText('점수 100점 · 통과 기준 100점')).toBeInTheDocument()
   })
 })

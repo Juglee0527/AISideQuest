@@ -1,35 +1,45 @@
+import type { SessionStatus } from '../sessions/session.types'
+
 export type QuestAttemptStatus =
   | 'IN_PROGRESS'
   | 'SUBMITTED'
   | 'COMPLETED'
   | 'FAILED'
   | 'EXPIRED'
-export type QuestCompletionStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'PASSED' | 'FAILED'
 
-export interface QuestAttemptSummary {
+export interface QuestAttemptRow {
   id: string
-  status: QuestAttemptStatus
+  user_id: string
+  quest_id: string
+  ai_session_id: string
+  attempt_status: QuestAttemptStatus
+  started_at: Date
+  submitted_at: Date | null
+  completed_at: Date | null
   score: number | null
   passed: boolean | null
-  startedAt: string
-  completedAt: string | null
-}
-
-export interface Quest {
-  id: string
+  reward_points_snapshot: number | null
   code: string
   version: number
   title: string
-  description: string
-  estimatedMinutes: number
-  rewardPoints: number
-  passScore: number
-  retryAllowed: boolean
-  completionStatus: QuestCompletionStatus
-  latestAttempt: QuestAttemptSummary | null
+  pass_score: number
+  reward_points: number
+  retry_allowed: boolean
+  session_status: SessionStatus
+  session_ended_at: Date | null
 }
 
-export interface QuestAttempt {
+export interface QuestAttemptQuestionRow {
+  question_id: string
+  question_position: number
+  prompt: string
+  option_id: string
+  option_position: number
+  option_label: string
+  selected_option_id: string | null
+}
+
+export interface QuestAttemptSnapshot {
   id: string
   aiSessionId: string
   status: QuestAttemptStatus

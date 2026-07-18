@@ -22,7 +22,10 @@ export function parseIdempotencyKey(value: string | undefined) {
   return parseUuid(value, 'Idempotency-Key')
 }
 
-export function assertEmptyBody(body: unknown) {
+export function assertEmptyBody(
+  body: unknown,
+  message = 'manual session start does not accept a request body',
+) {
   if (
     body === undefined ||
     (typeof body === 'object' &&
@@ -33,5 +36,5 @@ export function assertEmptyBody(body: unknown) {
     return
   }
 
-  validationError('manual session start does not accept a request body')
+  validationError(message)
 }

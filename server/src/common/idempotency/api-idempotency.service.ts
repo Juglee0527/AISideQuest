@@ -8,6 +8,8 @@ export type ApiIdempotencyOperation =
   | 'DEVICE_ROTATION_LINK_CREATE'
   | 'DEVICE_LINK_REDEEM'
   | 'DEVICE_REVOKE'
+  | 'QUEST_ATTEMPT_START'
+  | 'QUEST_ATTEMPT_SUBMIT'
 
 interface StoredIdempotencyRow {
   request_hash: string

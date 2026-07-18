@@ -171,15 +171,16 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 | `git-safe-history` | Git 안전한 이력 관리 | 2분 | 100P |
 | `testing-boundary-values` | 경계값 테스트 | 2분 | 100P |
 
-목록과 상세 API는 로그인 사용자에게만 제공하며 사용자의 최근 응시 상태를 포함한다. 문제·선택지·정답은 14번의 실제 응시 API 전까지 노출하지 않는다.
+목록과 상세 API는 로그인 사용자에게만 제공하며 사용자의 최근 응시 상태를 포함한다. 문제와 선택지는 활성 AI 세션에서 응시를 시작한 뒤 제공하며 정답은 클라이언트에 노출하지 않는다.
 
-## 6.3 퀘스트 완료
+## 6.3 실제 퀴즈 응시와 완료
 
-- 완료 시 `QuestHistory`를 생성한다.
-- 완료 이력은 활성 세션 ID와 퀘스트 ID를 함께 저장한다.
-- `(sessionId, questId)` 조합은 중복될 수 없다.
-- 퀘스트 ID가 비어 있거나 활성 세션이 없으면 완료 요청을 무시한다.
-- 완료 처리는 단방향이며 완료 취소를 지원하지 않는다.
+- 활성 AI 세션에서 게시 퀘스트 version에 고정된 응시를 시작한다.
+- 선택한 전체 답안 집합은 서버에서 원자적으로 교체하며 새로고침 후 복구한다.
+- 제출 시 저장 답안을 서버에서만 채점하고 `floor(정답 수 × 100 / 전체 문항 수)`로 점수를 계산한다.
+- AI 세션 종료 후 정확히 5분까지 제출할 수 있으며 이후 응시는 점수 없이 `EXPIRED` 처리한다.
+- 실패·만료는 퀘스트의 `retryAllowed` 정책에 따라 재응시하고, 이미 통과한 version은 다시 응시하지 않는다.
+- 시작과 제출은 멱등성 key와 DB row lock으로 중복·동시 요청에도 하나의 상태만 확정한다.
 
 ---
 
@@ -201,18 +202,19 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 | `id` | `string` | 퀘스트 고유 ID |
 | `title` | `string` | 제목 |
 | `description` | `string` | 설명 |
-| `reward` | `number` | 예상 포인트 |
+| `rewardPoints` | `number` | 예상 포인트 |
 | `estimatedMinutes` | `number` | 예상 소요 시간(분) |
 
-## 7.3 QuestHistory
+## 7.3 QuestAttempt
 
 | 필드 | 타입 | 설명 |
 |---|---|---|
 | `id` | `string` | 완료 이력 고유 ID |
-| `questId` | `string` | 완료한 퀘스트 ID |
-| `sessionId` | `string` | 연결된 AI 작업 세션 ID |
-| `completed` | `boolean` | 현재 구현에서는 항상 `true` |
-| `completedAt` | `string` | ISO 8601 완료 시각 |
+| `quest.id`, `quest.version` | `string`, `number` | 시작 시 고정된 퀘스트 version |
+| `aiSessionId` | `string` | 시작 시 연결된 AI 작업 세션 |
+| `status` | `string` | `IN_PROGRESS`, `COMPLETED`, `FAILED`, `EXPIRED` |
+| `questions` | `array` | 정답 표시가 없는 문제·선택지와 저장 선택 |
+| `result` | `object \| null` | 서버 점수·통과 여부와 재응시 정책 |
 
 ## 7.4 서버 User
 
@@ -346,7 +348,7 @@ GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용
 - TypeORM 1.1 SQL migration
 - 로컬 Docker Compose 실행 환경
 
-현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증, AI 세션 API와 게시 퀘스트 목록·상세 API가 있다. 실제 응시·채점과 포인트 비즈니스 API는 후속 작업에서 구현한다.
+현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증, AI 세션 API, 게시 퀘스트 목록·상세와 실제 응시·서버 채점 API가 있다. 포인트 비즈니스 API는 후속 작업에서 구현한다.
 
 ---
 
@@ -399,10 +401,10 @@ npm run build
 2026-07-18 기준
 
 - React 테스트 파일: 9개 통과
-- React 자동 테스트: 43개 통과
+- React 자동 테스트: 44개 통과
 - Codex 플러그인 테스트: 9개 통과
-- NestJS 비DB 테스트: 6개 통과
-- DB·인증·기기·AI 세션·퀘스트 PostgreSQL 통합 테스트: 29개 통과
+- NestJS 비DB 테스트: 8개 통과
+- DB·인증·기기·AI 세션·퀘스트 PostgreSQL 통합 테스트: 35개 통과
 - TypeScript 타입 검사 통과
 - Vite 및 NestJS 프로덕션 빌드 통과
 - 실제 `GET /api/v1/health` HTTP 200 확인
@@ -422,7 +424,7 @@ npm run build
 - 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
 - GitHub 로그인 진입 UI는 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
 - lifecycle event와 30초 heartbeat는 기기별 sequence를 가진 durable JSONL queue에서 FIFO로 재전송된다.
-- 세션과 퀘스트 catalog는 PostgreSQL 데이터를 사용하며 실제 응시·포인트·통계 API 전환은 후속 작업이다.
+- 세션, 퀘스트 catalog와 실제 응시는 PostgreSQL 데이터를 사용하며 포인트·통계 API 전환은 후속 작업이다.
 
 ---
 
@@ -461,7 +463,8 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 11. [x] AI 작업 자동 감지 연동 - lifecycle event 자동 전송, 웹 상태 반영과 수동 fallback 완료
 12. [x] Heartbeat와 장애 복구 구현 - PostgreSQL 통합 테스트 완료
 13. [x] 퀘스트 목록 API 구현 - 게시 catalog, 최근 응시 상태, pagination과 프런트엔드 전환 완료
-14. [ ] 실제 개발 퀴즈 구현 - 다음 작업
+14. [x] 실제 개발 퀴즈 구현 - 답안 복구, 서버 채점, 멱등 제출과 만료·재응시 완료
+15. [ ] 포인트 원장 구현 - 다음 작업
 
 확정된 최초 베타 범위
 

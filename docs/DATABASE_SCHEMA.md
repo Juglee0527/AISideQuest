@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`
+- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`, `1784181600000-add-quest-attempt-flow`
 
 ---
 
@@ -73,9 +73,12 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 
 - 퀘스트는 `(code, version)`으로 식별한다.
 - 같은 code에는 공개 버전이 하나만 존재한다.
+- 공개된 version의 메타데이터·문항·선택지는 불변이며 변경은 새 version으로 게시한다.
 - 베타 보상은 성공 시 100P로 고정한다.
 - 한 문항에는 정답 선택지를 최대 하나만 둘 수 있다.
 - 응시 답안의 문항과 선택지가 같은 퀘스트·문항에 속하도록 복합 FK를 사용한다.
+- 저장 중 답안의 `is_correct`는 `NULL`이며 제출 transaction에서만 확정한다.
+- 응시는 AI 세션 종료 후 5분이 지나면 점수 없는 `EXPIRED` 상태로 전이한다.
 - `point_ledger`는 사용자와 퀘스트 버전 조합당 보상 1건만 허용한다.
 - 포인트 잔액 컬럼은 두지 않고 원장의 합으로 계산한다.
 
@@ -162,5 +165,5 @@ npm.cmd run test:database
 - 10번 완료: 일회성 기기 연결 코드와 token 발급·회전·해제
 - 12번 구현 완료: integration event sequence, 세션 만료 정리와 late `Stop` 복구
 - 13번 구현 완료: 게시 퀘스트 콘텐츠 제약, 목록·상세 조회와 사용자별 최근 응시 상태
-- 14번: 퀘스트 제출과 서버 판정
+- 14번 구현 완료: 응시·답안 복구, 서버 채점, `EXPIRED`, 제출 멱등성과 5분 grace
 - 15번: 퀘스트 완료와 포인트 원장 기록 transaction
