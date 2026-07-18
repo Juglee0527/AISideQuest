@@ -135,16 +135,22 @@ async function appendDeadLetter(queuePaths, item, reason, now) {
 
 async function writeDiagnostic(queuePaths, patch) {
   const current = await readJson(queuePaths.diagnostic, {})
-  await atomicWrite(queuePaths.diagnostic, {
+  const diagnostic = {
     schemaVersion: 1,
     status: 'READY',
     queueDepth: 0,
     oldestAgeMs: 0,
     deadLetterCount: 0,
-    updatedAt: new Date().toISOString(),
     ...current,
     ...patch,
-  })
+    updatedAt: new Date().toISOString(),
+  }
+
+  if (diagnostic.status === 'READY') {
+    delete diagnostic.lastErrorCode
+  }
+
+  await atomicWrite(queuePaths.diagnostic, diagnostic)
 }
 
 async function compactDeadLetters(queuePaths, now) {

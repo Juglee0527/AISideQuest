@@ -92,6 +92,8 @@ stateDiagram-v2
 
 Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그인 hook에는 쓰기 가능한 `PLUGIN_DATA`를 제공한다. 플러그인은 원본 식별자를 서버로 보내지 않고 기존 PoC와 동일하게 SHA-256 hash로 변환한다.
 
+기기 연결 CLI는 Codex 밖에서도 실행할 수 있으므로 사용자 로컬 기본 데이터 위치에 `device.json`을 저장한다. hook 실행 시에는 queue와 진단 파일에 `PLUGIN_DATA`를 우선 사용하되, 그 위치에 기기 설정이 없으면 연결 CLI의 사용자 로컬 기본 위치를 읽는다. 기기 token을 두 위치에 복제하지 않는다.
+
 | Hook 또는 내부 event | 대상 상태 | 서버 처리 |
 |---|---|---|
 | `SessionStart` | 상태 변경 없음 | 연결 상태와 마지막 plugin 활동만 갱신 |
@@ -156,6 +158,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 ## 6.4 네트워크 단절과 앱 종료
 
 - 플러그인은 event를 로컬 queue에 보관하고 동일 `eventId`로 재전송한다.
+- `delivery-diagnostic.json`은 상태를 쓸 때마다 `updatedAt`을 갱신하며, 전송이 `READY`로 회복되면 과거 `lastErrorCode`를 제거한다.
 - 서버는 event가 오지 않는 동안 상태를 추측해 `COMPLETED`로 변경하지 않는다.
 - heartbeat 만료 시 `ABANDONED` 처리한다.
 - 같은 turn의 `Stop`이 24시간 안에 지연 도착하면 `COMPLETED/RECOVERED_LATE_STOP`으로 정정하지만 기존 종료 시각은 유지한다.

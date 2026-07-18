@@ -126,6 +126,25 @@ test('stops automatic retries on authentication failures without acknowledging t
     assert.equal(result.status, 'AUTH_BLOCKED')
     assert.equal(diagnostic.status, 'AUTH_BLOCKED')
     assert.equal(diagnostic.queueDepth, 1)
+    assert.equal(diagnostic.lastErrorCode, 'DEVICE_AUTH_REQUIRED')
+
+    await writeFile(join(directory, 'delivery-diagnostic.json'), JSON.stringify({
+      ...diagnostic,
+      updatedAt: '2026-07-18T00:00:00.000Z',
+    }), 'utf8')
+
+    const recovered = await processNextEvent({
+      environment,
+      fetchImpl: async (_url, options) => success(JSON.parse(options.body).eventId),
+    })
+    const recoveredDiagnostic = await readDeliveryDiagnostic(environment)
+
+    assert.equal(recovered.status, 'DELIVERED')
+    assert.equal(recoveredDiagnostic.status, 'READY')
+    assert.equal(recoveredDiagnostic.queueDepth, 0)
+    assert.equal('lastErrorCode' in recoveredDiagnostic, false)
+    assert.notEqual(recoveredDiagnostic.updatedAt, '2026-07-18T00:00:00.000Z')
+    assert.equal(typeof recoveredDiagnostic.lastDeliveredAt, 'string')
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { connectDevice } from '../scripts/connect-device.mjs'
-import { resolveConfigPath } from '../scripts/device-config.mjs'
+import { readDeviceConfig, resolveConfigPath } from '../scripts/device-config.mjs'
 import {
   hashIdentifier,
   sanitizeHookPayload,
@@ -112,8 +112,9 @@ test('keeps only the server event contract and hashed identifiers', () => {
 })
 
 test('connects with a generated token and stores only device credentials locally', async () => {
-  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
-  const environment = { AISIDEQUEST_DATA_DIR: dataDirectory }
+  const localAppData = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = { LOCALAPPDATA: localAppData }
+  const pluginDataDirectory = join(localAppData, 'codex-plugin-data')
   let receivedRequest
   const api = await startApiServer(async (request, response) => {
     receivedRequest = {
@@ -152,9 +153,15 @@ test('connects with a generated token and stores only device credentials locally
     assert.equal(config.deviceToken, receivedRequest.body.deviceToken)
     assert.equal(config.apiUrl, api.apiUrl)
     assert.doesNotMatch(configText, /github|oauth|access.?token/i)
+
+    const hookConfig = await readDeviceConfig({
+      ...environment,
+      PLUGIN_DATA: pluginDataDirectory,
+    })
+    assert.deepEqual(hookConfig, config)
   } finally {
     await api.close()
-    await rm(dataDirectory, { recursive: true, force: true })
+    await rm(localAppData, { recursive: true, force: true })
   }
 })
 
@@ -354,6 +361,7 @@ test('emits heartbeats while a turn is active and stops after Stop', async () =>
       session_id: 'heartbeat-session',
       turn_id: 'heartbeat-turn',
     }, environment)
+    await new Promise((resolve) => setTimeout(resolve, 100))
     const countAfterStop = received.filter((body) => body.event === 'Heartbeat').length
     await new Promise((resolve) => setTimeout(resolve, 150))
 

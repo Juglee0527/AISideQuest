@@ -13,6 +13,10 @@ export function resolveConfigPath(environment = process.env) {
   return join(resolveDataDirectory(environment), CONFIG_FILE_NAME)
 }
 
+function resolveConnectionConfigPath(environment = process.env) {
+  return resolveConfigPath({ ...environment, PLUGIN_DATA: '' })
+}
+
 export async function writeDeviceConfig(config, environment = process.env) {
   const configPath = resolveConfigPath(environment)
   const temporaryPath = `${configPath}.${process.pid}.tmp`
@@ -34,12 +38,29 @@ export async function writeDeviceConfig(config, environment = process.env) {
 }
 
 export async function readDeviceConfig(environment = process.env) {
-  const configPath = resolveConfigPath(environment)
+  const configPaths = [resolveConfigPath(environment)]
+  const connectionConfigPath = resolveConnectionConfigPath(environment)
+
+  if (!configPaths.includes(connectionConfigPath)) {
+    configPaths.push(connectionConfigPath)
+  }
+
   let parsed
 
-  try {
-    parsed = JSON.parse(await readFile(configPath, 'utf8'))
-  } catch {
+  for (const configPath of configPaths) {
+    try {
+      parsed = JSON.parse(await readFile(configPath, 'utf8'))
+      break
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        continue
+      }
+
+      throw new Error('AISideQuest 기기 연결 정보가 올바르지 않습니다. 다시 연결해 주세요.')
+    }
+  }
+
+  if (parsed === undefined) {
     throw new Error('AISideQuest 기기 연결 정보가 없습니다. 먼저 connect-device.mjs를 실행해 주세요.')
   }
 
