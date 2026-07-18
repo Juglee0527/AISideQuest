@@ -3,8 +3,8 @@
 - 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~18번, 총 18개
-- 다음 작업: 19. 통합 테스트와 CI 구성
+- 완료: 1~19번, 총 19개
+- 다음 작업: 20. 운영 배포와 파일럿 진행
 
 ---
 
@@ -602,10 +602,11 @@ React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 4
 | [AUTHENTICATION.md](./AUTHENTICATION.md) | GitHub OAuth, cookie 세션, CSRF와 인증 API 계약 |
 | [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md) | Endpoint 보안 matrix, Rate Limit, 개인정보 보존·내보내기·삭제 기준 |
 | [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md) | Request ID 로그, probe, 지표·경보, migration, backup·복원과 secret 회전 절차 |
+| [CI_AND_RELEASE_GATES.md](./CI_AND_RELEASE_GATES.md) | CI job, branch protection, artifact 정책과 staging·Codex 릴리스 체크리스트 |
 
 ---
 
-현재 결론: **Request ID 기반 구조화 로그, live/ready, 운영 지표·경보, 안전한 migration과 backup·restore runbook을 구현했다. 다음 작업은 19번 통합 테스트와 CI 구성이다.**
+현재 결론: **분리된 GitHub Actions, PostgreSQL 16 migration·통합 gate와 Chromium 핵심 흐름을 구현했다. 다음 작업은 20번 운영 배포와 파일럿 진행이다.**
 
 # 13. 17번 구현 결과
 
@@ -628,3 +629,9 @@ React 47개, 플러그인 9개, NestJS 비DB 12개, PostgreSQL 통합 테스트 
 18번에서는 request ID 구조화 로그와 오류 event, DB·migration readiness, protected Prometheus metrics와 alert rule을 구현했다. 플러그인 heartbeat는 queue 원문 대신 depth·oldest age·dead-letter count만 보고한다. advisory lock migration runner와 암호화 backup·격리 복원 스크립트를 추가하고 실제 Docker PostgreSQL에서 복원 훈련을 완료했다.
 
 운영 절차와 장애·secret 회전 기준은 [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md), 훈련 증적은 [2026-07-18-backup-restore-drill.md](./operations/2026-07-18-backup-restore-drill.md)에 기록했다.
+
+# 15. 19번 구현 결과
+
+19번에서는 읽기 전용 GitHub Actions를 quality, 비DB unit, PostgreSQL integration, migration·seed·upgrade, Chromium E2E로 분리했다. hook 자동 session이 반영된 브라우저에서 퀴즈 답안을 저장하고 새로고침으로 복구한 뒤 제출해 100P 원장과 Dashboard까지 확인한다. 플러그인에는 `429 Retry-After`, `5xx` backoff와 worker 재시작 검증을 추가했다.
+
+React 47개, 플러그인 10개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통합 45개, Chromium 핵심 흐름 1개 등 자동 테스트 123개와 lint·typecheck·production build를 통과했다. CI·branch protection·staging OAuth·실제 Codex 릴리스 기준은 [CI_AND_RELEASE_GATES.md](./CI_AND_RELEASE_GATES.md)에 기록했다.

@@ -464,7 +464,10 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 14. [x] 실제 개발 퀴즈 구현 - 답안 복구, 서버 채점, 멱등 제출과 만료·재응시 완료
 15. [x] 포인트 원장 구현 - 최초 통과 100P transaction, 잔액·cursor 이력과 중복 적립 방어 완료
 16. [x] 통계 API와 대시보드 전환 - IANA 기간 경계, 서버 집계와 저품질 세션 표시 완료
-17. [ ] 보안과 개인정보 보호 최종 점검 - 다음 작업
+17. [x] 보안과 개인정보 보호 최종 점검 - endpoint matrix, Rate Limit, redaction, 내보내기·삭제 완료
+18. [x] 운영 로그와 장애 대응 구성 - request ID, probe, 지표·경보, migration, backup·복원 완료
+19. [x] 통합 테스트와 CI 구성 - PostgreSQL 16·Chromium gate와 branch protection 기준 완료
+20. [ ] 운영 배포와 파일럿 진행 - 다음 작업
 
 확정된 최초 베타 범위
 

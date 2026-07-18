@@ -18,6 +18,7 @@
     "db:show": "npm run build:server && typeorm migration:show -d server/dist/database/data-source.js",
     "db:seed": "npm run build:server && node --enable-source-maps server/dist/database/seeds/development-quests.js",
     "db:setup": "npm run db:migrate && npm run db:seed",
+    "lint": "oxlint src server/src server/test plugins/aisidequest scripts e2e --deny-warnings",
     "typecheck": "npm run typecheck:client && npm run typecheck:server",
     "typecheck:client": "tsc -b --pretty false",
     "typecheck:server": "tsc -p server/tsconfig.json --noEmit --pretty false",
@@ -28,8 +29,14 @@
     "test:operations": "node --test scripts/*.test.mjs",
     "test:server": "tsc -p server/tsconfig.test.json && node --test server/dist-test/test/app.e2e.test.js server/dist-test/test/sessions/session-recovery.unit.test.js server/dist-test/test/quests/quest-attempt.unit.test.js",
     "test:database": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js server/dist-test/test/auth/auth.integration.test.js server/dist-test/test/devices/device.integration.test.js server/dist-test/test/sessions/session.integration.test.js server/dist-test/test/quests/quest.integration.test.js server/dist-test/test/quests/quest-attempt.integration.test.js server/dist-test/test/statistics/statistics.integration.test.js",
+    "test:migrations": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/database/database.integration.test.js",
+    "test:postgres": "tsc -p server/tsconfig.test.json && node --test --test-concurrency=1 server/dist-test/test/auth/auth.integration.test.js server/dist-test/test/devices/device.integration.test.js server/dist-test/test/sessions/session.integration.test.js server/dist-test/test/quests/quest.integration.test.js server/dist-test/test/quests/quest-attempt.integration.test.js server/dist-test/test/statistics/statistics.integration.test.js",
+    "test:e2e": "node e2e/core-flow.mjs",
     "test:watch": "vitest",
     "preview": "vite preview"
+  },
+  "engines": {
+    "node": ">=22.12.0 <25"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
@@ -64,6 +71,8 @@
     "@types/supertest": "^7.2.1",
     "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
+    "oxlint": "^1.74.0",
+    "playwright": "^1.61.1",
     "supertest": "^7.2.2",
     "tailwindcss": "^4.3.2",
     "typescript": "^7.0.2",

@@ -91,6 +91,7 @@ function AppLayout() {
             </div>
             <a
               href={getGithubLoginUrl()}
+              data-testid="github-login"
               className="inline-flex shrink-0 items-center justify-center rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-200"
             >
               GitHub로 로그인

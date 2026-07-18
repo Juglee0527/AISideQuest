@@ -235,6 +235,7 @@ function QuestAttemptPage() {
           </p>
           <button
             type="button"
+            data-testid="attempt-start"
             onClick={() => void start()}
             disabled={activeSession === null || mutation !== 'idle'}
             className="mt-6 rounded-xl bg-emerald-400 px-6 py-3 font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
@@ -300,6 +301,7 @@ function QuestAttemptPage() {
                     <label key={option.id} className={`flex cursor-pointer gap-3 rounded-xl border p-4 transition ${question.selectedOptionId === option.id ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-slate-700 bg-slate-950/50 hover:border-slate-600'}`}>
                       <input
                         type="radio"
+                        data-testid={`answer-${question.position}-${option.position}`}
                         name={question.id}
                         value={option.id}
                         checked={question.selectedOptionId === option.id}
@@ -318,6 +320,7 @@ function QuestAttemptPage() {
             {!confirming ? (
               <button
                 type="button"
+                data-testid="attempt-submit"
                 onClick={() => setConfirming(true)}
                 disabled={!allAnswered || mutation !== 'idle' || !attempt.canSubmit}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
@@ -329,7 +332,7 @@ function QuestAttemptPage() {
                 <p className="font-semibold text-white">제출하면 답안을 수정할 수 없습니다. 채점할까요?</p>
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setConfirming(false)} className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-bold text-slate-300">취소</button>
-                  <button type="button" onClick={() => void submit()} disabled={mutation !== 'idle'} className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-40">
+                  <button type="button" data-testid="attempt-submit-confirm" onClick={() => void submit()} disabled={mutation !== 'idle'} className="rounded-xl bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-40">
                     {mutation === 'submitting' ? '채점 중...' : '최종 제출'}
                   </button>
                 </div>

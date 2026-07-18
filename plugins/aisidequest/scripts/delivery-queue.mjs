@@ -316,7 +316,7 @@ export async function processNextEvent({
         return { status: 'DELIVERED', waitMs: 0 }
       }
 
-      const retries = { ...(state.retries ?? {}) }
+      const retries = { ...state.retries }
       delete retries[item.sequence]
       const queue = await readQueue(queuePaths)
       const remaining = queue.items.filter((queued) => queued.sequence > item.sequence)
@@ -354,7 +354,7 @@ export async function processNextEvent({
 
       if (!retryable(error) || exhausted) {
         await appendDeadLetter(queuePaths, item, exhausted ? 'RETRY_EXHAUSTED' : 'PERMANENT_HTTP_ERROR', now)
-        const retries = { ...(state.retries ?? {}) }
+        const retries = { ...state.retries }
         delete retries[item.sequence]
         await atomicWrite(queuePaths.state, { ...state, ackedSequence: item.sequence, retries })
         await writeDiagnostic(queuePaths, {
@@ -370,7 +370,7 @@ export async function processNextEvent({
         ? Math.min(MAX_BACKOFF_MS, error.retryAfterMs)
         : backoff(attempts, random)
       const retries = {
-        ...(state.retries ?? {}),
+        ...state.retries,
         [item.sequence]: {
           attempts,
           firstAttemptAt: previous.firstAttemptAt,

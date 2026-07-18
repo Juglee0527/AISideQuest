@@ -5,8 +5,8 @@
 - 작성일: 2026-07-15
 - 최종 보완일: 2026-07-18
 - 전체 작업: 20개
-- 현재 완료: 18개
-- 다음 작업: 19. 통합 테스트와 CI 구성
+- 현재 완료: 19개
+- 다음 작업: 20. 운영 배포와 파일럿 진행
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -33,8 +33,8 @@
 | 16 | 통계 API와 대시보드 전환 | 완료 (2026-07-18) |
 | 17 | 보안과 개인정보 보호 최종 점검 | 완료 (2026-07-18) |
 | 18 | 운영 로그와 장애 대응 구성 | 완료 (2026-07-18) |
-| 19 | 통합 테스트와 CI 구성 | 다음 작업 |
-| 20 | 운영 배포와 파일럿 진행 | 대기 |
+| 19 | 통합 테스트와 CI 구성 | 완료 (2026-07-18) |
+| 20 | 운영 배포와 파일럿 진행 | 다음 작업 |
 
 ---
 
@@ -724,3 +724,20 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 10. React 47개, 플러그인 9개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통합 45개 등 자동 테스트 121개를 통과했다.
 
 판정: **18번 운영 로그와 장애 대응 구성을 완료하고 다음 작업을 19번 통합 테스트와 CI 구성으로 이동한다.**
+
+---
+
+# 20. 19번 작업 결과
+
+1. GitHub Actions를 quality, 비DB unit, PostgreSQL integration, migration·seed·upgrade, Chromium E2E job으로 격리하고 마지막 `Required checks` gate로 결합했다.
+2. 모든 job을 읽기 전용 권한과 secret 없는 `pull_request` 환경으로 구성하고 GitHub 공식 action을 검증된 commit SHA에 고정했다.
+3. PostgreSQL 16 빈 test DB에서 11개 migration, 5개 퀘스트 seed 멱등성, 전체 되돌리기·재적용과 직전 기능 schema에서 최신 4개 migration forward upgrade를 검증했다.
+4. 실제 PostgreSQL의 여러 connection과 transaction으로 OAuth mock, CSRF·CORS·소유권, 같은·다른 idempotency key, 동시 session 시작·퀴즈 제출·100P 보상을 검증했다.
+5. 플러그인 queue 테스트에 네트워크 단절, `429 Retry-After`, `5xx` 지수 backoff, worker 재시작, 부분 손상과 dead letter 복구를 추가했다.
+6. Chromium E2E에서 로그인, 연결 기기, hook 자동 session 반영, 퀴즈 시작, 답안 저장·새로고침 복구, 제출, 100P 원장과 Dashboard를 고정 시각·`Asia/Seoul`로 통과했다.
+7. flaky 재실행을 사용하지 않고 실패 시 sanitized screenshot·trace만 3일 보관하며 원본 서버 로그와 실제 credential은 artifact에 포함하지 않는다.
+8. `CI / Required checks` branch protection 설정, staging GitHub OAuth smoke, 실제 Codex 설치·신뢰·hook 수신 릴리스 체크리스트를 [CI_AND_RELEASE_GATES.md](./CI_AND_RELEASE_GATES.md)에 확정했다.
+9. React 47개, 플러그인 10개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통합 45개, Chromium 핵심 흐름 1개 등 자동 테스트 123개와 lint·typecheck·production build를 통과했다.
+10. `npm audit --audit-level=high` 결과 알려진 취약점은 0건이다.
+
+판정: **19번 통합 테스트와 CI 구성을 완료하고 다음 작업을 20번 운영 배포와 파일럿 진행으로 이동한다.**

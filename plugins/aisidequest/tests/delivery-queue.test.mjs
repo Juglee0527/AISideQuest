@@ -130,3 +130,77 @@ test('stops automatic retries on authentication failures without acknowledging t
     await rm(directory, { recursive: true, force: true })
   }
 })
+
+test('honors Retry-After, backs off on 5xx, and resumes after a simulated restart', async () => {
+  const { directory, environment } = await fixture()
+  const queued = event('Heartbeat')
+  const startedAt = new Date('2026-07-18T00:00:00.000Z')
+  let requests = 0
+
+  try {
+    await enqueueEvent(queued, { environment, now: startedAt })
+
+    const fetchImpl = async () => {
+      requests += 1
+
+      if (requests === 1) {
+        return new Response(
+          JSON.stringify({ error: { code: 'RATE_LIMITED' } }),
+          {
+            status: 429,
+            headers: {
+              'Content-Type': 'application/json',
+              'Retry-After': '3',
+            },
+          },
+        )
+      }
+
+      if (requests === 2) {
+        return new Response(
+          JSON.stringify({ error: { code: 'UPSTREAM_UNAVAILABLE' } }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } },
+        )
+      }
+
+      return success(queued.eventId)
+    }
+
+    const rateLimited = await processNextEvent({
+      environment,
+      fetchImpl,
+      now: startedAt,
+      random: () => 0.5,
+    })
+    assert.deepEqual(rateLimited, { status: 'WAIT', waitMs: 3_000 })
+
+    const restartedTooEarly = await processNextEvent({
+      environment,
+      fetchImpl,
+      now: new Date(startedAt.getTime() + 2_000),
+      random: () => 0.5,
+    })
+    assert.deepEqual(restartedTooEarly, { status: 'WAIT', waitMs: 1_000 })
+    assert.equal(requests, 1)
+
+    const unavailable = await processNextEvent({
+      environment,
+      fetchImpl,
+      now: new Date(startedAt.getTime() + 3_000),
+      random: () => 0.5,
+    })
+    assert.deepEqual(unavailable, { status: 'WAIT', waitMs: 1_000 })
+
+    const delivered = await processNextEvent({
+      environment,
+      fetchImpl,
+      now: new Date(startedAt.getTime() + 4_000),
+      random: () => 0.5,
+    })
+    assert.deepEqual(delivered, { status: 'DELIVERED', waitMs: 0 })
+    assert.equal(requests, 3)
+    assert.equal((await readDeliveryDiagnostic(environment)).queueDepth, 0)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
