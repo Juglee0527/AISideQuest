@@ -6,5 +6,6 @@ server/dist-test
 !.env.example
 *.local
 *.log
+backups/
 .DS_Store
 Thumbs.db

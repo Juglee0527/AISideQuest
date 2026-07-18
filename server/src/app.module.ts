@@ -11,6 +11,7 @@ import { QuestModule } from './quests/quest.module'
 import { SessionModule } from './sessions/session.module'
 import { StatisticsModule } from './statistics/statistics.module'
 import { SecurityModule } from './security/security.module'
+import { ObservabilityModule } from './observability/observability.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SecurityModule } from './security/security.module'
     }),
     DatabaseModule,
     SecurityModule,
+    ObservabilityModule,
     AuthModule,
     DeviceModule,
     SessionModule,

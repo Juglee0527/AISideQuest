@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000-initial-schema`, `1784163600000-add-authentication`, `1784167200000-add-session-api-idempotency`, `1784170800000-add-device-linking`, `1784174400000-add-heartbeat-recovery`, `1784178000000-add-quest-listing`, `1784181600000-add-quest-attempt-flow`, `1784185200000-add-point-ledger`, `1784188800000-add-server-statistics`
+- 기준 migration: `1784160000000`부터 `1784196000000-add-operational-diagnostics`까지 11개
 
 ---
 
@@ -69,6 +69,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - integration event에는 request hash와 처리 당시 응답 snapshot을 저장한다.
 - event의 사용자와 기기 소유자, 연결 세션의 사용자가 일치하도록 복합 FK를 사용한다.
 - 프롬프트, 응답, 코드, 파일 경로, 원본 hook JSON을 저장할 컬럼은 두지 않는다.
+- 기기 진단은 최근 queue depth·oldest age·dead-letter count와 보고 시각만 저장한다.
 
 ## 3.3 퀘스트와 포인트
 
@@ -126,7 +127,7 @@ npm.cmd run db:migrate
 npm.cmd run db:revert
 ```
 
-`db:revert`는 마지막 migration의 데이터를 제거할 수 있으므로 운영 적용 전 백업과 별도 복구 migration을 우선 검토한다.
+`db:migrate`는 PostgreSQL advisory lock으로 배포당 한 번만 실행되고 pending migration이 남으면 실패한다. `db:revert`는 마지막 migration의 데이터를 제거할 수 있으므로 운영에서는 사용하지 않고 백업과 forward 복구 migration을 사용한다.
 
 # 7. 통합 테스트
 
@@ -169,4 +170,5 @@ npm.cmd run test:database
 - 14번 구현 완료: 응시·답안 복구, 서버 채점, `EXPIRED`, 제출 멱등성과 5분 grace
 - 15번 구현 완료: 퀘스트 완료·포인트 원장 기록 transaction, 기존 통과 backfill, 잔액·cursor 이력 API
 - 16번 구현 완료: 미검증 UTC와 IANA time zone 저장, 세션 구간·통과 응시 index, 서버 기간 통계
-- 17번: endpoint 보안 matrix와 개인정보 보호 최종 점검
+- 17번 구현 완료: endpoint 보안 matrix, 공유 Rate Limit과 개인정보 보호
+- 18번 구현 완료: queue 진단 컬럼, advisory-lock migration runner와 readiness 검증

@@ -70,7 +70,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 5. 데이터 내보내기와 계정 삭제
 
-`POST /auth/me/export`는 profile, 연결 계정의 provider/login, 안전한 기기 metadata, AI 세션, allowlist 이벤트 metadata, 응시·답안, point 원장을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
+`POST /auth/me/export`는 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, AI 세션, allowlist 이벤트 metadata, 응시·답안, point 원장을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
 
 `DELETE /auth/me`는 확인 문자열, CSRF, 15분 이내 인증을 요구하며 다음 순서로 한 transaction에서 삭제한다.
 

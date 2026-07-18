@@ -29,7 +29,9 @@ export class UserDataService {
           `, userId)
       const devices = await this.rows(manager, `
             SELECT id, name, plugin_version, last_seen_at, expires_at,
-                   revoked_at, created_at, updated_at
+                   revoked_at, queue_depth, queue_oldest_age_seconds,
+                   dead_letter_count, diagnostics_reported_at,
+                   created_at, updated_at
             FROM devices WHERE user_id = $1 ORDER BY created_at, id
           `, userId)
       const sessions = await this.rows(manager, `

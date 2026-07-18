@@ -559,6 +559,37 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(device.last_seen_at, null)
   })
 
+  test('accepts bounded privacy-safe queue diagnostics only on heartbeat', async () => {
+    await sendIntegrationEvent({
+      event: 'PostToolUse',
+      body: {
+        diagnostics: { queueDepth: 1, oldestAgeSeconds: 2, deadLetterCount: 3 },
+      },
+    }).request.expect(400)
+
+    await sendIntegrationEvent({
+      event: 'Heartbeat',
+      body: {
+        diagnostics: { queueDepth: 4, oldestAgeSeconds: 5, deadLetterCount: 6 },
+      },
+    }).request.expect(200)
+
+    const [device] = await databaseService.query<Array<{
+      queue_depth: number
+      queue_oldest_age_seconds: number
+      dead_letter_count: number
+      diagnostics_reported_at: Date | null
+    }>>(`
+      SELECT queue_depth, queue_oldest_age_seconds,
+             dead_letter_count, diagnostics_reported_at
+      FROM devices WHERE user_id = $1
+    `, [firstIdentity.userId])
+    assert.equal(device.queue_depth, 4)
+    assert.equal(device.queue_oldest_age_seconds, 5)
+    assert.equal(device.dead_letter_count, 6)
+    assert.ok(device.diagnostics_reported_at instanceof Date)
+  })
+
   test('rejects more than 500 stored events for one turn', async () => {
     await databaseService.query(
       `

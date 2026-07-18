@@ -309,6 +309,10 @@ export class SessionService {
       validationError('observedAt cannot be more than 5 minutes in the future')
     }
 
+    if (dto.diagnostics && event !== 'Heartbeat') {
+      validationError('diagnostics are allowed only on Heartbeat events')
+    }
+
     const requestHash = hashToken(
       JSON.stringify({
         schemaVersion: dto.schemaVersion,
@@ -319,6 +323,13 @@ export class SessionService {
         sessionKey: dto.sessionKey,
         turnKey: dto.turnKey ?? null,
         observedAt: dto.observedAt,
+        diagnostics: dto.diagnostics
+          ? {
+              queueDepth: dto.diagnostics.queueDepth,
+              oldestAgeSeconds: dto.diagnostics.oldestAgeSeconds,
+              deadLetterCount: dto.diagnostics.deadLetterCount,
+            }
+          : null,
       }),
     )
 
@@ -403,6 +414,28 @@ export class SessionService {
         if (sequenceEvents.length > 0) {
           throw new ConflictException({ code: 'DEVICE_SEQUENCE_REUSED' })
         }
+      }
+
+      if (dto.diagnostics) {
+        await manager.query(
+          `
+            UPDATE devices
+            SET queue_depth = $2,
+                queue_oldest_age_seconds = $3,
+                dead_letter_count = $4,
+                diagnostics_reported_at = $5,
+                updated_at = $5
+            WHERE id = $1 AND user_id = $6
+          `,
+          [
+            deviceAuth.deviceId,
+            dto.diagnostics.queueDepth,
+            dto.diagnostics.oldestAgeSeconds,
+            dto.diagnostics.deadLetterCount,
+            receivedAt,
+            deviceAuth.userId,
+          ],
+        )
       }
 
       if (dto.turnKey) {

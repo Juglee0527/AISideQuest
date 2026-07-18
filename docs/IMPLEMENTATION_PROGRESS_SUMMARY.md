@@ -3,8 +3,8 @@
 - 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~17번, 총 17개
-- 다음 작업: 18. 운영 로그와 장애 대응 구성
+- 완료: 1~18번, 총 18개
+- 다음 작업: 19. 통합 테스트와 CI 구성
 
 ---
 
@@ -502,9 +502,10 @@ npm.cmd run test:database
 |---|---:|
 | React 테스트 | 47개 통과 |
 | Codex 플러그인 테스트 | 9개 통과 |
-| NestJS 비DB 테스트 | 12개 통과 |
-| 인증·PostgreSQL·세션·퀘스트·통계 통합 테스트 | 44개 통과 |
-| 전체 자동 테스트 | 112개 통과 |
+| 운영 스크립트 테스트 | 3개 통과 |
+| NestJS 비DB 테스트 | 17개 통과 |
+| 인증·PostgreSQL·세션·퀘스트·통계 통합 테스트 | 45개 통과 |
+| 전체 자동 테스트 | 121개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -600,10 +601,11 @@ React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 4
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | PostgreSQL 테이블, 제약, migration, seed와 실행 방법 |
 | [AUTHENTICATION.md](./AUTHENTICATION.md) | GitHub OAuth, cookie 세션, CSRF와 인증 API 계약 |
 | [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md) | Endpoint 보안 matrix, Rate Limit, 개인정보 보존·내보내기·삭제 기준 |
+| [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md) | Request ID 로그, probe, 지표·경보, migration, backup·복원과 secret 회전 절차 |
 
 ---
 
-현재 결론: **Endpoint 보안 matrix, 공유 Rate Limit, 요청 제한과 redaction, 개인정보 내보내기·삭제를 구현했다. 다음 작업은 18번 운영 로그와 장애 대응 구성이다.**
+현재 결론: **Request ID 기반 구조화 로그, live/ready, 운영 지표·경보, 안전한 migration과 backup·restore runbook을 구현했다. 다음 작업은 19번 통합 테스트와 CI 구성이다.**
 
 # 13. 17번 구현 결과
 
@@ -620,3 +622,9 @@ React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 4
 세부 기준은 [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md)에 기록했다.
 
 React 47개, 플러그인 9개, NestJS 비DB 12개, PostgreSQL 통합 테스트 44개와 양쪽 production build를 통과했다. `npm audit --audit-level=high` 결과는 취약점 0건이다.
+
+# 14. 18번 구현 결과
+
+18번에서는 request ID 구조화 로그와 오류 event, DB·migration readiness, protected Prometheus metrics와 alert rule을 구현했다. 플러그인 heartbeat는 queue 원문 대신 depth·oldest age·dead-letter count만 보고한다. advisory lock migration runner와 암호화 backup·격리 복원 스크립트를 추가하고 실제 Docker PostgreSQL에서 복원 훈련을 완료했다.
+
+운영 절차와 장애·secret 회전 기준은 [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md), 훈련 증적은 [2026-07-18-backup-restore-drill.md](./operations/2026-07-18-backup-restore-drill.md)에 기록했다.

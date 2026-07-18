@@ -5,8 +5,8 @@
 - 작성일: 2026-07-15
 - 최종 보완일: 2026-07-18
 - 전체 작업: 20개
-- 현재 완료: 17개
-- 다음 작업: 18. 운영 로그와 장애 대응 구성
+- 현재 완료: 18개
+- 다음 작업: 19. 통합 테스트와 CI 구성
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -32,8 +32,8 @@
 | 15 | 포인트 원장 구현 | 완료 (2026-07-18) |
 | 16 | 통계 API와 대시보드 전환 | 완료 (2026-07-18) |
 | 17 | 보안과 개인정보 보호 최종 점검 | 완료 (2026-07-18) |
-| 18 | 운영 로그와 장애 대응 구성 | 다음 작업 |
-| 19 | 통합 테스트와 CI 구성 | 대기 |
+| 18 | 운영 로그와 장애 대응 구성 | 완료 (2026-07-18) |
+| 19 | 통합 테스트와 CI 구성 | 다음 작업 |
 | 20 | 운영 배포와 파일럿 진행 | 대기 |
 
 ---
@@ -707,3 +707,20 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 9. `npm audit --audit-level=high` 결과 high·critical을 포함한 알려진 취약점은 0건이다.
 
 판정: **17번 보안과 개인정보 보호 최종 점검을 완료하고 다음 작업을 18번 운영 로그와 장애 대응 구성으로 이동한다.**
+
+---
+
+# 19. 18번 작업 결과
+
+1. 외부의 안전한 request ID를 계승하고 나머지는 UUID로 생성해 응답 header·envelope·JSON request log·오류 event에 연결했다.
+2. 배포 환경·service version·route template·status·latency·오류 code만 기록하는 구조화 로그와 공통 sanitizer를 구현했다.
+3. event loop liveness와 DB query·pending migration readiness를 분리하고 공개 실패 응답에는 내부 원인을 숨겼다.
+4. PostgreSQL advisory lock 기반 단일 migration runner와 pending migration 배포 차단을 구현했다.
+5. Bearer 보호 Prometheus 지표에 세션, heartbeat 만료율, deferred, late Stop, plugin queue, 인증·Rate Limit·5xx와 DB pool을 연결했다.
+6. heartbeat에는 queue depth·oldest age·dead-letter count만 전송하고 bounded DB 진단값과 device lastSeen으로 상태를 집계한다.
+7. Prometheus alert rule, privacy-safe webhook 전달 시험기와 담당자·severity·첫 대응·종료 조건을 작성했다.
+8. 암호화 backup·격리 restore script와 runbook을 작성하고 실제 PostgreSQL 16에서 11개 migration·5개 quest·point constraint 복원을 5.1초에 검증했다.
+9. migration 실패, rollback·roll-forward, DB 복원, OAuth·웹 세션·기기·metrics·backup secret 회전 절차를 문서화했다.
+10. React 47개, 플러그인 9개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통합 45개 등 자동 테스트 121개를 통과했다.
+
+판정: **18번 운영 로그와 장애 대응 구성을 완료하고 다음 작업을 19번 통합 테스트와 CI 구성으로 이동한다.**

@@ -357,7 +357,13 @@ test('emits heartbeats while a turn is active and stops after Stop', async () =>
     const countAfterStop = received.filter((body) => body.event === 'Heartbeat').length
     await new Promise((resolve) => setTimeout(resolve, 150))
 
-    assert.equal(received.some((body) => body.event === 'Heartbeat'), true)
+    const heartbeat = received.find((body) => body.event === 'Heartbeat')
+    assert.equal(Boolean(heartbeat), true)
+    assert.deepEqual(Object.keys(heartbeat.diagnostics).sort(), [
+      'deadLetterCount',
+      'oldestAgeSeconds',
+      'queueDepth',
+    ])
     assert.equal(
       received.filter((body) => body.event === 'Heartbeat').length,
       countAfterStop,

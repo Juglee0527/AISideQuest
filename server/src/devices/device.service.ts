@@ -26,7 +26,11 @@ const DEVICE_COLUMNS = `
   last_seen_at,
   expires_at,
   revoked_at,
-  created_at
+  created_at,
+  queue_depth,
+  queue_oldest_age_seconds,
+  dead_letter_count,
+  diagnostics_reported_at
 `
 const DEVICE_LINK_TTL_MINUTES = 10
 const DEVICE_TOKEN_TTL_DAYS = 90
@@ -392,6 +396,14 @@ export class DeviceService {
       expiresAt: device.expires_at.toISOString(),
       revokedAt: device.revoked_at?.toISOString() ?? null,
       createdAt: device.created_at.toISOString(),
+      diagnostics: device.diagnostics_reported_at
+        ? {
+            queueDepth: device.queue_depth,
+            oldestAgeSeconds: device.queue_oldest_age_seconds,
+            deadLetterCount: device.dead_letter_count,
+            reportedAt: device.diagnostics_reported_at.toISOString(),
+          }
+        : null,
     }
   }
 

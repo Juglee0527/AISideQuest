@@ -258,7 +258,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 실제 개발 퀴즈 최초 통과 transaction에서 100P를 한 번만 적립받고, 저장된 IANA 시간대와 동일한 서버 기준 시각으로 오늘·주·월·직접 선택 통계를 확인합니다. Endpoint 보안 matrix, 공유 Rate Limit, 개인정보 내보내기·삭제 기준은 [`docs/SECURITY_AND_PRIVACY.md`](./docs/SECURITY_AND_PRIVACY.md)에 정리되어 있으며 다음 기능 작업은 운영 로그와 장애 대응 구성입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 실제 개발 퀴즈 최초 통과 transaction에서 100P를 한 번만 적립받고, 저장된 IANA 시간대와 동일한 서버 기준 시각으로 오늘·주·월·직접 선택 통계를 확인합니다. 보안·개인정보 기준은 [`docs/SECURITY_AND_PRIVACY.md`](./docs/SECURITY_AND_PRIVACY.md), request ID 로그·health·지표·migration·복구 절차는 [`docs/OPERATIONS_RUNBOOK.md`](./docs/OPERATIONS_RUNBOOK.md)에 정리되어 있으며 다음 기능 작업은 통합 테스트와 CI 구성입니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 

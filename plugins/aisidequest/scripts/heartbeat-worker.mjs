@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 
-import { enqueueEvent } from './delivery-queue.mjs'
+import { enqueueEvent, readDeliveryDiagnostic } from './delivery-queue.mjs'
 import { resolveDataDirectory } from './event-recorder.mjs'
 import { acquireProcessLock } from './process-lock.mjs'
 import { readActiveTurn, markHeartbeat } from './turn-state.mjs'
@@ -31,6 +31,7 @@ async function main() {
       const lastHeartbeatAt = Date.parse(turn.lastHeartbeatAt ?? turn.activatedAt)
 
       if (!Number.isFinite(lastHeartbeatAt) || now.getTime() - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+        const diagnostic = await readDeliveryDiagnostic()
         await enqueueEvent({
           schemaVersion: 1,
           eventId: randomUUID(),
@@ -39,6 +40,11 @@ async function main() {
           sessionKey: turn.sessionKey,
           turnKey: turn.turnKey,
           observedAt: now.toISOString(),
+          diagnostics: {
+            queueDepth: Math.min(10_000, Math.max(0, Math.trunc(diagnostic?.queueDepth ?? 0))),
+            oldestAgeSeconds: Math.min(86_400, Math.max(0, Math.ceil((diagnostic?.oldestAgeMs ?? 0) / 1_000))),
+            deadLetterCount: Math.min(10_000, Math.max(0, Math.trunc(diagnostic?.deadLetterCount ?? 0))),
+          },
         }, { now })
         await markHeartbeat(turn, process.env, now)
         launchQueueWorker()

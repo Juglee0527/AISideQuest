@@ -8,6 +8,10 @@ export interface DeviceRow {
   expires_at: Date
   revoked_at: Date | null
   created_at: Date
+  queue_depth: number
+  queue_oldest_age_seconds: number
+  dead_letter_count: number
+  diagnostics_reported_at: Date | null
 }
 
 export interface DeviceSnapshot {
@@ -18,6 +22,12 @@ export interface DeviceSnapshot {
   expiresAt: string
   revokedAt: string | null
   createdAt: string
+  diagnostics: {
+    queueDepth: number
+    oldestAgeSeconds: number
+    deadLetterCount: number
+    reportedAt: string
+  } | null
 }
 
 export interface DeviceLinkSnapshot {

@@ -10,6 +10,7 @@ import {
   Post,
 } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
+import { ConfigService } from '@nestjs/config'
 import { IsNotEmpty, IsString } from 'class-validator'
 import request from 'supertest'
 
@@ -19,6 +20,7 @@ import { validateEnvironment } from '../src/config/environment'
 import { DatabaseService } from '../src/database/database.service'
 import { redactSensitiveText, safeErrorSummary } from '../src/common/security/sensitive-redaction'
 import { AuthCookieService } from '../src/auth/auth-cookie.service'
+import { sanitizeOperationalEvent } from '../src/observability/operational-logger.service'
 
 class ValidationProbeDto {
   @IsString()
@@ -35,16 +37,37 @@ class ValidationProbeController {
 }
 
 let app: INestApplication
+let databaseReady = true
+const metricsToken = 'test-metrics-token-with-at-least-32-characters'
 
 before(async () => {
   const testingModule = await Test.createTestingModule({
     imports: [AppModule],
     controllers: [ValidationProbeController],
   })
+    .overrideProvider(ConfigService)
+    .useValue(new ConfigService(validateEnvironment({
+      NODE_ENV: 'test',
+      METRICS_BEARER_TOKEN: metricsToken,
+    })))
     .overrideProvider(DatabaseService)
     .useValue({
       onModuleInit: () => undefined,
       onModuleDestroy: () => undefined,
+      checkReadiness: () => databaseReady,
+      getOperationalSnapshot: () => ({
+        activeSessions: 2,
+        heartbeatTimeouts15m: 1,
+        automaticTerminals15m: 4,
+        lateStopRecoveries15m: 1,
+        deferredEvents: 3,
+        deferredOldestAgeSeconds: 10,
+        staleDevices: 4,
+        pluginQueueDepth: 5,
+        pluginQueueOldestAgeSeconds: 6,
+        pluginDeadLetters: 7,
+        databasePool: { total: 8, idle: 7, waiting: 1 },
+      }),
     })
     .compile()
 
@@ -67,6 +90,56 @@ test('GET /api/v1/health returns the common success envelope', async () => {
     service: 'aisidequest-api',
   })
   assert.match(response.body.meta.serverTime, /^\d{4}-\d{2}-\d{2}T/)
+  assert.equal(response.body.meta.requestId, response.headers['x-request-id'])
+})
+
+test('request IDs are accepted only in the safe format and echoed consistently', async () => {
+  const accepted = await request(app.getHttpServer())
+    .get('/api/v1/health/live')
+    .set('x-request-id', 'client-request_1234')
+    .expect(200)
+  assert.equal(accepted.headers['x-request-id'], 'client-request_1234')
+  assert.equal(accepted.body.meta.requestId, 'client-request_1234')
+
+  const replaced = await request(app.getHttpServer())
+    .get('/api/v1/health/live')
+    .set('x-request-id', 'unsafe request id with spaces')
+    .expect(200)
+  assert.match(replaced.headers['x-request-id'], /^[0-9a-f-]{36}$/)
+})
+
+test('readiness checks DB and migrations without exposing failure details', async () => {
+  await request(app.getHttpServer()).get('/api/v1/health/ready').expect(200)
+  databaseReady = false
+  const unavailable = await request(app.getHttpServer())
+    .get('/api/v1/health/ready')
+    .expect(503)
+  assert.equal(unavailable.body.error.code, 'NOT_READY')
+  assert.doesNotMatch(JSON.stringify(unavailable.body), /database|migration/i)
+  databaseReady = true
+})
+
+test('database startup failure leaves the process available but readiness false', async () => {
+  const unavailableDatabase = new DatabaseService(new ConfigService(
+    validateEnvironment({
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://test:test@127.0.0.1:1/unavailable?connect_timeout=1',
+    }),
+  ))
+  await assert.doesNotReject(unavailableDatabase.onModuleInit())
+  assert.equal(await unavailableDatabase.checkReadiness(50), false)
+  await unavailableDatabase.onModuleDestroy()
+})
+
+test('metrics require a bearer secret and contain operational gauges only', async () => {
+  await request(app.getHttpServer()).get('/api/v1/health/metrics').expect(401)
+  const response = await request(app.getHttpServer())
+    .get('/api/v1/health/metrics')
+    .set('Authorization', `Bearer ${metricsToken}`)
+    .expect(200)
+  assert.match(response.text, /aisidequest_active_sessions 2/)
+  assert.match(response.text, /aisidequest_plugin_dead_letters 7/)
+  assert.doesNotMatch(response.text, /token|cookie|authorization/i)
 })
 
 test('global validation rejects unknown input with the common error envelope', async () => {
@@ -135,6 +208,19 @@ test('common redaction removes credentials and local paths from error text', () 
   assert.doesNotMatch(safeErrorSummary(new Error(redacted)), /Users\\jason/)
 })
 
+test('operational event sanitizer drops forbidden fields and redacts values', () => {
+  const sanitized = sanitizeOperationalEvent({
+    event: 'sample',
+    requestId: 'request-1234',
+    route: '/safe',
+    token: 'must-not-remain',
+    error: 'Bearer must-not-remain at C:\\private\\source.ts',
+  })
+  const serialized = JSON.stringify(sanitized)
+  assert.doesNotMatch(serialized, /must-not-remain|private|source\.ts/)
+  assert.doesNotMatch(serialized, /"token"/)
+})
+
 test('production authentication cookies use Secure and __Host- properties', () => {
   const cookies: Array<{
     name: string
@@ -186,6 +272,9 @@ test('environment validation applies defaults and rejects invalid ports', () => 
     'http://localhost:3000/api/v1/auth/github/callback',
   )
   assert.equal(environment.AUTH_SESSION_TTL_HOURS, 168)
+  assert.equal(environment.DEPLOYMENT_ENVIRONMENT, 'local')
+  assert.equal(environment.SERVICE_VERSION, '0.1.0')
+  assert.equal(environment.TRUST_PROXY_HOPS, 0)
   assert.throws(
     () => validateEnvironment({ API_PORT: '0' }),
     /API_PORT must be an integer between 1 and 65535/,
@@ -226,4 +315,23 @@ test('environment validation applies defaults and rejects invalid ports', () => 
     }),
     /CORS_ORIGIN must be a valid HTTP or HTTPS origin/,
   )
+
+  const production = validateEnvironment({
+    NODE_ENV: 'production',
+    DEPLOYMENT_ENVIRONMENT: 'staging',
+    SERVICE_VERSION: 'git-abcdef123',
+    TRUST_PROXY_HOPS: '1',
+    METRICS_BEARER_TOKEN: 'm'.repeat(43),
+    DATABASE_URL: 'postgresql://app:strong-password@db.example.com/app',
+    DATABASE_SSL: 'true',
+    GITHUB_CLIENT_ID: 'client',
+    GITHUB_CLIENT_SECRET: 'secret',
+    GITHUB_CALLBACK_URL: 'https://example.com/api/v1/auth/github/callback',
+    AUTH_SUCCESS_REDIRECT_URL: 'https://example.com/',
+    AUTH_FAILURE_REDIRECT_URL: 'https://example.com/login-failed',
+    CORS_ORIGIN: 'https://example.com',
+  })
+  assert.equal(production.DEPLOYMENT_ENVIRONMENT, 'staging')
+  assert.equal(production.DATABASE_SSL, true)
+  assert.equal(production.TRUST_PROXY_HOPS, 1)
 })
