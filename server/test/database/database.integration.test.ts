@@ -71,6 +71,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'quest_options',
       'quest_questions',
       'quests',
+      'rate_limit_buckets',
       'user_auth_accounts',
       'users',
     ]
@@ -89,6 +90,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [securityReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.rate_limit_buckets') AS rate_limit_table
+    `)) as Array<{ rate_limit_table: string | null }>
+    assert.equal(securityReverted.rate_limit_table, null)
 
     await dataSource.undoLastMigration()
     const [statisticsReverted] = (await dataSource.query(`
@@ -143,7 +150,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 2)
+    assert.equal(pointMigrations.length, 3)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -158,6 +165,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.query('DELETE FROM point_ledger')
     await dataSource.query('DELETE FROM quest_attempts WHERE id = $1', [migrationAttempt.id])
@@ -241,7 +249,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 9)
+    assert.equal(reappliedMigrations.length, 10)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

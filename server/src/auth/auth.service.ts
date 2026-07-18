@@ -33,6 +33,7 @@ interface UserRow {
 interface AuthSessionRow extends UserRow {
   session_id: string
   csrf_token_hash: string
+  authenticated_at: Date
 }
 
 interface CreatedSessionRow {
@@ -158,6 +159,7 @@ export class AuthService {
         SELECT
           auth_sessions.id AS session_id,
           auth_sessions.csrf_token_hash,
+          auth_sessions.created_at AS authenticated_at,
           users.id,
           users.display_name,
           users.avatar_url,
@@ -195,6 +197,7 @@ export class AuthService {
     return {
       sessionId: session.session_id,
       csrfTokenHash: session.csrf_token_hash,
+      authenticatedAt: session.authenticated_at,
       user: this.mapUser(session),
     }
   }

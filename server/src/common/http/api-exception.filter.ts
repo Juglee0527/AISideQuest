@@ -7,6 +7,7 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common'
 import type { Response } from 'express'
+import { safeErrorSummary } from '../security/sensitive-redaction'
 
 interface ApiError {
   code: string
@@ -47,6 +48,8 @@ function getErrorCode(status: number, payload: Record<string, unknown>) {
   }
 
   switch (status) {
+    case HttpStatus.PAYLOAD_TOO_LARGE:
+      return 'PAYLOAD_TOO_LARGE'
     case HttpStatus.BAD_REQUEST:
       return 'BAD_REQUEST'
     case HttpStatus.UNAUTHORIZED:
@@ -98,17 +101,14 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const isHttpException = exception instanceof HttpException
     const status = isHttpException
       ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR
+      : this.getStatus(exception)
     const payload = isHttpException
       ? getHttpExceptionPayload(exception)
       : {}
     const validationDetails = getValidationDetails(payload)
 
-    if (!isHttpException) {
-      this.logger.error(
-        'Unhandled API exception',
-        exception instanceof Error ? exception.stack : undefined,
-      )
+    if (!isHttpException && status >= 500) {
+      this.logger.error(`Unhandled API exception: ${safeErrorSummary(exception)}`)
     }
 
     const body: ApiErrorResponse = {
@@ -125,5 +125,18 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).json(body)
+  }
+
+  private getStatus(exception: unknown) {
+    if (
+      isRecord(exception)
+      && typeof exception.status === 'number'
+      && exception.status >= 400
+      && exception.status < 600
+    ) {
+      return exception.status
+    }
+
+    return HttpStatus.INTERNAL_SERVER_ERROR
   }
 }

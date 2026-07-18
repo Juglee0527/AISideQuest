@@ -12,6 +12,7 @@ import { AddQuestListing1784178000000 } from './migrations/1784178000000-add-que
 import { AddQuestAttemptFlow1784181600000 } from './migrations/1784181600000-add-quest-attempt-flow'
 import { AddPointLedger1784185200000 } from './migrations/1784185200000-add-point-ledger'
 import { AddServerStatistics1784188800000 } from './migrations/1784188800000-add-server-statistics'
+import { AddSecurityControls1784192400000 } from './migrations/1784192400000-add-security-controls'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -34,6 +35,7 @@ export function createDataSourceOptions(
       AddQuestAttemptFlow1784181600000,
       AddPointLedger1784185200000,
       AddServerStatistics1784188800000,
+      AddSecurityControls1784192400000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

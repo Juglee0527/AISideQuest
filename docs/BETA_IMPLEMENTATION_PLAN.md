@@ -5,8 +5,8 @@
 - 작성일: 2026-07-15
 - 최종 보완일: 2026-07-18
 - 전체 작업: 20개
-- 현재 완료: 16개
-- 다음 작업: 17. 보안과 개인정보 보호 최종 점검
+- 현재 완료: 17개
+- 다음 작업: 18. 운영 로그와 장애 대응 구성
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -31,8 +31,8 @@
 | 14 | 실제 개발 퀴즈 구현 | 완료 (2026-07-18) |
 | 15 | 포인트 원장 구현 | 완료 (2026-07-18) |
 | 16 | 통계 API와 대시보드 전환 | 완료 (2026-07-18) |
-| 17 | 보안과 개인정보 보호 최종 점검 | 다음 작업 |
-| 18 | 운영 로그와 장애 대응 구성 | 대기 |
+| 17 | 보안과 개인정보 보호 최종 점검 | 완료 (2026-07-18) |
+| 18 | 운영 로그와 장애 대응 구성 | 다음 작업 |
 | 19 | 통합 테스트와 CI 구성 | 대기 |
 | 20 | 운영 배포와 파일럿 진행 | 대기 |
 
@@ -691,3 +691,19 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 9. React 테스트 47개, 플러그인 테스트 9개, NestJS 비DB 테스트 8개와 PostgreSQL 통합 테스트 41개를 통과했다.
 
 판정: **16번 통계 API와 대시보드 전환을 완료하고 다음 작업을 17번 보안과 개인정보 보호 최종 점검으로 이동한다.**
+
+---
+
+# 18. 17번 작업 결과
+
+1. 모든 endpoint의 인증·CSRF·소유권·입력·멱등성·Rate Limit 기준을 [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md)에 확정했다.
+2. PostgreSQL 공유 bucket 기반 OAuth·기기 연결·integration event Rate Limit과 `429`, `Retry-After`를 구현했다.
+3. 정확한 credential CORS origin, production HTTPS·Secure `__Host-` cookie, 16 KiB JSON 제한과 turn당 500 event 상한을 적용했다.
+4. prompt·AI 응답·source·경로·원본 payload 비수집 계약을 재검증하고 token·cookie·OAuth code·경로 공통 redaction과 stack 비노출 오류 처리를 추가했다.
+5. CSRF와 15분 이내 인증을 요구하는 개인정보 내보내기·계정 삭제 API를 구현하고 삭제 순서를 단일 transaction으로 고정했다.
+6. 인증·이벤트·dead-letter·로그·백업 보존 기간과 primary 삭제·백업 예외·로컬 플러그인 정리 책임을 문서화했다.
+7. CORS, CSRF, OAuth replay, 만료 token, IDOR, 중복 보상, payload, 금지 데이터, Rate Limit, 삭제 격리 공격 테스트를 통과했다.
+8. React 47개, 플러그인 9개, NestJS 비DB 12개, PostgreSQL 통합 44개 등 자동 테스트 112개와 production build를 통과했다.
+9. `npm audit --audit-level=high` 결과 high·critical을 포함한 알려진 취약점은 0건이다.
+
+판정: **17번 보안과 개인정보 보호 최종 점검을 완료하고 다음 작업을 18번 운영 로그와 장애 대응 구성으로 이동한다.**

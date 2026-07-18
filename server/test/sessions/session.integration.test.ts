@@ -559,6 +559,28 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(device.last_seen_at, null)
   })
 
+  test('rejects more than 500 stored events for one turn', async () => {
+    await databaseService.query(
+      `
+        INSERT INTO integration_events (
+          event_id, device_id, user_id, event,
+          external_session_key, external_turn_key, observed_at,
+          processing_result, request_hash
+        )
+        SELECT gen_random_uuid(), device.id, device.user_id, 'Heartbeat',
+               $2, $3, now(), 'IGNORED_ORPHAN', $4
+        FROM devices device
+        CROSS JOIN generate_series(1, 500)
+        WHERE device.user_id = $1
+      `,
+      [firstIdentity.userId, SESSION_KEY, FIRST_TURN_KEY, 'd'.repeat(64)],
+    )
+
+    const response = await sendIntegrationEvent({ event: 'Heartbeat' })
+      .request.expect(422)
+    assert.equal(response.body.error.code, 'TURN_EVENT_LIMIT_EXCEEDED')
+  })
+
   test('device event sequence is unique and included in idempotency hashing', async () => {
     const eventId = randomUUID()
     const first = await sendIntegrationEvent({

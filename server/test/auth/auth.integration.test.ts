@@ -359,4 +359,82 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'http://localhost:5173/?authError=github_oauth_failed',
     )
   })
+
+  test('user export excludes secrets and account deletion removes owned server data', async () => {
+    const agent = request.agent(app.getHttpServer())
+    const startResponse = await agent.get('/api/v1/auth/github').expect(302)
+    const state = new URL(startResponse.headers.location).searchParams.get('state')
+    const callbackResponse = await agent
+      .get('/api/v1/auth/github/callback')
+      .query({ code: 'temporary-github-code', state })
+      .expect(302)
+    const csrfCookie = getCookiePair(getSetCookie(callbackResponse, 'aisidequest_csrf'))
+    const csrfToken = csrfCookie.slice(csrfCookie.indexOf('=') + 1)
+    const currentUser = await agent.get('/api/v1/auth/me').expect(200)
+    const userId = currentUser.body.data.id as string
+
+    await agent.post('/api/v1/auth/me/export').send({}).expect(403)
+    const exportResponse = await agent
+      .post('/api/v1/auth/me/export')
+      .set('x-csrf-token', csrfToken)
+      .send({})
+      .expect(200)
+    const exported = JSON.stringify(exportResponse.body.data)
+
+    assert.equal(exportResponse.body.data.schemaVersion, 1)
+    assert.equal(exportResponse.body.data.profile.id, userId)
+    assert.doesNotMatch(exported, /tokenHash|csrfToken|requestHash|responseBody|externalSessionKey|externalTurnKey/i)
+
+    await databaseService.query(`
+      UPDATE auth_sessions
+      SET created_at = now() - interval '16 minutes'
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+    `, [userId])
+    await agent
+      .post('/api/v1/auth/me/export')
+      .set('x-csrf-token', csrfToken)
+      .send({})
+      .expect(403)
+      .expect(({ body }) => assert.equal(body.error.code, 'RECENT_AUTHENTICATION_REQUIRED'))
+    await databaseService.query(`
+      UPDATE auth_sessions SET created_at = now() - interval '1 minute'
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+    `, [userId])
+
+    const [otherUser] = await databaseService.query<Array<{ id: string }>>(`
+      INSERT INTO users (display_name) VALUES ('Preserved user') RETURNING id
+    `)
+    const deleted = await agent
+      .delete('/api/v1/auth/me')
+      .set('x-csrf-token', csrfToken)
+      .send({ confirmation: 'DELETE' })
+      .expect(200)
+
+    assert.equal(deleted.body.data.deleted, true)
+    assert.match(deleted.body.data.localPluginAction, /플러그인/)
+    assert.match(getSetCookie(deleted, 'aisidequest_session'), /Expires=Thu, 01 Jan 1970/i)
+    await agent.get('/api/v1/auth/me').expect(401)
+
+    const [counts] = await databaseService.query<Array<{ deleted_user: number; other_user: number }>>(`
+      SELECT
+        (SELECT count(*)::integer FROM users WHERE id = $1) AS deleted_user,
+        (SELECT count(*)::integer FROM users WHERE id = $2) AS other_user
+    `, [userId, otherUser.id])
+    assert.deepEqual(counts, { deleted_user: 0, other_user: 1 })
+  })
+
+  test('OAuth start rate limit is shared in PostgreSQL and returns Retry-After', async () => {
+    await databaseService.query("DELETE FROM rate_limit_buckets WHERE scope = 'OAUTH_START'")
+
+    for (let index = 0; index < 10; index += 1) {
+      await request(app.getHttpServer()).get('/api/v1/auth/github').expect(302)
+    }
+
+    const limited = await request(app.getHttpServer())
+      .get('/api/v1/auth/github')
+      .expect(429)
+
+    assert.equal(limited.body.error.code, 'RATE_LIMITED')
+    assert.equal(limited.headers['retry-after'], '600')
+  })
 }

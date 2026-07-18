@@ -10,6 +10,7 @@ import { PointModule } from './points/point.module'
 import { QuestModule } from './quests/quest.module'
 import { SessionModule } from './sessions/session.module'
 import { StatisticsModule } from './statistics/statistics.module'
+import { SecurityModule } from './security/security.module'
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { StatisticsModule } from './statistics/statistics.module'
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    SecurityModule,
     AuthModule,
     DeviceModule,
     SessionModule,

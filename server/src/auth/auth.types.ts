@@ -19,6 +19,7 @@ export interface AuthUser {
 export interface AuthSessionContext {
   sessionId: string
   csrfTokenHash: string
+  authenticatedAt: Date
   user: AuthUser
 }
 

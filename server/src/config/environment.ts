@@ -59,7 +59,7 @@ function parsePort(value: unknown) {
   return port
 }
 
-function parseCorsOrigin(value: unknown) {
+function parseCorsOrigin(value: unknown, nodeEnvironment: NodeEnvironment) {
   const origin = readNonEmptyString(value, DEFAULT_ENVIRONMENT.CORS_ORIGIN)
 
   try {
@@ -67,6 +67,10 @@ function parseCorsOrigin(value: unknown) {
 
     if (parsedOrigin.protocol !== 'http:' && parsedOrigin.protocol !== 'https:') {
       throw new Error('unsupported protocol')
+    }
+
+    if (nodeEnvironment === 'production' && parsedOrigin.protocol !== 'https:') {
+      throw new Error('production origin must use HTTPS')
     }
 
     return parsedOrigin.origin
@@ -94,7 +98,7 @@ export function validateEnvironment(
 ): Record<string, unknown> & AppEnvironment {
   const nodeEnvironment = parseNodeEnvironment(configuration.NODE_ENV)
   const authEnvironment = readAuthEnvironment(configuration, nodeEnvironment)
-  const corsOrigin = parseCorsOrigin(configuration.CORS_ORIGIN)
+  const corsOrigin = parseCorsOrigin(configuration.CORS_ORIGIN, nodeEnvironment)
 
   assertCompatibleAuthCookieHost(authEnvironment, corsOrigin)
 

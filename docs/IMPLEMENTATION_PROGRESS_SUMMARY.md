@@ -3,8 +3,8 @@
 - 작성일: 2026-07-18
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
-- 완료: 1~16번, 총 16개
-- 다음 작업: 17. 보안과 개인정보 보호 최종 점검
+- 완료: 1~17번, 총 17개
+- 다음 작업: 18. 운영 로그와 장애 대응 구성
 
 ---
 
@@ -500,11 +500,11 @@ npm.cmd run test:database
 
 | 구분 | 결과 |
 |---|---:|
-| React 테스트 | 44개 통과 |
+| React 테스트 | 47개 통과 |
 | Codex 플러그인 테스트 | 9개 통과 |
-| NestJS 비DB 테스트 | 8개 통과 |
-| 인증·PostgreSQL·세션·퀘스트 통합 테스트 | 35개 통과 |
-| 전체 자동 테스트 | 96개 통과 |
+| NestJS 비DB 테스트 | 12개 통과 |
+| 인증·PostgreSQL·세션·퀘스트·통계 통합 테스트 | 44개 통과 |
+| 전체 자동 테스트 | 112개 통과 |
 | 프런트·서버 타입 검사 | 통과 |
 | Vite 프로덕션 빌드 | 통과 |
 | NestJS 프로덕션 빌드 | 통과 |
@@ -599,7 +599,24 @@ React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 4
 | [SESSION_STATE_AND_DATA_FLOW.md](./SESSION_STATE_AND_DATA_FLOW.md) | 세션 상태, 장애 규칙, 책임 분리, API 계약 |
 | [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) | PostgreSQL 테이블, 제약, migration, seed와 실행 방법 |
 | [AUTHENTICATION.md](./AUTHENTICATION.md) | GitHub OAuth, cookie 세션, CSRF와 인증 API 계약 |
+| [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md) | Endpoint 보안 matrix, Rate Limit, 개인정보 보존·내보내기·삭제 기준 |
 
 ---
 
-현재 결론: **IANA 시간대와 동일한 서버 시각을 사용하는 기간 통계와 Dashboard 전환을 완료했다. 다음 작업은 17번 보안과 개인정보 보호 최종 점검이다.**
+현재 결론: **Endpoint 보안 matrix, 공유 Rate Limit, 요청 제한과 redaction, 개인정보 내보내기·삭제를 구현했다. 다음 작업은 18번 운영 로그와 장애 대응 구성이다.**
+
+# 13. 17번 구현 결과
+
+17번에서는 다음 항목을 구현했다.
+
+1. 전체 endpoint의 인증·CSRF·소유권·입력·멱등성·Rate Limit matrix
+2. PostgreSQL 공유 bucket 기반 OAuth·기기 연결·integration event Rate Limit과 `429`, `Retry-After`
+3. 16 KiB JSON 제한, 정확한 CORS origin, production HTTPS 강제, turn당 500 event 제한
+4. token·cookie·OAuth code·경로를 제거하는 공통 redaction과 stack 비노출 오류 처리
+5. CSRF와 15분 내 재인증을 요구하는 개인정보 내보내기·계정 삭제 API
+6. 삭제 transaction 순서, 로컬 플러그인 정리 안내, 데이터별 보존·삭제 예외 정책
+7. CORS·payload·금지 데이터·최근 인증·Rate Limit·삭제 격리 테스트와 의존성 audit
+
+세부 기준은 [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md)에 기록했다.
+
+React 47개, 플러그인 9개, NestJS 비DB 12개, PostgreSQL 통합 테스트 44개와 양쪽 production build를 통과했다. `npm audit --audit-level=high` 결과는 취약점 0건이다.

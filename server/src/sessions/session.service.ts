@@ -61,6 +61,7 @@ const INTEGRATION_EVENTS = new Set<IntegrationEventName>([
 
 const MAX_OBSERVED_AT_FUTURE_MS = 5 * 60 * 1_000
 const DEFERRED_EVENT_TTL_MS = 24 * 60 * 60 * 1_000
+const MAX_EVENTS_PER_TURN = 500
 
 interface StoredIntegrationEventRow {
   ai_session_id: string | null
@@ -401,6 +402,26 @@ export class SessionService {
 
         if (sequenceEvents.length > 0) {
           throw new ConflictException({ code: 'DEVICE_SEQUENCE_REUSED' })
+        }
+      }
+
+      if (dto.turnKey) {
+        const [turnEventCount] = (await manager.query(
+          `
+            SELECT count(*)::integer AS count
+            FROM integration_events
+            WHERE user_id = $1
+              AND provider = 'CODEX'
+              AND external_turn_key = $2
+          `,
+          [deviceAuth.userId, dto.turnKey],
+        )) as Array<{ count: number }>
+
+        if ((turnEventCount?.count ?? 0) >= MAX_EVENTS_PER_TURN) {
+          throw new UnprocessableEntityException({
+            code: 'TURN_EVENT_LIMIT_EXCEEDED',
+            message: '한 AI turn에서 허용된 이벤트 수를 초과했습니다.',
+          })
         }
       }
 

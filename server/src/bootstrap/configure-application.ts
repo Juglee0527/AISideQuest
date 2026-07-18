@@ -1,6 +1,8 @@
 import { ValidationPipe, type INestApplication } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
 import { ConfigService } from '@nestjs/config'
 import cookieParser from 'cookie-parser'
+import type { NextFunction, Request, Response } from 'express'
 
 import { ApiExceptionFilter } from '../common/http/api-exception.filter'
 import { ApiResponseInterceptor } from '../common/http/api-response.interceptor'
@@ -25,9 +27,24 @@ export function configureApplication(app: INestApplication) {
   const corsOrigin = configService.getOrThrow<string>('CORS_ORIGIN')
 
   app.setGlobalPrefix(API_PREFIX)
+  app.use((_request: Request, response: Response, next: NextFunction) => {
+    response.setHeader('Cache-Control', 'no-store')
+    response.setHeader('X-Content-Type-Options', 'nosniff')
+    response.setHeader('Referrer-Policy', 'no-referrer')
+    next()
+  })
+  ;(app as NestExpressApplication).useBodyParser('json', {
+    limit: '16kb',
+    strict: true,
+  })
   app.use(cookieParser())
   app.enableCors({
-    origin: corsOrigin,
+    origin: (
+      requestOrigin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) => {
+      callback(null, requestOrigin === undefined || requestOrigin === corsOrigin)
+    },
     credentials: true,
   })
   app.useGlobalPipes(createValidationPipe())
