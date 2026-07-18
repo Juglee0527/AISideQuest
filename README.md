@@ -258,7 +258,7 @@ npm.cmd run preview
 
 # 🚧 현재 상태
 
-현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 실제 개발 퀴즈 최초 통과 transaction에서 100P를 한 번만 적립받고, 저장된 IANA 시간대와 동일한 서버 기준 시각으로 오늘·주·월·직접 선택 통계를 확인합니다. 보안·개인정보 기준은 [`docs/SECURITY_AND_PRIVACY.md`](./docs/SECURITY_AND_PRIVACY.md), 운영 절차는 [`docs/OPERATIONS_RUNBOOK.md`](./docs/OPERATIONS_RUNBOOK.md), CI·릴리스 gate는 [`docs/CI_AND_RELEASE_GATES.md`](./docs/CI_AND_RELEASE_GATES.md)에 정리되어 있으며 다음 작업은 운영 배포와 파일럿 진행입니다.
+현재는 브라우저 MVP, NestJS API, PostgreSQL, GitHub OAuth, AI 세션 API와 AISideQuest Codex 플러그인의 자동 감지 연동을 완료한 실사용 베타 개발 단계입니다. 연결된 플러그인은 lifecycle event와 30초 heartbeat를 durable queue로 전송하며, 서버는 누락된 종료 event와 장시간 수동 세션을 안전 만료 처리합니다. 인증 사용자는 실제 개발 퀴즈 최초 통과 transaction에서 100P를 한 번만 적립받고, 저장된 IANA 시간대와 동일한 서버 기준 시각으로 오늘·주·월·직접 선택 통계를 확인합니다. 보안·개인정보 기준은 [`docs/SECURITY_AND_PRIVACY.md`](./docs/SECURITY_AND_PRIVACY.md), 운영 절차는 [`docs/OPERATIONS_RUNBOOK.md`](./docs/OPERATIONS_RUNBOOK.md), CI·릴리스 gate는 [`docs/CI_AND_RELEASE_GATES.md`](./docs/CI_AND_RELEASE_GATES.md), 실제 배포·파일럿 절차는 [`docs/DEPLOYMENT_AND_PILOT.md`](./docs/DEPLOYMENT_AND_PILOT.md)에 정리했습니다. 운영 패키지의 로컬 Docker 리허설은 통과했고 실제 domain·OAuth·PostgreSQL과 초대 사용자 파일럿은 남아 있습니다.
 
 핵심 목표는 다음 한 문장으로 설명할 수 있습니다.
 
@@ -268,8 +268,8 @@ npm.cmd run preview
 
 # 📌 앞으로의 계획
 
-- staging·production 환경 분리와 배포·rollback 검증
-- 초대 사용자 10명 이상의 운영 파일럿과 품질 기준 평가
+- 실제 staging·production domain, PostgreSQL, OAuth 자격증명 주입과 live browser 검증
+- 초대 사용자 10명 이상·7일·자동 세션 100건 파일럿과 품질 기준 평가
 
 ---
 

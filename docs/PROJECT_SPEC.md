@@ -467,7 +467,7 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 17. [x] 보안과 개인정보 보호 최종 점검 - endpoint matrix, Rate Limit, redaction, 내보내기·삭제 완료
 18. [x] 운영 로그와 장애 대응 구성 - request ID, probe, 지표·경보, migration, backup·복원 완료
 19. [x] 통합 테스트와 CI 구성 - PostgreSQL 16·Chromium gate와 branch protection 기준 완료
-20. [ ] 운영 배포와 파일럿 진행 - 다음 작업
+20. [ ] 운영 배포와 파일럿 진행 - 배포 패키지·검증 도구 완료, 실제 환경·사용자 파일럿 대기
 
 확정된 최초 베타 범위
 

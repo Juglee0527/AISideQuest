@@ -1,0 +1,35 @@
+# 파일럿 사용자용 Codex 플러그인 설치 안내
+
+지원 범위는 Windows 11, 현재 안정 버전 Codex 데스크톱 앱, Chrome 또는 Edge다. 초대 메일의 운영 주소와 release SHA가 안내서의 값과 같은지 먼저 확인한다.
+
+## 설치와 연결
+
+1. 운영자가 제공한 `aisidequest-codex-plugin-<sha>` bundle을 내려받아 사용자 전용 폴더에 압축 해제한다.
+2. 해당 폴더를 Codex에서 workspace로 연다. Plugins의 `Personal` marketplace에서 `aisidequest`를 설치하고 활성화한다.
+3. hook 신뢰 화면에서 plugin 이름, 이벤트명, `plugins/aisidequest/hooks/` 아래 명령인지 확인한 뒤 승인한다. 다른 경로나 관리자 권한을 요구하면 취소하고 지원 채널에 알린다.
+4. AISideQuest 운영 사이트에 GitHub로 로그인하고 `Devices`에서 일회용 연결 코드를 발급한다. 코드는 지원 담당자에게 보내지 않는다.
+5. 압축을 푼 `plugins/aisidequest` 폴더의 PowerShell에서 실행한다.
+
+```powershell
+node .\scripts\connect-device.mjs --code <연결-코드> --api-url https://운영도메인/api/v1
+node .\scripts\send-test-event.mjs
+```
+
+6. 웹 Devices에 기기가 표시되는지 확인한다. Codex에서 짧은 요청을 한 번 실행하고 5초 안팎에 AI 세션이 보이는지, 종료 후 퀘스트를 제출해 100P가 한 번만 생기는지 확인한다.
+
+## 장애와 복구
+
+- 서버 또는 네트워크 장애 중에도 event는 사용자 로컬 durable queue에 남고 Codex 작업은 계속된다.
+- `delivery-diagnostic.json`의 숫자와 상태만 지원 채널에 전달한다. `device.json`, queue, dead-letter 원문은 token 또는 식별 정보가 있을 수 있으므로 보내지 않는다.
+- `401` 또는 `403`으로 재연결 안내가 나오면 웹에서 기존 기기를 폐기하고 새 연결 코드를 발급해 다시 연결한다.
+- 자동 감지가 보이지 않으면 웹 수동 시작·종료를 사용하고 발생 시각과 앱·plugin version만 신고한다. prompt나 코드는 보내지 않는다.
+
+## 해제와 삭제
+
+1. 웹 Devices에서 기기를 폐기한다.
+2. Codex에서 `aisidequest` plugin을 비활성화·제거한다.
+3. plugin data directory의 `device.json`, queue, dead-letter를 사용자 본인이 삭제한다. 서버는 로컬 파일을 원격 삭제할 수 없다.
+4. 서버 데이터 사본은 계정의 내보내기 기능으로 받고, 전체 삭제는 최근 재인증 후 계정 삭제를 실행한다.
+
+설치 전에 [파일럿 개인정보 안내](./PILOT_PRIVACY_NOTICE.md)를 읽어야 한다.
+

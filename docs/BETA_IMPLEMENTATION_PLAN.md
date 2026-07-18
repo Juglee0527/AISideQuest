@@ -6,7 +6,7 @@
 - 최종 보완일: 2026-07-18
 - 전체 작업: 20개
 - 현재 완료: 19개
-- 다음 작업: 20. 운영 배포와 파일럿 진행
+- 현재 작업: 20. 배포 패키지 구현 완료, 외부 운영 배포·파일럿 대기
 - 기준 원칙: 한 번에 한 작업만 구현하고 각 작업의 완료 기준을 검증한 뒤 다음 작업으로 이동한다.
 
 ---
@@ -34,7 +34,7 @@
 | 17 | 보안과 개인정보 보호 최종 점검 | 완료 (2026-07-18) |
 | 18 | 운영 로그와 장애 대응 구성 | 완료 (2026-07-18) |
 | 19 | 통합 테스트와 CI 구성 | 완료 (2026-07-18) |
-| 20 | 운영 배포와 파일럿 진행 | 다음 작업 |
+| 20 | 운영 배포와 파일럿 진행 | 배포 준비 완료·실제 파일럿 대기 |
 
 ---
 
@@ -741,3 +741,19 @@ hook 비활성, 신뢰 해제, 네트워크 단절 등으로 자동 감지를 �
 10. `npm audit --audit-level=high` 결과 알려진 취약점은 0건이다.
 
 판정: **19번 통합 테스트와 CI 구성을 완료하고 다음 작업을 20번 운영 배포와 파일럿 진행으로 이동한다.**
+
+---
+
+# 21. 20번 구현 및 실행 준비 결과
+
+1. Node 22 API·Caddy 웹 운영 이미지와 staging·production Compose를 만들고 API를 내부 network에 격리했다.
+2. GitHub Actions가 한 commit의 API·웹 이미지와 Codex plugin bundle을 만들고 image digest가 고정된 release manifest를 제공하도록 구성했다.
+3. environment validator가 HTTPS, 정확한 OAuth callback, DB TLS, secret placeholder, mutable image tag, 환경 분리와 동일 artifact 승격을 배포 전에 차단한다.
+4. backup 증거→one-shot migration→readiness→웹→HTTPS·CORS·OAuth·SPA smoke 순서의 배포와 직전 digest app-only rollback을 자동화했다. DB down migration은 금지하고 forward-fix한다.
+5. event kill switch는 `503`·`Retry-After`로 plugin queue를 보존하고, reward kill switch는 채점 transaction 전에 제출을 막아 point 없는 통과를 방지한다.
+6. 설치·연결·해제 안내와 개인정보 사전 안내, 50 turn checkpoint·7일·10명·자동 세션 100건 최종 기준을 평가하는 파일럿 판정기를 추가했다.
+7. Docker 리허설에서 운영 이미지를 빌드하고 PostgreSQL 16에 11개 migration을 적용했다. 재실행 결과는 `applied: []`였다.
+8. API·DB readiness와 Caddy 경유 health, CORS allowlist, OAuth state·PKCE·cookie, SPA 10개 smoke를 통과했다.
+9. React 47개, plugin 10개, 운영 11개, NestJS 비DB 19개, PostgreSQL 통합 45개와 lint·typecheck·양쪽 production build를 통과했다.
+
+판정: **20번의 저장소 구현과 로컬 배포 리허설은 완료했다. 실제 staging·production domain·DB·OAuth 설정, 복원·rollback 증거, 초대 사용자 10명 이상과 최소 7일 관찰은 외부 실행 항목이므로 이를 마칠 때까지 20번 전체 상태는 미완료로 유지한다.**

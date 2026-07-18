@@ -275,6 +275,8 @@ test('environment validation applies defaults and rejects invalid ports', () => 
   assert.equal(environment.DEPLOYMENT_ENVIRONMENT, 'local')
   assert.equal(environment.SERVICE_VERSION, '0.1.0')
   assert.equal(environment.TRUST_PROXY_HOPS, 0)
+  assert.equal(environment.INTEGRATION_EVENTS_ENABLED, true)
+  assert.equal(environment.QUEST_REWARDS_ENABLED, true)
   assert.throws(
     () => validateEnvironment({ API_PORT: '0' }),
     /API_PORT must be an integer between 1 and 65535/,
@@ -322,6 +324,8 @@ test('environment validation applies defaults and rejects invalid ports', () => 
     SERVICE_VERSION: 'git-abcdef123',
     TRUST_PROXY_HOPS: '1',
     METRICS_BEARER_TOKEN: 'm'.repeat(43),
+    INTEGRATION_EVENTS_ENABLED: 'true',
+    QUEST_REWARDS_ENABLED: 'true',
     DATABASE_URL: 'postgresql://app:strong-password@db.example.com/app',
     DATABASE_SSL: 'true',
     GITHUB_CLIENT_ID: 'client',

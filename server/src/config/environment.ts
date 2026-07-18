@@ -19,6 +19,8 @@ export interface AppEnvironment extends DatabaseEnvironment, AuthEnvironment {
   OPERATIONAL_LOG_ENABLED: boolean
   METRICS_BEARER_TOKEN: string
   TRUST_PROXY_HOPS: number
+  INTEGRATION_EVENTS_ENABLED: boolean
+  QUEST_REWARDS_ENABLED: boolean
 }
 
 const DEFAULT_ENVIRONMENT: Pick<
@@ -155,6 +157,12 @@ export function validateEnvironment(
     if (metricsToken.length < 32) {
       throw new Error('METRICS_BEARER_TOKEN must contain at least 32 characters in production')
     }
+    if (configuration.INTEGRATION_EVENTS_ENABLED === undefined) {
+      throw new Error('INTEGRATION_EVENTS_ENABLED must be explicitly configured in production')
+    }
+    if (configuration.QUEST_REWARDS_ENABLED === undefined) {
+      throw new Error('QUEST_REWARDS_ENABLED must be explicitly configured in production')
+    }
   }
 
   assertCompatibleAuthCookieHost(authEnvironment, corsOrigin)
@@ -181,6 +189,16 @@ export function validateEnvironment(
     TRUST_PROXY_HOPS: parseTrustProxyHops(
       configuration.TRUST_PROXY_HOPS,
       nodeEnvironment,
+    ),
+    INTEGRATION_EVENTS_ENABLED: parseBoolean(
+      configuration.INTEGRATION_EVENTS_ENABLED,
+      true,
+      'INTEGRATION_EVENTS_ENABLED',
+    ),
+    QUEST_REWARDS_ENABLED: parseBoolean(
+      configuration.QUEST_REWARDS_ENABLED,
+      true,
+      'QUEST_REWARDS_ENABLED',
     ),
   }
 }

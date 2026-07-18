@@ -2,13 +2,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import type { EntityManager } from 'typeorm'
 
 import { hashToken } from '../auth/auth-crypto'
 import { ApiIdempotencyService } from '../common/idempotency/api-idempotency.service'
 import { DatabaseService } from '../database/database.service'
+import type { AppEnvironment } from '../config/environment'
 import type { QuestAnswerDto } from './quest-attempt.dto'
 import type {
   QuestAttemptQuestionRow,
@@ -56,6 +59,7 @@ export class QuestAttemptService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly apiIdempotencyService: ApiIdempotencyService,
+    private readonly configService: ConfigService<AppEnvironment, true>,
   ) {}
 
   async startAttempt(userId: string, code: string, idempotencyKey: string) {
@@ -268,6 +272,10 @@ export class QuestAttemptService {
   }
 
   async submitAttempt(userId: string, attemptId: string, idempotencyKey: string) {
+    if (!this.configService.getOrThrow('QUEST_REWARDS_ENABLED')) {
+      throw new ServiceUnavailableException({ code: 'QUEST_REWARDS_PAUSED' })
+    }
+
     const requestHash = hashToken(JSON.stringify({
       operation: 'QUEST_ATTEMPT_SUBMIT',
       attemptId,

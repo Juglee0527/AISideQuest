@@ -4,7 +4,7 @@
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
-- 다음 작업: 20. 운영 배포와 파일럿 진행
+- 현재 작업: 20. 배포 패키지 구현 완료, 외부 운영 배포·파일럿 대기
 
 ---
 
@@ -635,3 +635,11 @@ React 47개, 플러그인 9개, NestJS 비DB 12개, PostgreSQL 통합 테스트 
 19번에서는 읽기 전용 GitHub Actions를 quality, 비DB unit, PostgreSQL integration, migration·seed·upgrade, Chromium E2E로 분리했다. hook 자동 session이 반영된 브라우저에서 퀴즈 답안을 저장하고 새로고침으로 복구한 뒤 제출해 100P 원장과 Dashboard까지 확인한다. 플러그인에는 `429 Retry-After`, `5xx` backoff와 worker 재시작 검증을 추가했다.
 
 React 47개, 플러그인 10개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통합 45개, Chromium 핵심 흐름 1개 등 자동 테스트 123개와 lint·typecheck·production build를 통과했다. CI·branch protection·staging OAuth·실제 Codex 릴리스 기준은 [CI_AND_RELEASE_GATES.md](./CI_AND_RELEASE_GATES.md)에 기록했다.
+
+# 16. 20번 구현 및 실행 준비 결과
+
+20번에서는 Node 22 API와 Caddy 웹 운영 이미지, staging·production Compose와 secret template, digest 고정 release workflow를 추가했다. backup 증거→one-shot migration→readiness→웹→HTTPS·CORS·OAuth smoke 순서를 배포 스크립트에 고정하고 app-only rollback과 DB forward-fix 원칙을 구현했다.
+
+event 수신과 퀘스트 제출·보상을 독립적으로 멈추는 kill switch를 추가했다. event 중단은 `503`과 `Retry-After`로 plugin queue를 보존하고, 보상 중단은 채점 transaction 전에 제출을 막는다. plugin bundle·설치 안내·개인정보 안내, 7일·10명·50건 checkpoint·100건 최종 표본과 품질 기준을 평가하는 파일럿 판정기도 추가했다.
+
+Docker 리허설에서 11개 migration 적용과 재실행 `applied: []`, API·PostgreSQL health, Caddy 경유 health·CORS·OAuth state/PKCE·cookie·SPA smoke 10개를 통과했다. 세부 실행서는 [DEPLOYMENT_AND_PILOT.md](./DEPLOYMENT_AND_PILOT.md)에 기록했다. 실제 domain·DB·OAuth 자격증명, production 복원·rollback 증거, 초대 사용자 10명과 최소 7일 관찰이 완료되기 전까지 20번 전체는 미완료다.
