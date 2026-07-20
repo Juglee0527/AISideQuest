@@ -13,7 +13,7 @@ Implemented:
 - Developer-operated, local-first distribution with one-command PostgreSQL, migration/seed, API, and web startup via `npm run dev:local`.
 - GitHub OAuth with state, PKCE, server-side hashed sessions, secure cookies, and CSRF.
 - Device linking, rotation, revocation, and hash-only token storage.
-- Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, expiration, and current-runtime fallback when a local plugin reinstall removes an older versioned cache. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
+- Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, and expiration. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
 - Home session cards show only a locally sanitized final-folder label and fixed-allowlist operation label; full paths, raw commands, arguments, and tool results never enter persistence or delivery.
 - Published quest catalog, resumable quiz attempts, server grading, and retry policy.
 - Transactional 100P point ledger with duplicate/concurrency protection.

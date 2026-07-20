@@ -151,17 +151,15 @@ test('bounds heartbeat liveness by the Codex host process and fallback lease', (
   ), false)
 })
 
-test('hook commands resolve the current installed runtime after an older cache is removed', async () => {
-  const cacheRoot = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-cache-'))
-  const removedRuntimeRoot = join(cacheRoot, '0.1.0+codex.removed')
-  const currentRuntimeRoot = join(cacheRoot, '0.1.0+codex.current')
-  const currentScripts = join(currentRuntimeRoot, 'scripts')
-  const markerPath = join(cacheRoot, 'selected-runtime.txt')
+test('hook commands use the direct plugin runtime entrypoint', async () => {
+  const pluginRoot = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-root-'))
+  const scriptsDirectory = join(pluginRoot, 'scripts')
+  const markerPath = join(pluginRoot, 'selected-runtime.txt')
 
   try {
-    await mkdir(currentScripts, { recursive: true })
+    await mkdir(scriptsDirectory, { recursive: true })
     await writeFile(
-      join(currentScripts, 'record-event.mjs'),
+      join(scriptsDirectory, 'record-event.mjs'),
       'import { writeFile } from "node:fs/promises"\n'
         + 'await writeFile(process.env.AISIDEQUEST_TEST_MARKER, import.meta.url, "utf8")\n',
       'utf8',
@@ -176,23 +174,21 @@ test('hook commands resolve the current installed runtime after an older cache i
 
     assert.equal(posixCommands.size, 1)
     assert.equal(windowsCommands.size, 1)
-
-    const posixCommand = [...posixCommands][0]
-    const inlineSource = posixCommand.match(/node -e '(.+)'$/)?.[1]
-    assert.ok(inlineSource)
+    assert.equal(
+      [...posixCommands][0],
+      'AISIDEQUEST_HOST_PID=$PPID node "$PLUGIN_ROOT/scripts/record-event.mjs"',
+    )
 
     const environment = {
-      PLUGIN_ROOT: removedRuntimeRoot,
+      PLUGIN_ROOT: pluginRoot,
       AISIDEQUEST_TEST_MARKER: markerPath,
     }
-    await runProcess(process.execPath, ['-e', inlineSource], environment)
-    assert.match(await readFile(markerPath, 'utf8'), /codex\.current/)
 
     if (process.platform === 'win32') {
-      await rm(markerPath)
       const windowsCommand = [...windowsCommands][0]
       const prefix = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "'
       assert.ok(windowsCommand.startsWith(prefix) && windowsCommand.endsWith('"'))
+      assert.ok(windowsCommand.length < 400)
       const script = windowsCommand.slice(prefix.length, -1)
 
       await runProcess(
@@ -200,10 +196,10 @@ test('hook commands resolve the current installed runtime after an older cache i
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
         environment,
       )
-      assert.match(await readFile(markerPath, 'utf8'), /codex\.current/)
+      assert.match(await readFile(markerPath, 'utf8'), /record-event\.mjs/)
     }
   } finally {
-    await rm(cacheRoot, { recursive: true, force: true })
+    await rm(pluginRoot, { recursive: true, force: true })
   }
 })
 
