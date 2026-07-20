@@ -7,7 +7,6 @@ import { DeviceAuthService } from './device-auth.service'
 import { IntegrationEventController } from './integration-event.controller'
 import { SessionRecoveryService } from './session-recovery.service'
 import { SessionController } from './session.controller'
-import { SessionRecoveryService } from './session-recovery.service'
 import { SessionService } from './session.service'
 
 @Module({
