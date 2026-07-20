@@ -1,13 +1,14 @@
 # AISideQuest 보안 및 개인정보 보호 기준
 
-작성일: 2026-07-18
+작성일: 2026-07-20
 
 ## 1. 핵심 원칙
 
 - 브라우저는 서버 세션 cookie와 CSRF double-submit token을 사용한다.
 - Codex 플러그인은 기기별 Bearer token을 사용하며 token 원문은 서버 DB에 저장하지 않는다.
 - 모든 사용자 리소스 조회와 변경은 인증 주체의 `user_id`를 SQL 조건에 포함한다.
-- prompt, AI response, source code, 파일 경로, 원본 hook payload는 수집하지 않는다.
+- prompt, AI response, source code, 전체 파일 경로, 원본 명령·인자와 원본 hook payload는 수집하지 않는다.
+- 표시용으로 허용하는 값은 로컬에서 먼저 정제한 마지막 폴더명과 고정 허용 목록의 명령 분류뿐이다.
 - 오류 응답과 로그에는 body, query 원문, cookie, Authorization, OAuth code, 연결 code를 남기지 않는다.
 
 ## 2. Endpoint 보안 matrix
@@ -37,7 +38,7 @@
 | `POST /sessions/:id/end` | 웹 세션 | 예 | 본인 세션 | enum, Idem | 없음 |
 | `GET /sessions/active` | 웹 세션 | 아니오 | 본인 | body 없음 | 없음 |
 | `GET /sessions` | 웹 세션 | 아니오 | 본인 | cursor, 최대 100건 | 없음 |
-| `POST /integration-events` | 기기 token | 아니오 | 기기 소유 사용자 | event allowlist, eventId와 Idem 일치 | 기기+IP 240회/분 |
+| `POST /integration-events` | 기기 token | 아니오 | 기기 소유 사용자 | event allowlist, eventId와 Idem 일치, 정제 label 제한 | 기기+IP 240회/분 |
 | `GET /quests`, `GET /quests/:code` | 웹 세션 | 아니오 | 본인 응시 상태만 | cursor, 최대 50건 | 없음 |
 | `POST /quests/:code/attempts` | 웹 세션 | 예 | 본인·활성 세션 | body 없음, Idem | 없음 |
 | `GET /quest-attempts/:id` | 웹 세션 | 아니오 | 본인 응시 | UUID | 없음 |
@@ -66,15 +67,18 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 - 사용자 prompt와 AI 응답
 - source code와 diff
-- 로컬 파일·workspace 경로
+- 전체 로컬 파일·workspace 경로
+- 원본 명령, 인자, 환경변수와 도구 입출력
 - 원본 lifecycle hook payload
 - OAuth access token, 웹 session·CSRF token, 기기 token, 연결 code
 
 식별이 필요한 외부 session·turn, token, idempotency 본문은 SHA-256 hash만 저장한다. 브라우저 연결 verifier도 원문 대신 S256 challenge만 저장하고, 기기 token은 플러그인이 로컬에서 만든 뒤 hash만 연결 요청으로 전송한다. 예외 로그는 stack과 요청 원문 대신 redaction된 오류 종류와 메시지만 남긴다.
 
+예외적으로 화면 표시를 위해 허용하는 `workspaceLabel`은 플러그인이 `cwd`의 마지막 폴더명만 최대 64자로 남긴 값이다. `operationLabel`은 원본 명령을 `npm test`, `git status`, `Gradle test`, `코드 변경`, `기타 명령` 등의 고정 목록으로 분류한 값이다. 원본 값은 event log와 queue를 만들기 전에 폐기하며, 서버는 경로 구분자·제어문자·허용 목록 밖 명령을 DTO와 DB 제약으로 다시 거부한다.
+
 ## 5. 데이터 내보내기와 계정 삭제
 
-`POST /auth/me/export`는 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, AI 세션, allowlist 이벤트 metadata, 응시·답안, point 원장을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
+`POST /auth/me/export`는 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, 정제된 workspace·operation label을 포함한 AI 세션과 allowlist 이벤트 metadata, 응시·답안, point 원장을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
 
 `DELETE /auth/me`는 확인 문자열, CSRF, 15분 이내 인증을 요구하며 다음 순서로 한 transaction에서 삭제한다.
 

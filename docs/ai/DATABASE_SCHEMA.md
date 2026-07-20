@@ -1,10 +1,10 @@
 # AISideQuest PostgreSQL 데이터베이스 구성
 
-- 작성일: 2026-07-16
+- 작성일: 2026-07-20
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784199600000-add-browser-device-linking`까지 12개
+- 기준 migration: `1784160000000`부터 `1784264400000-add-sanitized-session-context`까지 14개
 
 ---
 
@@ -71,7 +71,9 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `(device_id, event_id)` unique key로 event 재전송을 한 번만 저장한다.
 - integration event에는 request hash와 처리 당시 응답 snapshot을 저장한다.
 - event의 사용자와 기기 소유자, 연결 세션의 사용자가 일치하도록 복합 FK를 사용한다.
-- 프롬프트, 응답, 코드, 파일 경로, 원본 hook JSON을 저장할 컬럼은 두지 않는다.
+- `workspace_label`은 전체 경로가 아닌 마지막 폴더명만 최대 64자로 저장하며 경로 구분자와 제어문자를 DB 제약으로 거부한다.
+- `operation_label`은 `npm test`, `git status`, `Gradle test`, `코드 변경`, `기타 명령` 등 migration에 정의된 고정 허용 목록만 저장한다.
+- 프롬프트, 응답, 코드, 전체 파일 경로, 원본 명령·인자, 도구 출력, 원본 hook JSON을 저장할 컬럼은 두지 않는다.
 - 기기 진단은 최근 queue depth·oldest age·dead-letter count와 보고 시각만 저장한다.
 
 ## 3.3 퀘스트와 포인트

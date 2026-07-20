@@ -23,6 +23,8 @@ function createSession(id: string): Session {
     durationMs: 60_000,
     terminalReason: 'MANUAL_COMPLETED',
     timingQuality: 'EXACT',
+    workspaceLabel: 'AISideQuest',
+    operationLabel: 'npm test',
     version: 2,
   }
 }
@@ -106,5 +108,17 @@ describe('session API client', () => {
 
     await expect(request).rejects.toBeInstanceOf(ApiClientError)
     await expect(request).rejects.toMatchObject({ code: 'INVALID_API_RESPONSE' })
+  })
+
+  it('rejects raw paths and non-allowlisted operations from a session response', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => response([{
+      ...createSession('session-1'),
+      workspaceLabel: 'C:\\private\\source',
+      operationLabel: 'curl --token secret',
+    }])))
+
+    await expect(getActiveSessions()).rejects.toMatchObject({
+      code: 'INVALID_API_RESPONSE',
+    })
   })
 })

@@ -15,6 +15,27 @@ export type SessionTerminalReason =
   | 'MANUAL_TIMEOUT'
   | 'SUPERSEDED_BY_NEW_TURN'
 
+export type SessionOperationLabel =
+  | 'git status'
+  | 'git diff'
+  | 'git log'
+  | 'git show'
+  | 'npm test'
+  | 'npm build'
+  | 'npm typecheck'
+  | 'npm lint'
+  | 'npm install'
+  | 'Gradle test'
+  | 'Gradle build'
+  | 'Maven test'
+  | 'Maven build'
+  | 'Python test'
+  | 'Cargo test'
+  | 'Go test'
+  | 'Docker'
+  | '코드 변경'
+  | '기타 명령'
+
 export interface Session {
   id: string
   provider: 'CODEX'
@@ -27,6 +48,8 @@ export interface Session {
   durationMs: number
   terminalReason: SessionTerminalReason | null
   timingQuality: 'EXACT' | 'DEGRADED'
+  workspaceLabel: string | null
+  operationLabel: SessionOperationLabel | null
   version: number
 }
 

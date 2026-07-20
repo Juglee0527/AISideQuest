@@ -56,6 +56,8 @@ function createSession(
     ),
     terminalReason: status === 'COMPLETED' ? 'MANUAL_COMPLETED' : null,
     timingQuality: 'EXACT',
+    workspaceLabel: 'AISideQuest',
+    operationLabel: 'npm test',
     version: status === 'COMPLETED' ? 2 : 1,
   }
 }
@@ -128,6 +130,8 @@ describe('AISideQuest API session flow', () => {
     expect(screen.queryByRole('button', { name: 'AI 작업 시작' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI 작업 종료' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('timer')).toHaveLength(2)
+    expect(screen.getAllByText('AISideQuest').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('npm test')).toHaveLength(2)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(65_000)

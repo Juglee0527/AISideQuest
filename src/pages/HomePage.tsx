@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, Clock3, Coins, Compass, Flag, Trophy } from 'lucide-react'
+import { ArrowRight, Bot, Clock3, Coins, Compass, Flag, Folder, Terminal, Trophy } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import PageHeader from '../components/PageHeader'
@@ -28,13 +28,26 @@ function ActiveSessionCard({ session, getCurrentTime }: ActiveSessionCardProps) 
           </span>
           <div className="min-w-0">
             <p className="truncate font-bold text-white">Codex 작업 {shortId}</p>
-            <p className="mt-1 text-xs text-slate-500">작업 내용과 로컬 경로는 수집하지 않습니다.</p>
+            <p className="mt-1 text-xs text-slate-500">전체 경로와 원본 명령은 수집하지 않습니다.</p>
           </div>
         </div>
         <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${isWaitingForUser ? 'border-amber-400/20 bg-amber-400/10 text-amber-200' : 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300'}`}>
           {isWaitingForUser ? '확인 필요' : '진행 중'}
         </span>
       </div>
+
+      <dl className="mt-5 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="flex min-w-0 items-center gap-2 rounded-lg bg-slate-900/80 px-3 py-2">
+          <Folder className="shrink-0 text-sky-300" size={15} aria-hidden="true" />
+          <dt className="sr-only">프로젝트</dt>
+          <dd className="truncate text-slate-300">{session.workspaceLabel ?? '프로젝트 확인 중'}</dd>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 rounded-lg bg-slate-900/80 px-3 py-2">
+          <Terminal className="shrink-0 text-violet-300" size={15} aria-hidden="true" />
+          <dt className="sr-only">최근 명령</dt>
+          <dd className="truncate text-slate-300">{session.operationLabel ?? '명령 대기 중'}</dd>
+        </div>
+      </dl>
 
       <div className="mt-6 flex items-end justify-between gap-4">
         <div>
@@ -112,6 +125,11 @@ function HomePage() {
                 <p className="mt-3 text-sm text-slate-500">
                   {lastCompletedSession ? '최근 종료한 AI 작업 시간입니다.' : 'Codex 작업을 시작하면 자동으로 이곳에 표시됩니다.'}
                 </p>
+                {lastCompletedSession?.workspaceLabel || lastCompletedSession?.operationLabel ? (
+                  <p className="mt-2 text-sm text-slate-400">
+                    {[lastCompletedSession.workspaceLabel, lastCompletedSession.operationLabel].filter(Boolean).join(' · ')}
+                  </p>
+                ) : null}
               </div>
             )}
             <p className="mt-5 text-center text-xs text-slate-600">

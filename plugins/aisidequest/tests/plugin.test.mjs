@@ -19,8 +19,10 @@ import {
   writeDeviceConfig,
 } from '../scripts/device-config.mjs'
 import {
+  classifyOperation,
   hashIdentifier,
   sanitizeHookPayload,
+  sanitizeWorkspaceLabel,
 } from '../scripts/event-recorder.mjs'
 import { sendTestEvent } from '../scripts/send-test-event.mjs'
 import {
@@ -121,14 +123,14 @@ test('bounds heartbeat liveness by the Codex host process and fallback lease', (
   ), false)
 })
 
-test('keeps only the server event contract and hashed identifiers', () => {
+test('keeps only hashed identifiers and locally sanitized display metadata', () => {
   const event = sanitizeHookPayload(
     {
       hook_event_name: 'UserPromptSubmit',
       session_id: 'session-123',
       turn_id: 'turn-456',
       transcript_path: 'C:\\private\\transcript.jsonl',
-      cwd: 'C:\\private\\source',
+      cwd: 'C:\\Users\\developer\\IdeaProjects\\AISideQuest',
       prompt: 'private prompt',
       tool_input: { command: 'private command' },
     },
@@ -144,10 +146,27 @@ test('keeps only the server event contract and hashed identifiers', () => {
     'schemaVersion',
     'sessionKey',
     'turnKey',
+    'workspaceLabel',
   ])
   assert.equal(event?.sessionKey, hashIdentifier('session-123'))
   assert.equal(event?.turnKey, hashIdentifier('turn-456'))
-  assert.doesNotMatch(JSON.stringify(event), /private|prompt|transcript|source|command/)
+  assert.equal(event?.workspaceLabel, 'AISideQuest')
+  assert.doesNotMatch(JSON.stringify(event), /Users|developer|IdeaProjects|prompt|transcript|private command/)
+})
+
+test('maps raw tool input to a fixed operation allowlist without leaking arguments', () => {
+  const payload = {
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: {
+      command: 'npm.cmd test -- --filter C:\\private\\customer-project --token secret',
+    },
+  }
+
+  assert.equal(classifyOperation(payload), 'npm test')
+  assert.equal(sanitizeWorkspaceLabel('C:\\private\\한글 프로젝트'), '한글 프로젝트')
+  assert.equal(classifyOperation({ ...payload, tool_input: { command: 'curl --token secret' } }), '기타 명령')
+  assert.equal(classifyOperation({ ...payload, tool_name: 'apply_patch' }), '코드 변경')
 })
 
 test('connects with a generated token and stores only device credentials locally', async () => {
@@ -452,6 +471,8 @@ test('automatically sends every supported lifecycle event after local persistenc
           hook_event_name: event,
           session_id: 'session-automatic',
           ...(event === 'SessionStart' ? {} : { turn_id: 'turn-automatic' }),
+          cwd: 'C:\\private\\AISideQuest',
+          ...(event === 'PreToolUse' ? { tool_name: 'Bash' } : {}),
           prompt: 'must not be sent',
           transcript_path: 'must not be sent',
           tool_input: { command: 'must not be sent' },
@@ -481,9 +502,13 @@ test('automatically sends every supported lifecycle event after local persistenc
       )
       assert.doesNotMatch(
         JSON.stringify(eventRequest.body),
-        /prompt|transcript|tool_input|must not be sent/,
+        /C:\\|private|prompt|transcript|tool_input|must not be sent/,
       )
     }
+
+    const toolEvent = eventRequests.find((request) => request.body.event === 'PreToolUse')
+    assert.equal(toolEvent?.body.workspaceLabel, 'AISideQuest')
+    assert.equal(toolEvent?.body.operationLabel, '기타 명령')
 
     const log = await readFile(join(dataDirectory, 'events.jsonl'), 'utf8')
     const localEvents = log.trim().split('\n').map((line) => JSON.parse(line))

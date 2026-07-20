@@ -22,6 +22,7 @@ import type {
   IntegrationEventName,
   IntegrationEventResponse,
   IntegrationProcessingResult,
+  SafeOperationLabel,
   SessionRow,
   SessionSnapshot,
   SessionStatus,
@@ -41,6 +42,8 @@ const SESSION_COLUMNS = `
   last_activity_at,
   terminal_reason,
   timing_quality,
+  workspace_label,
+  operation_label,
   version
 `
 
@@ -76,6 +79,8 @@ interface DeferredEventRow {
   event: IntegrationEventName
   device_id: string
   received_at: Date
+  workspace_label: string | null
+  operation_label: SafeOperationLabel | null
 }
 
 interface DatabaseTimeRow {
@@ -90,6 +95,11 @@ interface SessionCursor {
 interface AppliedEvent {
   result: IntegrationProcessingResult
   session: SessionRow | null
+}
+
+interface SanitizedSessionContext {
+  workspaceLabel: string | null
+  operationLabel: SafeOperationLabel | null
 }
 
 @Injectable()
@@ -308,6 +318,7 @@ export class SessionService {
     dto: IntegrationEventDto,
   ): Promise<IntegrationEventResponse> {
     const event = this.validateIntegrationEvent(dto)
+    this.validateSanitizedContext(event, dto)
     const observedAt = new Date(dto.observedAt)
 
     if (observedAt.getTime() > Date.now() + MAX_OBSERVED_AT_FUTURE_MS) {
@@ -328,6 +339,8 @@ export class SessionService {
         sessionKey: dto.sessionKey,
         turnKey: dto.turnKey ?? null,
         observedAt: dto.observedAt,
+        workspaceLabel: dto.workspaceLabel ?? null,
+        operationLabel: dto.operationLabel ?? null,
         diagnostics: dto.diagnostics
           ? {
               queueDepth: dto.diagnostics.queueDepth,
@@ -471,6 +484,10 @@ export class SessionService {
         dto.sessionKey,
         dto.turnKey ?? null,
         receivedAt,
+        {
+          workspaceLabel: dto.workspaceLabel ?? null,
+          operationLabel: dto.operationLabel ?? null,
+        },
       )
 
       if (
@@ -510,6 +527,8 @@ export class SessionService {
             event,
             external_session_key,
             external_turn_key,
+            workspace_label,
+            operation_label,
             observed_at,
             received_at,
             processing_result,
@@ -518,7 +537,7 @@ export class SessionService {
           )
           VALUES (
             $1, $2, $3, $4, $5, 'CODEX', $6, $7, $8,
-            $9, $10, $11, $12, $13::jsonb
+            $9, $10, $11, $12, $13, $14, $15::jsonb
           )
         `,
         [
@@ -530,6 +549,8 @@ export class SessionService {
           event,
           dto.sessionKey,
           dto.turnKey ?? null,
+          dto.workspaceLabel ?? null,
+          dto.operationLabel ?? null,
           observedAt,
           receivedAt,
           applied.result,
@@ -550,6 +571,7 @@ export class SessionService {
     sessionKey: string,
     turnKey: string | null,
     receivedAt: Date,
+    context: SanitizedSessionContext,
   ): Promise<AppliedEvent> {
     if (event === 'SessionStart') {
       return { result: 'APPLIED', session: null }
@@ -566,6 +588,7 @@ export class SessionService {
         sessionKey,
         turnKey,
         receivedAt,
+        context,
       )
     }
 
@@ -586,6 +609,7 @@ export class SessionService {
       deviceId,
       event,
       receivedAt,
+      context,
     )
   }
 
@@ -595,6 +619,7 @@ export class SessionService {
     sessionKey: string,
     turnKey: string,
     receivedAt: Date,
+    context: SanitizedSessionContext,
   ): Promise<AppliedEvent> {
     const sameTurnSession = await this.findSessionByTurn(
       manager,
@@ -632,13 +657,23 @@ export class SessionService {
             UPDATE ai_sessions
             SET external_session_key = $3,
                 external_turn_key = $4,
+                workspace_label = COALESCE($6, workspace_label),
+                operation_label = COALESCE($7, operation_label),
                 last_activity_at = GREATEST(last_activity_at, $5::timestamptz),
                 version = version + 1,
                 updated_at = $5
             WHERE id = $1 AND user_id = $2
             RETURNING ${SESSION_COLUMNS}
           `,
-          [manualSession.id, userId, sessionKey, turnKey, receivedAt],
+          [
+            manualSession.id,
+            userId,
+            sessionKey,
+            turnKey,
+            receivedAt,
+            context.workspaceLabel,
+            context.operationLabel,
+          ],
         )) as [SessionRow[], number]
 
         return { result: 'APPLIED', session: sessions[0] ?? null }
@@ -670,13 +705,22 @@ export class SessionService {
           origin,
           external_session_key,
           external_turn_key,
+          workspace_label,
+          operation_label,
           started_at,
           last_activity_at
         )
-        VALUES ($1, 'CODEX', 'RUNNING', 'HOOK', $2, $3, $4, $4)
+        VALUES ($1, 'CODEX', 'RUNNING', 'HOOK', $2, $3, $4, $5, $6, $6)
         RETURNING ${SESSION_COLUMNS}
       `,
-      [userId, sessionKey, turnKey, receivedAt],
+      [
+        userId,
+        sessionKey,
+        turnKey,
+        context.workspaceLabel,
+        context.operationLabel,
+        receivedAt,
+      ],
     )) as SessionRow[]
 
     return { result: 'APPLIED', session: sessions[0] ?? null }
@@ -691,6 +735,7 @@ export class SessionService {
       'SessionStart' | 'UserPromptSubmit'
     >,
     receivedAt: Date,
+    context: SanitizedSessionContext,
   ): Promise<AppliedEvent> {
     if (!this.isActive(session.status)) {
       if (
@@ -721,12 +766,20 @@ export class SessionService {
             SET status = 'COMPLETED',
                 terminal_reason = 'RECOVERED_LATE_STOP',
                 timing_quality = 'DEGRADED',
+                workspace_label = COALESCE($4, workspace_label),
+                operation_label = COALESCE($5, operation_label),
                 version = version + 1,
                 updated_at = $3
             WHERE id = $1 AND user_id = $2
             RETURNING ${SESSION_COLUMNS}
           `,
-          [session.id, session.user_id, receivedAt],
+          [
+            session.id,
+            session.user_id,
+            receivedAt,
+            context.workspaceLabel,
+            context.operationLabel,
+          ],
         )) as [SessionRow[], number]
 
         return { result: 'APPLIED', session: sessions[0] ?? null }
@@ -756,6 +809,8 @@ export class SessionService {
               WHEN $6::boolean THEN 'DEGRADED'
               ELSE timing_quality
             END,
+            workspace_label = COALESCE($7, workspace_label),
+            operation_label = COALESCE($8, operation_label),
             version = version + 1,
             updated_at = $5
         WHERE id = $1 AND user_id = $2
@@ -768,6 +823,8 @@ export class SessionService {
         isStop,
         effectiveAt,
         degraded,
+        context.workspaceLabel,
+        context.operationLabel,
       ],
     )) as [SessionRow[], number]
 
@@ -783,7 +840,8 @@ export class SessionService {
   ) {
     const deferredEvents = (await manager.query(
       `
-        SELECT id, event_id, event, device_id, received_at
+        SELECT id, event_id, event, device_id, received_at,
+               workspace_label, operation_label
         FROM integration_events
         WHERE user_id = $1
           AND provider = 'CODEX'
@@ -814,6 +872,10 @@ export class SessionService {
             'SessionStart' | 'UserPromptSubmit'
           >,
           deferredEvent.received_at,
+          {
+            workspaceLabel: deferredEvent.workspace_label,
+            operationLabel: deferredEvent.operation_label,
+          },
         )
         session = applied.session ?? session
       }
@@ -913,6 +975,25 @@ export class SessionService {
     )) as SessionRow[]
 
     return rows[0] ?? null
+  }
+
+  private validateSanitizedContext(
+    event: IntegrationEventName,
+    dto: IntegrationEventDto,
+  ) {
+    if (
+      event === 'SessionStart'
+      && (dto.workspaceLabel !== undefined || dto.operationLabel !== undefined)
+    ) {
+      validationError('sanitized context requires a turn event')
+    }
+
+    if (
+      dto.operationLabel !== undefined
+      && !['PreToolUse', 'PermissionRequest', 'PostToolUse'].includes(event)
+    ) {
+      validationError('operationLabel requires a tool event')
+    }
   }
 
   private async findActiveSessionByExternalSessionKey(
@@ -1015,6 +1096,8 @@ export class SessionService {
       ),
       terminalReason: session.terminal_reason,
       timingQuality: session.timing_quality,
+      workspaceLabel: session.workspace_label,
+      operationLabel: session.operation_label,
       version: session.version,
     }
   }

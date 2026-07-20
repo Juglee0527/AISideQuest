@@ -416,16 +416,20 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     const startEvent = sendIntegrationEvent({
       event: 'UserPromptSubmit',
       observedAt: startObservedAt,
+      body: { workspaceLabel: 'AISideQuest' },
     })
     const started = await startEvent.request.expect(200)
     assert.equal(started.body.data.result, 'APPLIED')
     assert.equal(started.body.data.session.status, 'RUNNING')
     assert.equal(started.body.data.session.origin, 'HOOK')
+    assert.equal(started.body.data.session.workspaceLabel, 'AISideQuest')
+    assert.equal(started.body.data.session.operationLabel, null)
 
     const duplicate = sendIntegrationEvent({
       event: 'UserPromptSubmit',
       eventId: startEvent.eventId,
       observedAt: startObservedAt,
+      body: { workspaceLabel: 'AISideQuest' },
     })
     const replay = await duplicate.request.expect(200)
     assert.deepEqual(replay.body.data, started.body.data)
@@ -450,25 +454,53 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
     const waiting = await sendIntegrationEvent({
       event: 'PermissionRequest',
+      body: { workspaceLabel: 'AISideQuest', operationLabel: 'npm test' },
     }).request.expect(200)
     assert.equal(waiting.body.data.session.status, 'WAITING_FOR_USER')
+    assert.equal(waiting.body.data.session.operationLabel, 'npm test')
 
     const running = await sendIntegrationEvent({
       event: 'PostToolUse',
+      body: { workspaceLabel: 'AISideQuest', operationLabel: 'git status' },
     }).request.expect(200)
     assert.equal(running.body.data.session.status, 'RUNNING')
+    assert.equal(running.body.data.session.operationLabel, 'git status')
 
     const stopped = await sendIntegrationEvent({
       event: 'Stop',
     }).request.expect(200)
     assert.equal(stopped.body.data.session.status, 'COMPLETED')
     assert.equal(stopped.body.data.session.terminalReason, 'HOOK_STOP')
+    assert.equal(stopped.body.data.session.workspaceLabel, 'AISideQuest')
+    assert.equal(stopped.body.data.session.operationLabel, 'git status')
 
     const active = await request(app.getHttpServer())
       .get('/api/v1/sessions/active')
       .set('Cookie', cookieHeader(firstIdentity))
       .expect(200)
     assert.deepEqual(active.body.data, [])
+  })
+
+  test('rejects raw paths, raw tool input and context outside the safe allowlist', async () => {
+    await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      body: { cwd: 'C:\\private\\source' },
+    }).request.expect(400)
+
+    await sendIntegrationEvent({
+      event: 'PreToolUse',
+      body: { toolInput: { command: 'curl --token secret' } },
+    }).request.expect(400)
+
+    await sendIntegrationEvent({
+      event: 'PreToolUse',
+      body: { operationLabel: 'curl --token secret' },
+    }).request.expect(400)
+
+    await sendIntegrationEvent({
+      event: 'Stop',
+      body: { operationLabel: 'npm test' },
+    }).request.expect(400)
   })
 
   test('automatic start links a manual session and a new turn supersedes it', async () => {

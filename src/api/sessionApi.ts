@@ -7,6 +7,7 @@ import {
 import type {
   Session,
   SessionHistoryPage,
+  SessionOperationLabel,
   SessionStatus,
 } from '../types/session'
 
@@ -22,6 +23,28 @@ const SESSION_STATUSES: readonly SessionStatus[] = [
 ]
 const SESSION_ORIGINS = ['HOOK', 'MANUAL'] as const
 const TIMING_QUALITIES = ['EXACT', 'DEGRADED'] as const
+const OPERATION_LABELS: readonly SessionOperationLabel[] = [
+  'git status',
+  'git diff',
+  'git log',
+  'git show',
+  'npm test',
+  'npm build',
+  'npm typecheck',
+  'npm lint',
+  'npm install',
+  'Gradle test',
+  'Gradle build',
+  'Maven test',
+  'Maven build',
+  'Python test',
+  'Cargo test',
+  'Go test',
+  'Docker',
+  '코드 변경',
+  '기타 명령',
+]
+const WORKSPACE_LABEL_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N}._ -]{0,63}$/u
 const TERMINAL_REASONS = [
   'HOOK_STOP',
   'MANUAL_COMPLETED',
@@ -73,6 +96,11 @@ function parseSession(value: unknown): Session {
     value.durationMs < 0 ||
     !(value.terminalReason === null || isOneOf(value.terminalReason, TERMINAL_REASONS)) ||
     !isOneOf(value.timingQuality, TIMING_QUALITIES) ||
+    !(value.workspaceLabel === null || (
+      typeof value.workspaceLabel === 'string'
+      && WORKSPACE_LABEL_PATTERN.test(value.workspaceLabel)
+    )) ||
+    !(value.operationLabel === null || isOneOf(value.operationLabel, OPERATION_LABELS)) ||
     typeof value.version !== 'number' ||
     !Number.isSafeInteger(value.version) ||
     value.version < 1
@@ -92,6 +120,8 @@ function parseSession(value: unknown): Session {
     durationMs: value.durationMs,
     terminalReason: value.terminalReason,
     timingQuality: value.timingQuality,
+    workspaceLabel: value.workspaceLabel,
+    operationLabel: value.operationLabel,
     version: value.version,
   }
 }

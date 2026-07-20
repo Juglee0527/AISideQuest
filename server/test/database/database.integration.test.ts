@@ -93,6 +93,16 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [sanitizedContextReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name IN ('ai_sessions', 'integration_events')
+        AND column_name IN ('workspace_label', 'operation_label')
+    `)) as Array<{ count: number }>
+    assert.equal(sanitizedContextReverted.count, 0)
+
+    await dataSource.undoLastMigration()
     const [concurrentSessionsReverted] = (await dataSource.query(`
       SELECT
         to_regclass('public.uk_ai_sessions_active_user') AS legacy_index,
@@ -185,7 +195,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 6)
+    assert.equal(pointMigrations.length, 7)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -209,6 +219,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     await dataSource.query('DELETE FROM ai_sessions WHERE id = $1', [migrationSession.id])
     await dataSource.query('DELETE FROM users WHERE id = $1', [migrationUser.id])
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -287,7 +298,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 13)
+    assert.equal(reappliedMigrations.length, 14)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
@@ -424,6 +435,39 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       )
 
     await insertEvent()
+    await dataSource.query(
+      `UPDATE integration_events
+       SET workspace_label = 'AISideQuest', operation_label = 'npm test'
+       WHERE device_id = $1 AND event_id = $2`,
+      [device.id, eventId],
+    )
+
+    await assert.rejects(
+      dataSource.query(
+        `UPDATE integration_events SET workspace_label = $1
+         WHERE device_id = $2 AND event_id = $3`,
+        ['C:\\private\\source', device.id, eventId],
+      ),
+      (error: unknown) => hasPostgresCode(error, '23514'),
+    )
+
+    await assert.rejects(
+      dataSource.query(
+        `UPDATE integration_events SET operation_label = $1
+         WHERE device_id = $2 AND event_id = $3`,
+        ['curl --token secret', device.id, eventId],
+      ),
+      (error: unknown) => hasPostgresCode(error, '23514'),
+    )
+
+    await assert.rejects(
+      dataSource.query(
+        'UPDATE ai_sessions SET workspace_label = $1 WHERE user_id = $2',
+        ['C:\\private\\source', testUserId],
+      ),
+      (error: unknown) => hasPostgresCode(error, '23514'),
+    )
+
     await assert.rejects(insertEvent(), (error: unknown) =>
       hasPostgresCode(error, '23505'),
     )

@@ -4,7 +4,7 @@
 
 - 현재 상태: 실사용 베타 1~16번 완료, 서버 통계와 Dashboard 전환 완료
 - 애플리케이션 버전: `0.1.0`
-- 최종 현행화: 2026-07-18
+- 최종 현행화: 2026-07-20
 
 ---
 
@@ -65,6 +65,7 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 - 서버 세션 자동 저장, 새로고침·다른 인증 브라우저 복구
 - 기존 LocalStorage 감지, 참고 요약 또는 초기화 전환
 - 오늘·이번 주·이번 달 통계
+- 실행 중 세션의 정제된 프로젝트명과 최근 명령 분류 표시
 - 자동 테스트와 프로덕션 빌드 검증
 
 ## 4.2 MVP 제외 범위
@@ -89,6 +90,7 @@ AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작�
 
 - 현재 AI 작업 상태
 - 현재 또는 최근 세션 시간
+- 전체 경로를 제거한 프로젝트 폴더명과 허용 목록 기반 최근 명령 분류
 - 오늘 AI 대기 시간
 - 오늘 완료한 퀘스트 수
 - 오늘 예상 리워드
@@ -477,7 +479,7 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 - 최초 퀘스트: 객관식 개발 퀴즈
 - 포인트: 현금 가치가 없는 서비스 포인트
 - 파일럿: 초대 기반 폐쇄형 베타
-- 개인정보 원칙: 프롬프트, Codex 응답, 소스 코드, 파일 경로를 수집하지 않음
+- 개인정보 원칙: 프롬프트, Codex 응답, 소스 코드, 전체 경로와 원본 명령을 수집하지 않음. 표시용 마지막 폴더명과 고정 명령 분류만 로컬 정제 후 허용
 
 세션 상태와 데이터 흐름의 상세 계약은 [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)를 따른다.
 PostgreSQL 구조와 실행 방법은 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.

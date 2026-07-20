@@ -37,9 +37,11 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 | 웹 동기화 | 활성 탭에서 5초 polling, 창 focus 시 즉시 갱신 |
 | 실시간 기술 | 베타에서는 WebSocket과 SSE를 사용하지 않음 |
 | 시간 산정 | `endedAt - startedAt`; 권한 승인 대기 시간 포함 |
-| 금지 데이터 | 프롬프트, 응답, transcript, 소스 코드, 파일 경로, 명령 및 도구 입출력 |
+| 금지 데이터 | 프롬프트, 응답, transcript, 소스 코드, 전체 파일 경로, 원본 명령·인자 및 도구 입출력 |
 
 서로 다른 Codex 작업의 hashed session key는 원문 경로나 작업 내용을 저장하지 않고 병렬 추적한다. 같은 hashed session key에서 새 turn이 시작될 때만 해당 key의 기존 자동 세션을 `ABANDONED`로 정리한다.
+
+플러그인은 turn event를 로컬에 기록하기 전에 `cwd`의 마지막 폴더명만 `workspaceLabel`로 정제한다. 도구 event의 원본 입력은 고정 허용 목록의 `operationLabel`로 분류하고 즉시 폐기한다. 서버와 queue에는 경로 구분자, 상위 경로, 명령 인자, 환경변수 또는 도구 결과가 들어가지 않는다.
 
 # 3. 세션 상태
 

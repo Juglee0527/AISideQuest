@@ -41,7 +41,7 @@ Base path: `/api/v1`
 | `POST /sessions/:id/end` | session + CSRF + ownership + idempotency | complete/fail/cancel manual session |
 | `GET /sessions/active` | browser session | all current active sessions, newest first; returns an empty array when none |
 | `GET /sessions` | browser session | owned cursor history |
-| `POST /integration-events` | device token + idempotency | apply privacy-safe Codex lifecycle event |
+| `POST /integration-events` | device token + idempotency | apply privacy-safe Codex lifecycle event and optional sanitized display labels |
 | `GET /quests` | browser session | published current-version catalog |
 | `GET /quests/:code` | browser session | published metadata and recent user status |
 | `POST /quests/:code/attempts` | session + CSRF + active AI session + idempotency | start pinned attempt |
@@ -54,3 +54,5 @@ Base path: `/api/v1`
 | `GET /stats/activity` | browser session | cursor-paginated mixed activity |
 
 For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md). For session event semantics, use [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md).
+
+`workspaceLabel` is optional turn metadata produced locally from only the final folder segment. It is limited to 64 letters, numbers, spaces, `.`, `_`, and `-`; separators and full paths are rejected. `operationLabel` is optional only for `PreToolUse`, `PermissionRequest`, and `PostToolUse`, and must be one of the server allowlisted canonical labels such as `npm test`, `git status`, `Gradle test`, `코드 변경`, or `기타 명령`. Raw `cwd`, tool input, command arguments, environment variables, and tool output remain unknown fields and are rejected.

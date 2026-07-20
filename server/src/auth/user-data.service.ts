@@ -37,12 +37,14 @@ export class UserDataService {
       const sessions = await this.rows(manager, `
             SELECT id, provider, status, origin, started_at, ended_at,
                    last_activity_at, terminal_reason, timing_quality,
+                   workspace_label, operation_label,
                    version, created_at, updated_at
             FROM ai_sessions WHERE user_id = $1 ORDER BY started_at, id
           `, userId)
       const events = await this.rows(manager, `
             SELECT event_id, device_id, ai_session_id, provider, event,
-                   sequence, observed_at, received_at, processing_result
+                   sequence, workspace_label, operation_label,
+                   observed_at, received_at, processing_result
             FROM integration_events WHERE user_id = $1
             ORDER BY received_at, id
           `, userId)

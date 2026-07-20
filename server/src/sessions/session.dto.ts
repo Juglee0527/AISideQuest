@@ -15,7 +15,12 @@ import {
   ValidateNested,
 } from 'class-validator'
 
-import { SESSION_STATUSES, type SessionStatus } from './session.types'
+import {
+  SAFE_OPERATION_LABELS,
+  SESSION_STATUSES,
+  type SafeOperationLabel,
+  type SessionStatus,
+} from './session.types'
 
 export const SESSION_END_OUTCOMES = [
   'COMPLETED',
@@ -100,6 +105,17 @@ export class IntegrationEventDto {
 
   @IsISO8601({ strict: true })
   observedAt!: string
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  @Matches(/^[\p{L}\p{N}][\p{L}\p{N}._ -]{0,63}$/u)
+  workspaceLabel?: string
+
+  @IsOptional()
+  @IsIn(SAFE_OPERATION_LABELS)
+  operationLabel?: SafeOperationLabel
 
   @IsOptional()
   @ValidateNested()

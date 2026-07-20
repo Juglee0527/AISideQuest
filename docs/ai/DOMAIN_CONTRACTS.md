@@ -42,7 +42,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - PostgreSQL permits different hashed Codex session keys to run concurrently, while allowing at most one active turn per hashed Codex session key and one active manual fallback session per user.
 - A new turn supersedes only the previous active turn with the same hashed Codex session key.
 - `GET /sessions/active` returns every active snapshot newest first. Home polls this collection and renders one read-only elapsed-time card per session; it never exposes start or end controls.
-- Cards use a fragment of the server session ID. Folder names, local paths, prompts, task titles, and completion percentages are not collected or inferred.
+- Cards use a fragment of the server session ID and may show a locally sanitized final folder label plus a canonical operation label. Full paths, command arguments, environment variables, prompts, task titles, and completion percentages are not collected or inferred.
 - Unknown non-start events are stored as `DEFERRED`; start arrival reprocesses them in order.
 - Automatic sessions become `ABANDONED` exactly at last valid activity + 120 seconds.
 - Pure manual sessions become `ABANDONED` exactly at start + 12 hours.
@@ -61,6 +61,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Recognized queue formats from earlier plugin versions are migrated under the queue lock, rebased above the last acknowledged device sequence, and delivered in their original FIFO order. A compatible old record is never classified as corrupt.
 - Permanent failures and corrupt records go to a 7-day dead-letter store with a privacy-safe reason.
 - Delivery failure must never block Codex work. Manual web sessions remain the fallback.
+- Before persistence or delivery, the plugin reduces `cwd` to a separator-free final folder label and maps tool input to a fixed operation allowlist. Raw paths, raw commands, arguments, and tool results never enter the event log or queue.
 
 ## Quests and attempts
 
@@ -97,7 +98,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 
 ## Security and privacy
 
-- Forbidden data: prompt, AI response, code, diff, file/workspace path, transcript, tool input/output, raw hook payload, raw tokens, cookies, OAuth codes, and link codes.
+- Forbidden data: prompt, AI response, code, diff, full file/workspace path, raw command or arguments, transcript, tool input/output, raw hook payload, raw tokens, cookies, OAuth codes, and link codes. The only permitted display derivatives are the final-folder `workspaceLabel` and fixed-allowlist `operationLabel` produced locally before persistence.
 - The API accepts one exact credentialed CORS origin. Production callback, redirects, and CORS origin must use HTTPS and compatible hosts.
 - Request logs contain environment, service version, method, route template, status, latency, request ID, and safe error code only.
 - Rate limits are PostgreSQL-backed so all API instances share buckets.

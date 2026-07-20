@@ -14,6 +14,7 @@ Implemented:
 - GitHub OAuth with state, PKCE, server-side hashed sessions, secure cookies, and CSRF.
 - Device linking, rotation, revocation, and hash-only token storage.
 - Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, and expiration. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
+- Home session cards show only a locally sanitized final-folder label and fixed-allowlist operation label; full paths, raw commands, arguments, and tool results never enter persistence or delivery.
 - Published quest catalog, resumable quiz attempts, server grading, and retry policy.
 - Transactional 100P point ledger with duplicate/concurrency protection.
 - Server statistics using saved IANA time zones.
@@ -33,14 +34,14 @@ Optional external deployment remains unverified:
 
 | Suite | Passed |
 |---|---:|
-| React | 49 |
-| Codex plugin | 18 |
+| React | 50 |
+| Codex plugin | 19 |
 | operations and local startup scripts | 17 |
 | server non-database | 19 |
-| PostgreSQL integration | 50 |
-| total | 153 |
+| PostgreSQL integration | 51 |
+| total | 156 |
 
-Also passed: lint, client/server typecheck, client/server production build, 13 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
+Also passed: lint, client/server typecheck, client/server production build, 14 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
 ## Operational defaults
 

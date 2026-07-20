@@ -12,6 +12,30 @@ export type SessionStatus = (typeof SESSION_STATUSES)[number]
 export type SessionOrigin = 'HOOK' | 'MANUAL'
 export type TimingQuality = 'EXACT' | 'DEGRADED'
 
+export const SAFE_OPERATION_LABELS = [
+  'git status',
+  'git diff',
+  'git log',
+  'git show',
+  'npm test',
+  'npm build',
+  'npm typecheck',
+  'npm lint',
+  'npm install',
+  'Gradle test',
+  'Gradle build',
+  'Maven test',
+  'Maven build',
+  'Python test',
+  'Cargo test',
+  'Go test',
+  'Docker',
+  '코드 변경',
+  '기타 명령',
+] as const
+
+export type SafeOperationLabel = (typeof SAFE_OPERATION_LABELS)[number]
+
 export type TerminalReason =
   | 'HOOK_STOP'
   | 'MANUAL_COMPLETED'
@@ -35,6 +59,8 @@ export interface SessionRow {
   last_activity_at: Date
   terminal_reason: TerminalReason | null
   timing_quality: TimingQuality
+  workspace_label: string | null
+  operation_label: SafeOperationLabel | null
   version: number
 }
 
@@ -50,6 +76,8 @@ export interface SessionSnapshot {
   durationMs: number
   terminalReason: TerminalReason | null
   timingQuality: TimingQuality
+  workspaceLabel: string | null
+  operationLabel: SafeOperationLabel | null
   version: number
 }
 
