@@ -105,7 +105,57 @@ async function readQueue(queuePaths) {
   }
 
   const items = new Map()
+  const sequenceOwners = new Map()
   const corrupt = []
+  let migrated = false
+
+  const removeItem = (eventId) => {
+    const existing = items.get(eventId)
+    if (!existing) return false
+
+    items.delete(eventId)
+    sequenceOwners.delete(existing.sequence)
+    return true
+  }
+
+  const setItem = (candidate) => {
+    if (
+      !isRecord(candidate)
+      || !Number.isSafeInteger(candidate.sequence)
+      || candidate.sequence < 1
+      || !isRecord(candidate.event)
+      || typeof candidate.event.eventId !== 'string'
+      || candidate.event.eventId.trim() === ''
+      || typeof candidate.enqueuedAt !== 'string'
+      || !Number.isFinite(Date.parse(candidate.enqueuedAt))
+    ) {
+      return false
+    }
+
+    const eventId = candidate.event.eventId
+    const previous = items.get(eventId)
+    if (previous) {
+      sequenceOwners.delete(previous.sequence)
+    }
+
+    const previousOwner = sequenceOwners.get(candidate.sequence)
+    if (previousOwner && previousOwner !== eventId) {
+      items.delete(previousOwner)
+    }
+
+    const item = {
+      ...candidate,
+      event: { ...candidate.event, sequence: candidate.sequence },
+    }
+    items.set(eventId, item)
+    sequenceOwners.set(item.sequence, eventId)
+    return true
+  }
+
+  const nextSequence = () => {
+    if (sequenceOwners.size === 0) return 1
+    return Math.max(...sequenceOwners.keys()) + 1
+  }
 
   for (const line of text.split('\n')) {
     if (line.trim() === '') {
@@ -114,19 +164,80 @@ async function readQueue(queuePaths) {
 
     try {
       const record = JSON.parse(line)
-      if (isRecord(record) && isRecord(record.item) && Number.isSafeInteger(record.item.sequence)) {
-        if (record.type === 'EVENT' || record.type === 'REPLACE') {
-          items.set(record.item.sequence, record.item)
-        }
-      } else {
-        corrupt.push(line)
+
+      if (
+        isRecord(record)
+        && (record.type === 'EVENT' || record.type === 'REPLACE')
+        && setItem(record.item)
+      ) {
+        continue
       }
+
+      if (isRecord(record) && typeof record.op === 'string') {
+        migrated = true
+
+        if (
+          record.op === 'META'
+          && Number.isSafeInteger(record.nextSequence)
+          && record.nextSequence >= 1
+        ) {
+          continue
+        }
+
+        if (record.op === 'ENQUEUE' && setItem(record.item)) {
+          continue
+        }
+
+        if (
+          record.op === 'UPDATE'
+          && typeof record.eventId === 'string'
+          && isRecord(record.changes)
+        ) {
+          const existing = items.get(record.eventId)
+          if (existing && setItem({ ...existing, ...record.changes })) {
+            continue
+          }
+        }
+
+        if (
+          record.op === 'REMOVE'
+          && typeof record.eventId === 'string'
+        ) {
+          removeItem(record.eventId)
+          continue
+        }
+
+        corrupt.push(line)
+        continue
+      }
+
+      if (
+        isRecord(record)
+        && typeof record.eventId === 'string'
+        && typeof record.event === 'string'
+        && typeof record.observedAt === 'string'
+        && setItem({
+          sequence: nextSequence(),
+          event: record,
+          enqueuedAt: record.observedAt,
+        })
+      ) {
+        migrated = true
+        continue
+      }
+
+      corrupt.push(line)
     } catch {
       corrupt.push(line)
     }
   }
 
-  return { text, items: [...items.values()].sort((a, b) => a.sequence - b.sequence), corrupt }
+  return {
+    text,
+    items: [...items.values()].sort((a, b) => a.sequence - b.sequence),
+    corrupt,
+    migrated,
+  }
 }
 
 async function appendDeadLetter(queuePaths, item, reason, now) {
@@ -182,8 +293,32 @@ async function rewriteQueue(queuePaths, items) {
 }
 
 async function normalizeQueue(queuePaths, queue, state, now) {
-  let items = queue.items.filter((item) => item.sequence > (state.ackedSequence ?? 0))
-  let changed = queue.corrupt.length > 0
+  let items = queue.items
+  let changed = queue.corrupt.length > 0 || queue.migrated
+
+  if (queue.migrated) {
+    const firstSequence = Math.max(
+      1,
+      Number.isSafeInteger(state.nextSequence) ? state.nextSequence : 1,
+      Number.isSafeInteger(state.ackedSequence) ? state.ackedSequence + 1 : 1,
+    )
+
+    items = items.map((item, index) => {
+      const sequence = firstSequence + index
+      return {
+        ...item,
+        sequence,
+        event: { ...item.event, sequence },
+      }
+    })
+    state.nextSequence = firstSequence + items.length
+    state.retries = {}
+    await atomicWrite(queuePaths.state, state)
+  }
+
+  items = items.filter(
+    (item) => item.sequence > (state.ackedSequence ?? 0),
+  )
 
   for (const line of queue.corrupt) {
     await appendDeadLetter(

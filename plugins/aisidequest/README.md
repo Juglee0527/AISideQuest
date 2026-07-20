@@ -45,3 +45,5 @@ node .\scripts\connect-device.mjs --code <연결-코드> --api-url https://examp
 진단 파일은 상태 기록마다 `updatedAt`을 갱신하고, 전송 상태가 `READY`로 회복되면 이전 `lastErrorCode`를 제거합니다.
 
 queue 파일은 최대 10,000건 또는 10MiB, 48시간으로 제한됩니다. heartbeat를 먼저 정리하고 다른 event를 제거해야 하는 경우에도 dead-letter와 진단 상태에 이유를 남깁니다. 전송 실패는 Codex 작업을 중단하지 않으며 웹 수동 모드를 계속 사용할 수 있습니다.
+
+플러그인 업데이트 시 지원하는 이전 queue 형식은 잠금 안에서 현재 형식으로 자동 변환되고, 기존 event 순서와 event ID를 유지해 재전송됩니다. 이전 버전 형식이라는 이유만으로 event를 dead-letter 처리하지 않으며, 구조적으로 복구할 수 없는 record만 `CORRUPT_QUEUE_RECORD`로 격리합니다.

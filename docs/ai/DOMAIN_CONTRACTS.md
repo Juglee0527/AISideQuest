@@ -56,6 +56,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Retry network errors, 408, 429, and 5xx. Honor `Retry-After`; otherwise use exponential backoff with full jitter.
 - Stop automatic retry on 401/403 and require device reconnection.
 - Active queue limits: 10,000 records, 10 MiB, and 48 hours. Expired heartbeats are removed before more valuable lifecycle events.
+- Recognized queue formats from earlier plugin versions are migrated under the queue lock, rebased above the last acknowledged device sequence, and delivered in their original FIFO order. A compatible old record is never classified as corrupt.
 - Permanent failures and corrupt records go to a 7-day dead-letter store with a privacy-safe reason.
 - Delivery failure must never block Codex work. Manual web sessions remain the fallback.
 

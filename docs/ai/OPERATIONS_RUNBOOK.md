@@ -80,6 +80,8 @@ pool waiting, connection 수, slow query와 storage를 확인한다. 임의 재�
 
 heartbeat 만료율, deferred 최고 age, late Stop 복구, queue depth/oldest age/dead-letter, device lastSeen을 함께 본다. queue 원문이나 로컬 경로를 요청하지 않는다. 서버 장애면 재시도 가능한 응답을 유지하고 플러그인 장애면 수동 세션 fallback을 안내한다.
 
+플러그인 업데이트 직후 `CORRUPT_QUEUE_RECORD`가 급증하면 먼저 queue schema 호환 회귀를 의심한다. 지원하는 이전 operation-log 또는 raw-event 형식은 queue lock 안에서 현재 형식으로 변환하고, 마지막 ack sequence보다 큰 값으로 재배정한 뒤 FIFO로 전송해야 한다. JSON 파싱 실패나 필수 필드 손상처럼 구조적으로 복구할 수 없는 record만 dead-letter로 격리한다.
+
 ### 인증/Rate Limit 이상
 
 OAuth 설정 변경, proxy hop 설정과 공격성 traffic을 확인한다. Rate Limit bucket을 임의 삭제하지 않는다. GitHub 장애가 원인이면 신규 로그인만 중단하고 기존 세션 상태를 확인한다.

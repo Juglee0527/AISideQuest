@@ -109,6 +109,102 @@ test('moves permanent failures and corrupt queue records to dead letter storage'
   }
 })
 
+test('migrates the previous operation-log queue without dead-lettering events', async () => {
+  const { directory, environment } = await fixture()
+  const prompt = event('UserPromptSubmit')
+  const removedHeartbeat = event('Heartbeat')
+  const stop = event('Stop')
+  const received = []
+  const now = new Date('2026-07-18T00:00:30.000Z')
+  const legacyItem = (queuedEvent, sequence) => ({
+    sequence,
+    event: queuedEvent,
+    enqueuedAt: queuedEvent.observedAt,
+    attemptCount: 0,
+    nextAttemptAt: queuedEvent.observedAt,
+    authBlocked: false,
+    lastFailureCode: null,
+  })
+  const operations = [
+    { op: 'META', nextSequence: 4 },
+    { op: 'ENQUEUE', item: legacyItem(prompt, 1) },
+    { op: 'ENQUEUE', item: legacyItem(removedHeartbeat, 2) },
+    {
+      op: 'UPDATE',
+      eventId: prompt.eventId,
+      changes: { attemptCount: 1 },
+    },
+    { op: 'REMOVE', eventId: removedHeartbeat.eventId },
+    { op: 'ENQUEUE', item: legacyItem(stop, 3) },
+  ]
+
+  try {
+    await writeFile(
+      join(directory, 'delivery-queue.jsonl'),
+      `${operations.map(JSON.stringify).join('\n')}\n`,
+      'utf8',
+    )
+    await writeFile(
+      join(directory, 'delivery-state.json'),
+      JSON.stringify({ nextSequence: 21, ackedSequence: 20, retries: {} }),
+      'utf8',
+    )
+
+    const fetchImpl = async (_url, options) => {
+      const body = JSON.parse(options.body)
+      received.push({ eventId: body.eventId, sequence: body.sequence })
+      return success(body.eventId)
+    }
+
+    await processNextEvent({ environment, fetchImpl, now })
+    await processNextEvent({ environment, fetchImpl, now })
+
+    assert.deepEqual(received, [
+      { eventId: prompt.eventId, sequence: 21 },
+      { eventId: stop.eventId, sequence: 22 },
+    ])
+    assert.equal((await readDeliveryDiagnostic(environment)).queueDepth, 0)
+    await assert.rejects(
+      readFile(join(directory, 'dead-letter.jsonl'), 'utf8'),
+      { code: 'ENOENT' },
+    )
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('migrates the oldest raw-event queue in FIFO order', async () => {
+  const { directory, environment } = await fixture()
+  const prompt = event('UserPromptSubmit')
+  const stop = event('Stop')
+  const received = []
+  const now = new Date('2026-07-18T00:00:30.000Z')
+
+  try {
+    await writeFile(
+      join(directory, 'delivery-queue.jsonl'),
+      `${JSON.stringify(prompt)}\n${JSON.stringify(stop)}\n`,
+      'utf8',
+    )
+
+    const fetchImpl = async (_url, options) => {
+      const body = JSON.parse(options.body)
+      received.push({ eventId: body.eventId, sequence: body.sequence })
+      return success(body.eventId)
+    }
+
+    await processNextEvent({ environment, fetchImpl, now })
+    await processNextEvent({ environment, fetchImpl, now })
+
+    assert.deepEqual(received, [
+      { eventId: prompt.eventId, sequence: 1 },
+      { eventId: stop.eventId, sequence: 2 },
+    ])
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('stops automatic retries on authentication failures without acknowledging the event', async () => {
   const { directory, environment } = await fixture()
 
