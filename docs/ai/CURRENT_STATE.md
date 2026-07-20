@@ -13,7 +13,7 @@ Implemented:
 - Developer-operated, local-first distribution with one-command PostgreSQL, migration/seed, API, and web startup via `npm run dev:local`.
 - GitHub OAuth with state, PKCE, server-side hashed sessions, secure cookies, and CSRF.
 - Device linking, rotation, revocation, and hash-only token storage.
-- Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, and expiration. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
+- Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, expiration, and current-runtime fallback when a local plugin reinstall removes an older versioned cache. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
 - Home session cards show only a locally sanitized final-folder label and fixed-allowlist operation label; full paths, raw commands, arguments, and tool results never enter persistence or delivery.
 - Published quest catalog, resumable quiz attempts, server grading, and retry policy.
 - Transactional 100P point ledger with duplicate/concurrency protection.
@@ -35,11 +35,11 @@ Optional external deployment remains unverified:
 | Suite | Passed |
 |---|---:|
 | React | 50 |
-| Codex plugin | 19 |
+| Codex plugin | 20 |
 | operations and local startup scripts | 17 |
 | server non-database | 19 |
 | PostgreSQL integration | 51 |
-| total | 156 |
+| total | 157 |
 
 Also passed: lint, client/server typecheck, client/server production build, 14 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
@@ -71,4 +71,4 @@ Also passed: lint, client/server typecheck, client/server production build, 14 m
 
 ## Immediate next action
 
-Keep the default product path free and local-first for developers. Improve clone-to-run and local connection reliability before adding product scope. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) are optional unless the product direction changes again; never mark task 20 complete without its real evidence.
+Begin task 21 in the ordered [`Discover development plan`](../Discover_개발_계획.md): reconcile the stale product-spec sections and lock the Discover product, privacy, and reward-classification contract before implementation. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

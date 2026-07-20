@@ -5,8 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -17,8 +17,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -29,8 +29,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -41,8 +41,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -53,8 +53,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]
@@ -65,8 +65,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AISIDEQUEST_HOST_PID=$PPID node \"$PLUGIN_ROOT/scripts/record-event.mjs\"",
-            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; node (Join-Path $env:PLUGIN_ROOT 'scripts\\record-event.mjs')\"",
+            "command": "AISIDEQUEST_HOST_PID=$PPID node -e 'const fs=require(\"node:fs\"),path=require(\"node:path\"),url=require(\"node:url\");const root=process.env.PLUGIN_ROOT,parent=path.dirname(root);const candidates=fs.existsSync(parent)?fs.readdirSync(parent,{withFileTypes:true}).filter((entry)=>entry.isDirectory()).map((entry)=>path.join(parent,entry.name)).filter((candidate)=>fs.existsSync(path.join(candidate,\"scripts\",\"record-event.mjs\"))).sort((left,right)=>fs.statSync(right).mtimeMs-fs.statSync(left).mtimeMs):[];import(url.pathToFileURL(path.join(candidates[0]??root,\"scripts\",\"record-event.mjs\")).href)'",
+            "commandWindows": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"$parentProcess = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $PID); $env:AISIDEQUEST_HOST_PID = [string]$parentProcess.ParentProcessId; $pluginParent = Split-Path -Parent $env:PLUGIN_ROOT; $runtimeRoot = Get-ChildItem -LiteralPath $pluginParent -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'scripts\\record-event.mjs') } | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1 -ExpandProperty FullName; if (-not $runtimeRoot) { $runtimeRoot = $env:PLUGIN_ROOT }; node (Join-Path $runtimeRoot 'scripts\\record-event.mjs')\"",
             "timeout": 5
           }
         ]

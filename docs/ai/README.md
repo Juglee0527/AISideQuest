@@ -19,7 +19,7 @@ Read documents in this order before changing code:
    - security and privacy: [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md)
    - operations: [`OPERATIONS_RUNBOOK.md`](./OPERATIONS_RUNBOOK.md)
    - deployment and pilot: [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md)
-6. Use [`PROJECT_SPEC.md`](./PROJECT_SPEC.md), [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md), and [`IMPLEMENTATION_PROGRESS_SUMMARY.md`](./IMPLEMENTATION_PROGRESS_SUMMARY.md) only for product rationale and historical decisions.
+6. Use [`PROJECT_SPEC.md`](./PROJECT_SPEC.md), [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md), [`../Discover_개발_계획.md`](../Discover_개발_계획.md), and [`IMPLEMENTATION_PROGRESS_SUMMARY.md`](./IMPLEMENTATION_PROGRESS_SUMMARY.md) only for product rationale, ordered implementation scope, and historical decisions.
 
 ## Source-of-truth order
 

@@ -485,10 +485,15 @@ MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_
 PostgreSQL 구조와 실행 방법은 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.
 사용자 인증 계약과 설정 방법은 [`AUTHENTICATION.md`](./AUTHENTICATION.md)를 따른다.
 
+기존 베타 이후의 신규 제품 확장은 [`Discover 개발 계획`](../Discover_개발_계획.md)의 21~33번 작업을 따른다. 첫 구현 범위는 문서 계약, 공통 외부 source Adapter, Hacker News, Remotive와 `/discover` 화면까지인 21~26번이다. 기존 20번 운영 배포·파일럿은 별도 트랙으로 유지한다.
+
 ---
 
 # 16. 향후 기능
 
+- Discover 수익 기회·개발 소식·커뮤니티 피드
+- 관심 항목 저장과 사용자가 직접 선택한 기술 기반 정렬
+- DEV, Stack Overflow, GitHub, Algora source 확장
 - VS Code Extension
 - Chrome Extension
 - Cursor Extension
@@ -501,13 +506,15 @@ PostgreSQL 구조와 실행 방법은 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.m
 
 # 17. 확장 아이디어
 
-- Stack Overflow 답변
-- GitHub Issue 해결
-- 오픈소스 기여
+- Stack Overflow 질문·평판 bounty 탐색
+- GitHub Issue와 오픈소스 기여 기회 탐색
+- 검증된 외부 현금 bounty 탐색
 - 데이터 라벨링
 - 영어 번역
 - 코드 리뷰
 - AI 학습 데이터 제작
+
+구체적인 순서, 제외 범위와 완료 조건은 [`Discover 개발 계획`](../Discover_개발_계획.md)을 따른다.
 
 ---
 

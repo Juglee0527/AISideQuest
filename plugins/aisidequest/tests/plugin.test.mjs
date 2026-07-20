@@ -36,6 +36,9 @@ const LINK_CODE = '123e4567-e89b-42d3-a456-426614174000'
 const recorderScriptPath = fileURLToPath(
   new URL('../scripts/record-event.mjs', import.meta.url),
 )
+const hookConfigPath = fileURLToPath(
+  new URL('../hooks/hooks.json', import.meta.url),
+)
 
 async function startApiServer(handler) {
   const server = createServer(handler)
@@ -98,6 +101,31 @@ async function waitFor(predicate, timeoutMs = 2_000) {
   throw new Error('Timed out waiting for plugin worker')
 }
 
+function runProcess(command, args, environment, input = '') {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      env: { ...process.env, ...environment },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
+    let standardError = ''
+
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk) => {
+      standardError += chunk
+    })
+    child.on('error', reject)
+    child.on('close', (exitCode) => {
+      if (exitCode === 0) {
+        resolve()
+        return
+      }
+
+      reject(new Error(`${command} exited with ${exitCode}: ${standardError}`))
+    })
+    child.stdin.end(input)
+  })
+}
+
 test('bounds heartbeat liveness by the Codex host process and fallback lease', () => {
   const activatedAt = new Date('2026-07-20T00:00:00.000Z')
   const turn = {
@@ -121,6 +149,62 @@ test('bounds heartbeat liveness by the Codex host process and fallback lease', (
     new Date(activatedAt.getTime() + HEARTBEAT_MAX_TURN_MS),
     () => true,
   ), false)
+})
+
+test('hook commands resolve the current installed runtime after an older cache is removed', async () => {
+  const cacheRoot = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-cache-'))
+  const removedRuntimeRoot = join(cacheRoot, '0.1.0+codex.removed')
+  const currentRuntimeRoot = join(cacheRoot, '0.1.0+codex.current')
+  const currentScripts = join(currentRuntimeRoot, 'scripts')
+  const markerPath = join(cacheRoot, 'selected-runtime.txt')
+
+  try {
+    await mkdir(currentScripts, { recursive: true })
+    await writeFile(
+      join(currentScripts, 'record-event.mjs'),
+      'import { writeFile } from "node:fs/promises"\n'
+        + 'await writeFile(process.env.AISIDEQUEST_TEST_MARKER, import.meta.url, "utf8")\n',
+      'utf8',
+    )
+
+    const config = JSON.parse(await readFile(hookConfigPath, 'utf8'))
+    const handlers = Object.values(config.hooks).flatMap((groups) => (
+      groups.flatMap((group) => group.hooks)
+    ))
+    const posixCommands = new Set(handlers.map((handler) => handler.command))
+    const windowsCommands = new Set(handlers.map((handler) => handler.commandWindows))
+
+    assert.equal(posixCommands.size, 1)
+    assert.equal(windowsCommands.size, 1)
+
+    const posixCommand = [...posixCommands][0]
+    const inlineSource = posixCommand.match(/node -e '(.+)'$/)?.[1]
+    assert.ok(inlineSource)
+
+    const environment = {
+      PLUGIN_ROOT: removedRuntimeRoot,
+      AISIDEQUEST_TEST_MARKER: markerPath,
+    }
+    await runProcess(process.execPath, ['-e', inlineSource], environment)
+    assert.match(await readFile(markerPath, 'utf8'), /codex\.current/)
+
+    if (process.platform === 'win32') {
+      await rm(markerPath)
+      const windowsCommand = [...windowsCommands][0]
+      const prefix = 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "'
+      assert.ok(windowsCommand.startsWith(prefix) && windowsCommand.endsWith('"'))
+      const script = windowsCommand.slice(prefix.length, -1)
+
+      await runProcess(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+        environment,
+      )
+      assert.match(await readFile(markerPath, 'utf8'), /codex\.current/)
+    }
+  } finally {
+    await rm(cacheRoot, { recursive: true, force: true })
+  }
 })
 
 test('keeps only hashed identifiers and locally sanitized display metadata', () => {
