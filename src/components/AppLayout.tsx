@@ -20,9 +20,11 @@ const getNavLinkClassName = ({ isActive }: { isActive: boolean }) =>
   ].join(' ')
 
 function AppLayout() {
-  const { activeSession, loadStatus, errorMessage, retry } = useSession()
+  const { activeSessions, loadStatus, errorMessage, retry } = useSession()
   const location = useLocation()
-  const isWaitingForUser = activeSession?.status === 'WAITING_FOR_USER'
+  const isWaitingForUser = activeSessions.some(
+    (session) => session.status === 'WAITING_FOR_USER',
+  )
   const loginReturnPath = location.pathname.startsWith('/devices/connect/')
     ? location.pathname
     : undefined
@@ -62,7 +64,7 @@ function AppLayout() {
               <LoaderCircle className="animate-spin" size={13} aria-hidden="true" />
               동기화 중
             </span>
-          ) : activeSession === null ? (
+          ) : activeSessions.length === 0 ? (
             <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-400">
               MVP
             </span>
@@ -74,7 +76,7 @@ function AppLayout() {
           ) : (
             <span className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
               <span className="size-2 animate-pulse rounded-full bg-emerald-400" aria-hidden="true" />
-              AI 작업 중
+              AI 작업 {activeSessions.length}개
             </span>
           )}
         </div>

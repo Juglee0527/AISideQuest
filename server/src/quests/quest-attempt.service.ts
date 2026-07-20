@@ -90,6 +90,7 @@ export class QuestAttemptService {
          FROM ai_sessions
          WHERE user_id = $1
            AND status IN ('RUNNING', 'WAITING_FOR_USER')
+         ORDER BY started_at DESC, id DESC
          FOR UPDATE`,
         [userId],
       )) as IdRow[]

@@ -96,8 +96,18 @@ function parseSession(value: unknown): Session {
   }
 }
 
-function parseNullableSession(value: unknown) {
-  return value === null ? null : parseSession(value)
+function parseActiveSessions(value: unknown) {
+  if (!Array.isArray(value)) {
+    return invalidSessionResponse()
+  }
+
+  const sessions = value.map(parseSession)
+
+  if (!sessions.every(isActiveSession)) {
+    return invalidSessionResponse()
+  }
+
+  return sessions
 }
 
 function parseSessionHistoryPage(value: unknown): SessionHistoryPage {
@@ -119,8 +129,8 @@ export function isActiveSession(session: Session | null): session is Session {
   return session !== null && ACTIVE_SESSION_STATUSES.includes(session.status)
 }
 
-export function getActiveSession(signal?: AbortSignal) {
-  return requestApi('/sessions/active', parseNullableSession, { signal })
+export function getActiveSessions(signal?: AbortSignal) {
+  return requestApi('/sessions/active', parseActiveSessions, { signal })
 }
 
 export function getSessionHistoryPage(

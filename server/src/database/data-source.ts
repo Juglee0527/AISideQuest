@@ -15,6 +15,7 @@ import { AddServerStatistics1784188800000 } from './migrations/1784188800000-add
 import { AddSecurityControls1784192400000 } from './migrations/1784192400000-add-security-controls'
 import { AddOperationalDiagnostics1784196000000 } from './migrations/1784196000000-add-operational-diagnostics'
 import { AddBrowserDeviceLinking1784199600000 } from './migrations/1784199600000-add-browser-device-linking'
+import { AllowConcurrentHookSessions1784260800000 } from './migrations/1784260800000-allow-concurrent-hook-sessions'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -40,6 +41,7 @@ export function createDataSourceOptions(
       AddSecurityControls1784192400000,
       AddOperationalDiagnostics1784196000000,
       AddBrowserDeviceLinking1784199600000,
+      AllowConcurrentHookSessions1784260800000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

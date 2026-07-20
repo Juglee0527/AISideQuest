@@ -61,8 +61,8 @@ export class SessionController {
 
   @Get('active')
   @UseGuards(SessionAuthGuard)
-  getActiveSession(@Req() request: AuthenticatedRequest) {
-    return this.sessionService.getActiveSession(request.auth.user.id)
+  getActiveSessions(@Req() request: AuthenticatedRequest) {
+    return this.sessionService.getActiveSessions(request.auth.user.id)
   }
 
   @Get()

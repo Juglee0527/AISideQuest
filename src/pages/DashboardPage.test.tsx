@@ -32,7 +32,7 @@ describe('Dashboard server statistics', () => {
   it('renders server aggregates and reloads when the period changes', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return response(null)
+      if (url.pathname.endsWith('/sessions/active')) return response([])
       if (url.pathname.endsWith('/sessions')) return response({ items: [], nextCursor: null })
       if (url.pathname.endsWith('/stats/summary')) {
         const period = url.searchParams.get('period') ?? 'today'
@@ -64,7 +64,7 @@ describe('Dashboard server statistics', () => {
   it('shows an explicit retry state for a failed statistics request', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return response(null)
+      if (url.pathname.endsWith('/sessions/active')) return response([])
       if (url.pathname.endsWith('/sessions')) return response({ items: [], nextCursor: null })
       return response({ code: 'STATS_FAILED', message: '통계 실패' }, 500)
     }))

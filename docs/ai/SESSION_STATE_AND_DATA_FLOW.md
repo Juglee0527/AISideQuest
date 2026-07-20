@@ -24,7 +24,7 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 | 항목 | 결정 |
 |---|---|
 | 세션 단위 | Codex thread 전체가 아닌 사용자 요청 1회에 대응하는 turn 1개 |
-| 활성 세션 수 | 베타에서는 사용자당 최대 1개 |
+| 활성 세션 수 | 서로 다른 hashed Codex session key는 동시 실행 가능. 같은 key에는 활성 turn 최대 1개, 사용자당 순수 수동 세션 최대 1개 |
 | 상태 소유자 | API 서버 |
 | 기준 시각 | API 서버의 event 수신 시각 |
 | 자동 시작 | `UserPromptSubmit` |
@@ -39,7 +39,7 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 | 시간 산정 | `endedAt - startedAt`; 권한 승인 대기 시간 포함 |
 | 금지 데이터 | 프롬프트, 응답, transcript, 소스 코드, 파일 경로, 명령 및 도구 입출력 |
 
-한 사용자가 여러 Codex turn을 동시에 추적하는 기능은 베타 범위에서 제외한다. 새 turn이 시작되면 기존 자동 세션은 `ABANDONED`로 정리하고 최신 turn만 활성 상태로 유지한다.
+서로 다른 Codex 작업의 hashed session key는 원문 경로나 작업 내용을 저장하지 않고 병렬 추적한다. 같은 hashed session key에서 새 turn이 시작될 때만 해당 key의 기존 자동 세션을 `ABANDONED`로 정리한다.
 
 # 3. 세션 상태
 
@@ -57,7 +57,8 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 
 ## 3.2 상태 불변 조건
 
-- 한 사용자에게 `RUNNING` 또는 `WAITING_FOR_USER` 세션은 최대 1개다.
+- 한 사용자에게 서로 다른 hashed Codex session key의 `RUNNING` 또는 `WAITING_FOR_USER` 세션이 여러 개 있을 수 있다.
+- 같은 `(userId, provider, externalSessionKey)`에는 활성 세션이 최대 1개이며 순수 수동 활성 세션도 사용자당 최대 1개다.
 - 활성 상태는 `endedAt = null`, 종료 상태는 `endedAt != null`이다.
 - `startedAt`은 생성 후 변경하지 않는다.
 - `lastActivityAt`과 `endedAt`은 `startedAt`보다 빠를 수 없다.
@@ -118,14 +119,16 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 | 활성 세션 없음 | 수동 시작 | `origin=MANUAL`인 `RUNNING` 생성 |
 | 활성 세션 없음 | `UserPromptSubmit` | `origin=HOOK`인 `RUNNING` 생성 |
 | 연결되지 않은 수동 세션 활성 | `UserPromptSubmit` | 새 세션을 만들지 않고 현재 세션에 turn hash를 연결. 수동 `startedAt` 유지 |
-| 자동 연결 세션 활성 | 수동 시작 | 새 세션을 만들지 않고 현재 활성 세션 반환 |
+| 자동 세션 활성, 순수 수동 세션 없음 | 복구 API 수동 시작 | 자동 세션과 별도로 순수 수동 세션 생성 |
+| 순수 수동 세션 활성 | 복구 API 수동 시작 | 새 세션을 만들지 않고 기존 수동 세션 반환 |
 | 같은 turn 활성 | 중복 `UserPromptSubmit` | 상태와 `startedAt` 유지, 중복 처리 결과 반환 |
-| 다른 turn 활성 | 새 `UserPromptSubmit` | 기존 세션을 `ABANDONED/SUPERSEDED_BY_NEW_TURN`으로 종료한 후 새 세션 생성 |
+| 같은 session key의 다른 turn 활성 | 새 `UserPromptSubmit` | 해당 key의 기존 세션만 `ABANDONED/SUPERSEDED_BY_NEW_TURN`으로 종료한 후 새 세션 생성 |
+| 다른 session key 활성 | 새 `UserPromptSubmit` | 기존 작업을 유지하고 별도 `RUNNING` 세션 생성 |
 | 자동 연결 세션 활성 | 수동 완료·실패·취소 | 사용자 요청대로 즉시 종료. 이후 같은 turn event는 중복 또는 지연 event로 기록 |
 | 수동 세션 활성 | 같은 turn의 `Stop` | 연결된 세션을 `COMPLETED`로 종료 |
 | 종료 세션 | 수동 종료 재요청 | 기존 결과 반환, 상태와 시각 변경 없음 |
 
-수동 세션에 자동 turn을 연결하는 규칙은 최초 지원 도구가 Codex 하나이고 사용자당 활성 세션이 하나라는 베타 제약에서만 사용한다. 지원 도구 또는 동시 활성 세션을 늘릴 때는 명시적인 대상 선택 기능이 필요하다.
+연결되지 않은 순수 수동 세션이 하나 있을 때 최초 자동 turn을 연결하는 기존 복구 계약은 유지한다. 홈은 수동 시작·종료를 노출하지 않으므로 정상 제품 흐름은 hook 자동 감지만 사용한다.
 
 # 6. 예외 및 복구 규칙
 
@@ -169,7 +172,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 ## 6.5 hook 미지원 또는 신뢰 해제
 
 - 서버에 자동 event가 도착하지 않으므로 자동 세션을 생성하지 않는다.
-- 웹은 활성 세션이 없을 때 수동 시작 버튼을 제공한다.
+- 웹은 시작·종료 버튼을 제공하지 않는다. 연결 문제는 Devices에서 해결하며 홈은 서버가 확인한 자동 상태만 읽기 전용으로 표시한다.
 - 마지막 plugin 활동 시각이 오래됐으면 `자동 감지 연결 안 됨`을 표시하되 사용자의 Codex 작업 자체를 막지 않는다.
 
 # 7. 데이터 모델 계약
@@ -240,7 +243,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 | 세션 상태 전이 | X | O | X |
 | 기준 시각 결정 | X | O | X |
 | heartbeat 전송·만료 판정 | 전송 | 판정 | X |
-| 수동 시작·종료 | X | 명령 처리 | 사용자 입력 전송 |
+| 수동 시작·종료 | X | 복구용 API 명령 처리 | 홈에서는 제공하지 않음 |
 | 현재 상태 표시 | X | 조회 제공 | O |
 | duration 계산 | X | 응답 값 계산 | 진행 중 표시만 현재 시각으로 갱신 |
 
@@ -288,7 +291,7 @@ sequenceDiagram
 
 ## 9.3 웹 동기화
 
-- 활성 탭은 5초마다 `GET /api/v1/sessions/active`를 호출한다.
+- 활성 탭은 5초마다 `GET /api/v1/sessions/active`를 호출하고 반환된 모든 활성 세션을 카드별로 표시한다.
 - 창 focus 또는 `visibilitychange`로 다시 활성화되면 즉시 조회한다.
 - 모든 정상 API 응답의 `meta.serverTime`으로 브라우저와 서버의 시각 차이를 계산한다.
 - 진행 시간 표시는 `startedAt`과 보정된 서버 현재 시각의 차이로 갱신하며, 저장값은 서버가 소유한다.
@@ -359,7 +362,7 @@ Idempotency-Key: <uuid>
 ```
 
 - 활성 세션이 없으면 `origin=MANUAL`, `status=RUNNING` 세션을 생성한다.
-- 이미 활성 세션이 있으면 새로 만들지 않고 기존 세션과 `created=false`를 반환한다.
+- 이미 순수 수동 활성 세션이 있으면 새로 만들지 않고 기존 수동 세션과 `created=false`를 반환한다. 자동 세션만 활성인 경우에는 별도의 수동 fallback 세션을 만들 수 있다.
 
 ## 10.3 수동 종료
 
@@ -385,11 +388,11 @@ GET /api/v1/sessions/active
 Authorization: <user-session-cookie>
 ```
 
-활성 세션이 없으면 `404` 대신 다음과 같이 응답한다.
+활성 세션은 `startedAt DESC, id DESC` 순서의 배열로 응답한다. 활성 세션이 없으면 `404`나 `null` 대신 다음과 같이 응답한다.
 
 ```json
 {
-  "data": null,
+  "data": [],
   "meta": {
     "serverTime": "2026-07-15T08:35:00.000Z"
   }
@@ -432,7 +435,7 @@ Authorization: <user-session-cookie>
 
 - integration event 저장과 세션 상태 변경은 하나의 DB transaction으로 처리한다.
 - 상태 변경 전에 사용자별 활성 세션을 잠그거나 동등한 DB 제약으로 직렬화한다.
-- event unique key와 활성 세션 unique 조건은 애플리케이션 검사뿐 아니라 DB에서도 보장한다.
+- event unique key, 사용자당 순수 수동 활성 세션 1개, hashed Codex session key별 활성 turn 1개 조건은 애플리케이션 검사뿐 아니라 DB에서도 보장한다.
 - 동시 수동 시작 두 건은 하나만 생성하고 둘 다 최종 활성 세션을 반환한다.
 - 새 자동 turn 처리 중 기존 세션 종료와 새 세션 생성을 한 transaction에서 수행한다.
 - 서버가 transaction을 완료하기 전에 실패하면 event를 처리 완료로 응답하지 않는다.
@@ -449,7 +452,7 @@ Authorization: <user-session-cookie>
 - 퀘스트 이력은 서버 세션 ID에 연결한다.
 - 통계 집계 기준은 16번 작업에서 별도로 확정한다.
 
-5초 polling은 활성 세션만 조회하고, 활성 세션 ID가 바뀌거나 종료되면 cursor 이력도 다시 읽는다. 초기 진입·수동 변경 후에는 전체 cursor 이력을 복구하며 모든 경과 시간은 `meta.serverTime`으로 보정한다.
+5초 polling은 모든 활성 세션을 조회하고, 활성 세션 ID 집합이 바뀌거나 종료되면 cursor 이력도 다시 읽는다. 초기 진입 후에는 전체 cursor 이력을 복구하며 모든 카드의 경과 시간은 `meta.serverTime`으로 보정한다.
 
 # 13. 검증 시나리오
 
@@ -471,7 +474,8 @@ Authorization: <user-session-cookie>
 3. 같은 turn `Stop` 중복
 4. 동시에 두 번 수동 시작
 5. 수동 시작과 자동 시작 동시 요청
-6. 기존 turn 실행 중 새 turn 시작
+6. 같은 session key의 기존 turn 실행 중 새 turn 시작
+7. 서로 다른 session key의 두 turn 동시 실행 및 한쪽만 종료
 
 ## 13.3 오류와 복구
 
@@ -513,7 +517,7 @@ Authorization: <user-session-cookie>
 |---|---|---|---|
 | `POST` | `/api/v1/sessions/manual` | 사용자 cookie + CSRF | 활성 세션 생성 또는 기존 세션 반환 |
 | `POST` | `/api/v1/sessions/{sessionId}/end` | 사용자 cookie + CSRF | 완료·실패·취소 종료, terminal 재요청 무변경 |
-| `GET` | `/api/v1/sessions/active` | 사용자 cookie | 활성 세션 또는 `data: null` |
+| `GET` | `/api/v1/sessions/active` | 사용자 cookie | 모든 활성 세션 배열, 없으면 `data: []` |
 | `GET` | `/api/v1/sessions` | 사용자 cookie | 상태 필터와 opaque cursor 이력 |
 | `POST` | `/api/v1/integration-events` | device bearer token | Codex event 저장과 상태 전이 transaction |
 
@@ -524,7 +528,7 @@ Authorization: <user-session-cookie>
 - 같은 key와 같은 요청은 저장된 응답을 반환한다.
 - 같은 key를 다른 endpoint, session 또는 outcome에 재사용하면 `IDEMPOTENCY_KEY_REUSED`를 반환한다.
 - 사용자별 `pg_advisory_xact_lock`으로 수동 요청과 integration event를 직렬화한다.
-- DB의 사용자별 활성 세션 unique index를 최종 방어선으로 유지한다.
+- DB의 사용자별 수동 활성 세션 unique index와 hashed Codex session key별 활성 turn unique index를 최종 방어선으로 유지한다.
 - integration event는 `(device_id, event_id)` unique key와 request hash를 함께 검증한다.
 
 ## 15.3 구현된 상태 처리
@@ -532,7 +536,8 @@ Authorization: <user-session-cookie>
 - 수동 시작과 `UserPromptSubmit` 시작
 - 수동 세션에 자동 turn 연결
 - 같은 turn의 의미 중복 시작 차단
-- 다른 turn 시작 시 기존 활성 세션 `ABANDONED/SUPERSEDED_BY_NEW_TURN` 처리
+- 같은 hashed Codex session key의 다른 turn 시작 시 해당 기존 세션만 `ABANDONED/SUPERSEDED_BY_NEW_TURN` 처리
+- 서로 다른 hashed Codex session key의 동시 활성 세션 유지
 - `PermissionRequest` 대기, `PostToolUse` 실행 복귀, `Stop` 완료
 - 시작보다 먼저 도착한 event `DEFERRED` 저장
 - 24시간 안에 시작이 도착한 역순 event 재처리

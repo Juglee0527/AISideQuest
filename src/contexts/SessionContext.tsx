@@ -11,11 +11,9 @@ import {
 
 import { ApiClientError } from '../api/apiClient'
 import {
-  endManualSession,
-  getActiveSession,
+  getActiveSessions,
   getAllSessionHistory,
   isActiveSession,
-  startManualSession,
 } from '../api/sessionApi'
 import type { Session } from '../types/session'
 
@@ -25,16 +23,12 @@ export type SessionLoadStatus =
   | 'unauthenticated'
   | 'error'
 
-export type SessionMutationStatus = 'idle' | 'starting' | 'ending'
-
 interface SessionContextValue {
+  activeSessions: Session[]
   activeSession: Session | null
   completedSessions: Session[]
   loadStatus: SessionLoadStatus
-  mutationStatus: SessionMutationStatus
   errorMessage: string | null
-  startSession: () => Promise<void>
-  endSession: () => Promise<void>
   retry: () => Promise<void>
   getCurrentTime: () => number
 }
@@ -64,21 +58,19 @@ function selectTerminalSessions(sessions: Session[]) {
 }
 
 export function SessionProvider({ children }: SessionProviderProps) {
-  const [activeSession, setActiveSessionState] = useState<Session | null>(null)
+  const [activeSessions, setActiveSessionsState] = useState<Session[]>([])
   const [completedSessions, setCompletedSessions] = useState<Session[]>([])
   const [loadStatus, setLoadStatus] = useState<SessionLoadStatus>('loading')
-  const [mutationStatus, setMutationStatus] = useState<SessionMutationStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const activeSessionRef = useRef<Session | null>(null)
+  const activeSessionsRef = useRef<Session[]>([])
   const clockOffsetRef = useRef(0)
   const latestRequestRef = useRef(0)
   const pollInFlightRef = useRef(false)
-  const mutationInFlightRef = useRef(false)
   const mountedRef = useRef(false)
 
-  const setActiveSession = useCallback((session: Session | null) => {
-    activeSessionRef.current = session
-    setActiveSessionState(session)
+  const setActiveSessions = useCallback((sessions: Session[]) => {
+    activeSessionsRef.current = sessions
+    setActiveSessionsState(sessions)
   }, [])
 
   const updateServerClock = useCallback((serverTime: string) => {
@@ -101,7 +93,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       }
 
       if (isUnauthorized(error)) {
-        setActiveSession(null)
+        setActiveSessions([])
         setCompletedSessions([])
         setLoadStatus('unauthenticated')
         setErrorMessage(null)
@@ -111,7 +103,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       setLoadStatus('error')
       setErrorMessage(getErrorMessage(error))
     },
-    [setActiveSession],
+    [setActiveSessions],
   )
 
   const synchronizeAll = useCallback(
@@ -120,7 +112,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
       try {
         const [activeResult, historyResult] = await Promise.all([
-          getActiveSession(signal),
+          getActiveSessions(signal),
           getAllSessionHistory(signal),
         ])
 
@@ -133,9 +125,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
             ? activeResult.serverTime
             : historyResult.serverTime,
         )
-        setActiveSession(
-          isActiveSession(activeResult.data) ? activeResult.data : null,
-        )
+        setActiveSessions(activeResult.data)
         setCompletedSessions(selectTerminalSessions(historyResult.data))
         setLoadStatus('ready')
         setErrorMessage(null)
@@ -145,36 +135,34 @@ export function SessionProvider({ children }: SessionProviderProps) {
         }
       }
     },
-    [handleRequestError, setActiveSession, updateServerClock],
+    [handleRequestError, setActiveSessions, updateServerClock],
   )
 
   const refreshActiveSession = useCallback(async () => {
-    if (pollInFlightRef.current || mutationInFlightRef.current) {
+    if (pollInFlightRef.current) {
       return
     }
 
     pollInFlightRef.current = true
-    const previousActiveSession = activeSessionRef.current
+    const previousActiveSessions = activeSessionsRef.current
     const requestId = ++latestRequestRef.current
 
     try {
-      const activeResult = await getActiveSession()
+      const activeResult = await getActiveSessions()
 
       if (!mountedRef.current || requestId !== latestRequestRef.current) {
         return
       }
 
-      const nextActiveSession = isActiveSession(activeResult.data)
-        ? activeResult.data
-        : null
-      const activeSessionChanged =
-        previousActiveSession !== null &&
-        previousActiveSession.id !== nextActiveSession?.id
+      const nextActiveSessions = activeResult.data
+      const previousIds = previousActiveSessions.map((session) => session.id).join(',')
+      const nextIds = nextActiveSessions.map((session) => session.id).join(',')
+      const activeSessionsChanged = previousIds !== nextIds
 
       updateServerClock(activeResult.serverTime)
-      setActiveSession(nextActiveSession)
+      setActiveSessions(nextActiveSessions)
 
-      if (activeSessionChanged) {
+      if (activeSessionsChanged) {
         const historyResult = await getAllSessionHistory()
 
         if (!mountedRef.current || requestId !== latestRequestRef.current) {
@@ -194,7 +182,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
     } finally {
       pollInFlightRef.current = false
     }
-  }, [handleRequestError, setActiveSession, updateServerClock])
+  }, [handleRequestError, setActiveSessions, updateServerClock])
 
   useEffect(() => {
     mountedRef.current = true
@@ -241,104 +229,23 @@ export function SessionProvider({ children }: SessionProviderProps) {
     await synchronizeAll()
   }, [loadStatus, synchronizeAll])
 
-  const startSession = useCallback(async () => {
-    if (
-      loadStatus !== 'ready' ||
-      mutationInFlightRef.current ||
-      activeSessionRef.current !== null
-    ) {
-      return
-    }
-
-    mutationInFlightRef.current = true
-    latestRequestRef.current += 1
-    setMutationStatus('starting')
-    setErrorMessage(null)
-
-    try {
-      const result = await startManualSession()
-
-      if (!mountedRef.current) {
-        return
-      }
-
-      updateServerClock(result.serverTime)
-      setActiveSession(result.data.session)
-      setLoadStatus('ready')
-      await synchronizeAll()
-    } catch (error) {
-      handleRequestError(error)
-    } finally {
-      mutationInFlightRef.current = false
-
-      if (mountedRef.current) {
-        setMutationStatus('idle')
-      }
-    }
-  }, [handleRequestError, loadStatus, setActiveSession, synchronizeAll, updateServerClock])
-
-  const endSession = useCallback(async () => {
-    const session = activeSessionRef.current
-
-    if (
-      loadStatus !== 'ready' ||
-      mutationInFlightRef.current ||
-      session === null
-    ) {
-      return
-    }
-
-    mutationInFlightRef.current = true
-    latestRequestRef.current += 1
-    setMutationStatus('ending')
-    setErrorMessage(null)
-
-    try {
-      const result = await endManualSession(session.id)
-
-      if (!mountedRef.current) {
-        return
-      }
-
-      updateServerClock(result.serverTime)
-      setActiveSession(null)
-      setCompletedSessions((current) => [
-        result.data.session,
-        ...current.filter((item) => item.id !== result.data.session.id),
-      ])
-      setLoadStatus('ready')
-      await synchronizeAll()
-    } catch (error) {
-      handleRequestError(error)
-    } finally {
-      mutationInFlightRef.current = false
-
-      if (mountedRef.current) {
-        setMutationStatus('idle')
-      }
-    }
-  }, [handleRequestError, loadStatus, setActiveSession, synchronizeAll, updateServerClock])
-
+  const activeSession = activeSessions[0] ?? null
   const value = useMemo(
     () => ({
+      activeSessions,
       activeSession,
       completedSessions,
       loadStatus,
-      mutationStatus,
       errorMessage,
-      startSession,
-      endSession,
       retry,
       getCurrentTime,
     }),
     [
+      activeSessions,
       activeSession,
       completedSessions,
       loadStatus,
-      mutationStatus,
       errorMessage,
-      startSession,
-      endSession,
       retry,
       getCurrentTime,
     ],

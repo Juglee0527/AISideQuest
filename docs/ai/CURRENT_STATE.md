@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-07-18  
+Last verified: 2026-07-20
 Application version: `0.1.0`  
 Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
@@ -13,7 +13,7 @@ Implemented:
 - Developer-operated, local-first distribution with one-command PostgreSQL, migration/seed, API, and web startup via `npm run dev:local`.
 - GitHub OAuth with state, PKCE, server-side hashed sessions, secure cookies, and CSRF.
 - Device linking, rotation, revocation, and hash-only token storage.
-- Manual and Codex-hook AI sessions with heartbeat, durable FIFO queue, recovery, and expiration.
+- Concurrent Codex-hook AI sessions with per-session elapsed-time cards, heartbeat, durable FIFO queue, recovery, and expiration. Home is read-only for session lifecycle; manual endpoints remain recovery-only API compatibility.
 - Published quest catalog, resumable quiz attempts, server grading, and retry policy.
 - Transactional 100P point ledger with duplicate/concurrency protection.
 - Server statistics using saved IANA time zones.
@@ -34,13 +34,13 @@ Optional external deployment remains unverified:
 | Suite | Passed |
 |---|---:|
 | React | 49 |
-| Codex plugin | 12 |
+| Codex plugin | 16 |
 | operations and local startup scripts | 17 |
 | server non-database | 19 |
-| PostgreSQL integration | 47 |
-| total | 144 |
+| PostgreSQL integration | 50 |
+| total | 151 |
 
-Also passed: lint, client/server typecheck, client/server production build, Docker API/web builds, 11 migrations, idempotent migration rerun (`applied: []`), and 10 deployment smoke checks.
+Also passed: lint, client/server typecheck, client/server production build, 13 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
 ## Operational defaults
 
@@ -50,6 +50,7 @@ Also passed: lint, client/server typecheck, client/server production build, Dock
 | browser origin | exactly one configured `CORS_ORIGIN` |
 | auth session | 168 hours by default; allowed 1–720 |
 | automatic timeout | 120 seconds after last valid activity |
+| concurrent automatic sessions | one active turn per hashed Codex session key; different keys may run together |
 | manual timeout | 12 hours after start |
 | late `Stop` recovery | heartbeat-timeout only, same device/turn, within 24 hours |
 | quiz submission grace | 5 minutes after AI session end |

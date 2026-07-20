@@ -93,6 +93,17 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
+    const [concurrentSessionsReverted] = (await dataSource.query(`
+      SELECT
+        to_regclass('public.uk_ai_sessions_active_user') AS legacy_index,
+        to_regclass('public.uk_ai_sessions_active_external_session') AS concurrent_index
+    `)) as Array<{ legacy_index: string | null; concurrent_index: string | null }>
+    assert.deepEqual(concurrentSessionsReverted, {
+      legacy_index: 'uk_ai_sessions_active_user',
+      concurrent_index: null,
+    })
+
+    await dataSource.undoLastMigration()
     const [browserLinkingReverted] = (await dataSource.query(`
       SELECT
         to_regclass('public.device_link_requests') AS request_table,
@@ -174,7 +185,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 5)
+    assert.equal(pointMigrations.length, 6)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -189,6 +200,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -275,7 +287,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 12)
+    assert.equal(reappliedMigrations.length, 13)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
@@ -307,7 +319,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     })
   })
 
-  test('database allows only one active session per user', async () => {
+  test('database allows concurrent hook sessions but only one per external session', async () => {
     const [user] = (await dataSource.query(
       `
         INSERT INTO users (display_name)
@@ -327,13 +339,35 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       [testUserId],
     )
 
+    await dataSource.query(
+      `
+        INSERT INTO ai_sessions (
+          user_id, status, origin, external_session_key, external_turn_key
+        )
+        VALUES ($1, 'RUNNING', 'HOOK', $2, $3)
+      `,
+      [testUserId, 'a'.repeat(64), 'b'.repeat(64)],
+    )
+
+    await dataSource.query(
+      `
+        INSERT INTO ai_sessions (
+          user_id, status, origin, external_session_key, external_turn_key
+        )
+        VALUES ($1, 'WAITING_FOR_USER', 'HOOK', $2, $3)
+      `,
+      [testUserId, 'c'.repeat(64), 'd'.repeat(64)],
+    )
+
     await assert.rejects(
       dataSource.query(
         `
-          INSERT INTO ai_sessions (user_id, status, origin)
-          VALUES ($1, 'WAITING_FOR_USER', 'HOOK')
+          INSERT INTO ai_sessions (
+            user_id, status, origin, external_session_key, external_turn_key
+          )
+          VALUES ($1, 'RUNNING', 'HOOK', $2, $3)
         `,
-        [testUserId],
+        [testUserId, 'a'.repeat(64), 'e'.repeat(64)],
       ),
       (error: unknown) => hasPostgresCode(error, '23505'),
     )

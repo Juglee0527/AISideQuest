@@ -38,7 +38,7 @@ Do not silently change code to match an old plan. Confirm whether the code or th
 - Never collect or log prompts, AI responses, source code, diffs, local paths, transcripts, or raw hook payloads.
 - Browser mutations require a valid authenticated session and CSRF protection. Device events use device-token authentication.
 - Mutation idempotency is enforced with request hashes, stored responses, row/advisory locks, and database uniqueness where applicable.
-- A user may have at most one active AI session.
+- Different hashed Codex session keys may run concurrently. A user may have at most one active manual fallback session and one active turn per hashed Codex session key.
 - Automatic sessions expire after 120 seconds without valid activity. Pure manual sessions expire after 12 hours.
 - A late `Stop` may recover only a same-device, same-turn session abandoned by heartbeat timeout within 24 hours.
 - Quiz answers are graded only on the server. Correct-answer metadata never reaches the browser.

@@ -352,7 +352,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .get('/api/v1/sessions/active')
       .set('Cookie', cookieHeader(firstIdentity))
       .expect(200)
-    assert.equal(active.body.data, null)
+    assert.deepEqual(active.body.data, [])
   })
 
   test('session history uses a stable cursor and optional status filter', async () => {
@@ -468,7 +468,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .get('/api/v1/sessions/active')
       .set('Cookie', cookieHeader(firstIdentity))
       .expect(200)
-    assert.equal(active.body.data, null)
+    assert.deepEqual(active.body.data, [])
   })
 
   test('automatic start links a manual session and a new turn supersedes it', async () => {
@@ -503,6 +503,44 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       status: 'ABANDONED',
       terminal_reason: 'SUPERSEDED_BY_NEW_TURN',
     })
+  })
+
+  test('different Codex sessions remain active concurrently', async () => {
+    const first = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      sessionKey: 'a'.repeat(64),
+      turnKey: 'b'.repeat(64),
+    }).request.expect(200)
+    const second = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+      sessionKey: 'c'.repeat(64),
+      turnKey: 'd'.repeat(64),
+    }).request.expect(200)
+
+    assert.notEqual(first.body.data.session.id, second.body.data.session.id)
+
+    const active = await request(app.getHttpServer())
+      .get('/api/v1/sessions/active')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(200)
+    assert.equal(active.body.data.length, 2)
+    assert.deepEqual(
+      new Set(active.body.data.map((session: { id: string }) => session.id)),
+      new Set([first.body.data.session.id, second.body.data.session.id]),
+    )
+
+    await sendIntegrationEvent({
+      event: 'Stop',
+      sessionKey: 'a'.repeat(64),
+      turnKey: 'b'.repeat(64),
+    }).request.expect(200)
+
+    const remaining = await request(app.getHttpServer())
+      .get('/api/v1/sessions/active')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(200)
+    assert.equal(remaining.body.data.length, 1)
+    assert.equal(remaining.body.data[0].id, second.body.data.session.id)
   })
 
   test('a Stop received before start is deferred and reapplied with degraded timing', async () => {
@@ -571,19 +609,22 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     )
 
     const results = await Promise.all([
-      sessionRecoveryService.runRecoveryCycle(),
-      sessionRecoveryService.runRecoveryCycle(),
+      sessionRecoveryService.runCleanup(),
+      sessionRecoveryService.runCleanup(),
     ])
     assert.equal(
-      results.reduce((sum, result) => sum + result.heartbeatTimeouts, 0),
+      results.reduce(
+        (sum, result) => sum + result.automaticSessionsExpired,
+        0,
+      ),
       1,
     )
     assert.equal(
-      results.reduce((sum, result) => sum + result.manualTimeouts, 0),
+      results.reduce((sum, result) => sum + result.manualSessionsExpired, 0),
       1,
     )
     assert.equal(
-      results.reduce((sum, result) => sum + result.ignoredOrphans, 0),
+      results.reduce((sum, result) => sum + result.orphanEventsIgnored, 0),
       1,
     )
 
@@ -669,8 +710,8 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       event: 'Heartbeat',
       turnKey: FIRST_TURN_KEY,
     }).request.expect(200)
-    const heartbeatRecovery = await sessionRecoveryService.runRecoveryCycle()
-    assert.equal(heartbeatRecovery.heartbeatTimeouts, 0)
+    const heartbeatRecovery = await sessionRecoveryService.runCleanup()
+    assert.equal(heartbeatRecovery.automaticSessionsExpired, 0)
 
     await sendIntegrationEvent({
       event: 'Stop',
@@ -825,8 +866,9 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     }>>(`
       SELECT queue_depth, queue_oldest_age_seconds,
              dead_letter_count, diagnostics_reported_at
-      FROM devices WHERE user_id = $1
-    `, [firstIdentity.userId])
+      FROM devices
+      WHERE user_id = $1 AND token_hash = $2
+    `, [firstIdentity.userId, hashToken(deviceToken)])
     assert.equal(device.queue_depth, 4)
     assert.equal(device.queue_oldest_age_seconds, 5)
     assert.equal(device.dead_letter_count, 6)

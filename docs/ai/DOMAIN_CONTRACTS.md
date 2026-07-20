@@ -39,8 +39,10 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 | `Heartbeat` | activity only; may carry bounded queue diagnostics |
 | `Stop` | transitions to `COMPLETED` with `HOOK_STOP` |
 
-- PostgreSQL guarantees at most one `RUNNING`/`WAITING_FOR_USER` session per user.
-- A new turn may supersede the previous active automatic turn.
+- PostgreSQL permits different hashed Codex session keys to run concurrently, while allowing at most one active turn per hashed Codex session key and one active manual fallback session per user.
+- A new turn supersedes only the previous active turn with the same hashed Codex session key.
+- `GET /sessions/active` returns every active snapshot newest first. Home polls this collection and renders one read-only elapsed-time card per session; it never exposes start or end controls.
+- Cards use a fragment of the server session ID. Folder names, local paths, prompts, task titles, and completion percentages are not collected or inferred.
 - Unknown non-start events are stored as `DEFERRED`; start arrival reprocesses them in order.
 - Automatic sessions become `ABANDONED` exactly at last valid activity + 120 seconds.
 - Pure manual sessions become `ABANDONED` exactly at start + 12 hours.

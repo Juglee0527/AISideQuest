@@ -39,7 +39,7 @@ Base path: `/api/v1`
 | `POST /devices/:id/revoke` | session + CSRF + ownership | revoke device idempotently |
 | `POST /sessions/manual` | session + CSRF + idempotency | create or reuse active manual session |
 | `POST /sessions/:id/end` | session + CSRF + ownership + idempotency | complete/fail/cancel manual session |
-| `GET /sessions/active` | browser session | current active session |
+| `GET /sessions/active` | browser session | all current active sessions, newest first; returns an empty array when none |
 | `GET /sessions` | browser session | owned cursor history |
 | `POST /integration-events` | device token + idempotency | apply privacy-safe Codex lifecycle event |
 | `GET /quests` | browser session | published current-version catalog |

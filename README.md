@@ -54,7 +54,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-마지막 전체 검증에서는 React 49개, Codex plugin 12개, 운영·로컬 실행 도구 17개, 서버 비DB 19개, PostgreSQL 통합 47개 등 총 144개 테스트를 통과했습니다.
+마지막 전체 검증에서는 React 49개, Codex plugin 16개, 운영·로컬 실행 도구 17개, 서버 비DB 19개, PostgreSQL 통합 50개 등 총 151개 테스트를 통과했습니다.
 
 ## 현재 상태
 

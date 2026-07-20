@@ -117,7 +117,11 @@ export class SessionService {
       }
 
       const currentTime = await this.getDatabaseTime(manager)
-      const activeSession = await this.findActiveSession(manager, userId, true)
+      const activeSession = await this.findActiveManualSession(
+        manager,
+        userId,
+        true,
+      )
       let created = false
       let session = activeSession
 
@@ -243,19 +247,20 @@ export class SessionService {
     })
   }
 
-  async getActiveSession(userId: string) {
+  async getActiveSessions(userId: string) {
     const sessions = await this.databaseService.query<SessionRow[]>(
       `
         SELECT ${SESSION_COLUMNS}
         FROM ai_sessions
         WHERE user_id = $1
           AND status IN ('RUNNING', 'WAITING_FOR_USER')
+        ORDER BY started_at DESC, id DESC
       `,
       [userId],
     )
-    const session = sessions[0]
+    const currentTime = new Date()
 
-    return session ? this.toSnapshot(session, new Date()) : null
+    return sessions.map((session) => this.toSnapshot(session, currentTime))
   }
 
   async getSessionHistory(userId: string, query: SessionHistoryQueryDto) {
@@ -607,24 +612,37 @@ export class SessionService {
       }
     }
 
-    const activeSession = await this.findActiveSession(manager, userId, true)
+    const activeSession = await this.findActiveSessionByExternalSessionKey(
+      manager,
+      userId,
+      sessionKey,
+      true,
+    )
 
-    if (activeSession && activeSession.external_turn_key === null) {
-      const [sessions] = (await manager.query(
-        `
-          UPDATE ai_sessions
-          SET external_session_key = $3,
-              external_turn_key = $4,
-              last_activity_at = GREATEST(last_activity_at, $5::timestamptz),
-              version = version + 1,
-              updated_at = $5
-          WHERE id = $1 AND user_id = $2
-          RETURNING ${SESSION_COLUMNS}
-        `,
-        [activeSession.id, userId, sessionKey, turnKey, receivedAt],
-      )) as [SessionRow[], number]
+    if (!activeSession) {
+      const manualSession = await this.findActiveManualSession(
+        manager,
+        userId,
+        true,
+      )
 
-      return { result: 'APPLIED', session: sessions[0] ?? null }
+      if (manualSession?.external_turn_key === null) {
+        const [sessions] = (await manager.query(
+          `
+            UPDATE ai_sessions
+            SET external_session_key = $3,
+                external_turn_key = $4,
+                last_activity_at = GREATEST(last_activity_at, $5::timestamptz),
+                version = version + 1,
+                updated_at = $5
+            WHERE id = $1 AND user_id = $2
+            RETURNING ${SESSION_COLUMNS}
+          `,
+          [manualSession.id, userId, sessionKey, turnKey, receivedAt],
+        )) as [SessionRow[], number]
+
+        return { result: 'APPLIED', session: sessions[0] ?? null }
+      }
     }
 
     if (activeSession) {
@@ -877,7 +895,7 @@ export class SessionService {
     }
   }
 
-  private async findActiveSession(
+  private async findActiveManualSession(
     manager: EntityManager,
     userId: string,
     lock: boolean,
@@ -887,10 +905,33 @@ export class SessionService {
         SELECT ${SESSION_COLUMNS}
         FROM ai_sessions
         WHERE user_id = $1
+          AND origin = 'MANUAL'
           AND status IN ('RUNNING', 'WAITING_FOR_USER')
         ${lock ? 'FOR UPDATE' : ''}
       `,
       [userId],
+    )) as SessionRow[]
+
+    return rows[0] ?? null
+  }
+
+  private async findActiveSessionByExternalSessionKey(
+    manager: EntityManager,
+    userId: string,
+    externalSessionKey: string,
+    lock: boolean,
+  ) {
+    const rows = (await manager.query(
+      `
+        SELECT ${SESSION_COLUMNS}
+        FROM ai_sessions
+        WHERE user_id = $1
+          AND provider = 'CODEX'
+          AND external_session_key = $2
+          AND status IN ('RUNNING', 'WAITING_FOR_USER')
+        ${lock ? 'FOR UPDATE' : ''}
+      `,
+      [userId, externalSessionKey],
     )) as SessionRow[]
 
     return rows[0] ?? null

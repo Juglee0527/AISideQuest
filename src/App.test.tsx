@@ -92,24 +92,23 @@ describe('AISideQuest API session flow', () => {
     document.cookie = 'aisidequest_csrf=test-csrf; path=/'
   })
 
-  it('starts, polls, restores and ends the same server session without Session LocalStorage', async () => {
-    let activeSession: Session | null = null
-    let completedSessions: Session[] = []
+  it('shows concurrent Codex sessions independently and never exposes manual controls', async () => {
+    let activeSessions: Session[] = [
+      createSession('11111111-0000-4000-8000-000000000001', 'RUNNING', new Date().toISOString()),
+      createSession('22222222-0000-4000-8000-000000000002', 'RUNNING', new Date().toISOString()),
+    ]
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
 
       if (url.pathname.endsWith('/sessions/active')) {
-        return jsonResponse(activeSession === null
-          ? null
-          : createSession(activeSession.id, activeSession.status, activeSession.startedAt))
+        return jsonResponse(activeSessions)
       }
 
       if (url.pathname.endsWith('/sessions') && init?.method !== 'POST') {
         return jsonResponse({
           items: [
-            ...(activeSession === null ? [] : [activeSession]),
-            ...completedSessions,
+            ...activeSessions,
           ],
           nextCursor: null,
         })
@@ -119,55 +118,33 @@ describe('AISideQuest API session flow', () => {
         return jsonResponse({ items: [questFixture], nextCursor: null })
       }
 
-      if (url.pathname.endsWith('/sessions/manual') && init?.method === 'POST') {
-        activeSession ??= createSession(
-          '00000000-0000-4000-8000-000000000001',
-          'RUNNING',
-          new Date().toISOString(),
-        )
-        return jsonResponse({ created: true, session: activeSession })
-      }
-
-      if (url.pathname.endsWith('/end') && init?.method === 'POST' && activeSession !== null) {
-        const completedSession = createSession(
-          activeSession.id,
-          'COMPLETED',
-          activeSession.startedAt,
-          new Date().toISOString(),
-        )
-        completedSessions = [completedSession, ...completedSessions]
-        activeSession = null
-        return jsonResponse({ session: completedSession })
-      }
-
       return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
     }))
 
     const firstRender = renderApp()
     await flushRequests()
 
-    const startButton = screen.getByRole('button', { name: 'AI 작업 시작' })
-    expect(startButton).toBeEnabled()
-
-    fireEvent.click(startButton)
-    await flushRequests()
-    expect(screen.getByRole('button', { name: 'AI 작업 종료' })).toBeEnabled()
+    expect(screen.getByText('2개 작업 진행 중')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI 작업 시작' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI 작업 종료' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('timer')).toHaveLength(2)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(65_000)
     })
-    expect(screen.getByRole('timer')).toHaveTextContent('01:05')
+    expect(screen.getAllByRole('timer')[0]).toHaveTextContent('01:05')
+    expect(screen.getAllByRole('timer')[1]).toHaveTextContent('01:05')
 
-    activeSession = createSession(
-      '00000000-0000-4000-8000-000000000001',
-      'WAITING_FOR_USER',
-      '2026-07-15T00:00:00.000Z',
-    )
+    activeSessions = [
+      { ...activeSessions[0], status: 'WAITING_FOR_USER' },
+      activeSessions[1],
+    ]
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5_000)
     })
     await flushRequests()
-    expect(screen.getAllByText('Codex 확인 필요')).toHaveLength(2)
+    expect(screen.getByText('1개 확인 필요')).toBeInTheDocument()
+    expect(screen.getByText('확인 필요')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('link', { name: /사이드 퀘스트 둘러보기/ }))
     expect(screen.getByRole('link', { name: 'AI 작업 경험 설문 퀴즈 시작' })).toBeInTheDocument()
@@ -179,22 +156,14 @@ describe('AISideQuest API session flow', () => {
 
     expect(screen.getByText('현재 세션 0/1 완료')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'AISideQuest Home' }))
-    expect(screen.getByRole('timer')).toHaveTextContent('01:10')
+    expect(screen.getAllByRole('timer')[0]).toHaveTextContent('01:10')
 
     secondRender.unmount()
     window.localStorage.clear()
     renderApp()
     await flushRequests()
-    expect(screen.getByRole('timer')).toHaveTextContent('01:10')
-
-    fireEvent.click(screen.getByRole('button', { name: 'AI 작업 종료' }))
-    await flushRequests()
-
-    expect(screen.getByRole('button', { name: 'AI 작업 시작' })).toBeEnabled()
-    expect(screen.getByText('작업 대기 중')).toBeInTheDocument()
-    expect(screen.getByRole('timer')).toHaveTextContent('01:10')
+    expect(screen.getAllByRole('timer')[0]).toHaveTextContent('01:10')
     expect(window.localStorage.getItem('aisidequest.sessions')).toBeNull()
-    expect(completedSessions).toHaveLength(1)
   })
 
   it('shows authentication expiry and the GitHub login route', async () => {
@@ -211,7 +180,7 @@ describe('AISideQuest API session flow', () => {
       'href',
       'http://localhost:3000/api/v1/auth/github',
     )
-    expect(screen.getByRole('button', { name: 'AI 작업 시작' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'AI 작업 시작' })).not.toBeInTheDocument()
   })
 
   it('keeps an error state until retry reloads server data', async () => {
@@ -224,7 +193,7 @@ describe('AISideQuest API session flow', () => {
 
       const url = new URL(typeof input === 'string' ? input : input.toString())
       return url.pathname.endsWith('/sessions/active')
-        ? jsonResponse(null)
+        ? jsonResponse([])
         : jsonResponse({ items: [], nextCursor: null })
     }))
 
@@ -237,7 +206,7 @@ describe('AISideQuest API session flow', () => {
     await flushRequests()
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'AI 작업 시작' })).toBeEnabled()
+    expect(screen.getByText('작업 대기 중')).toBeInTheDocument()
   })
 
   it('uses meta.serverTime instead of the browser clock for elapsed time', async () => {
@@ -251,7 +220,7 @@ describe('AISideQuest API session flow', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
       return url.pathname.endsWith('/sessions/active')
-        ? jsonResponse(activeSession, 200, correctedServerTime)
+        ? jsonResponse([activeSession], 200, correctedServerTime)
         : jsonResponse({ items: [activeSession], nextCursor: null }, 200, correctedServerTime)
     }))
 
@@ -268,7 +237,7 @@ describe('AISideQuest API session flow', () => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
 
       if (url.pathname.endsWith('/sessions/active')) {
-        return jsonResponse(null)
+        return jsonResponse([])
       }
 
       if (url.pathname.endsWith('/sessions')) {
@@ -315,7 +284,7 @@ describe('AISideQuest API session flow', () => {
       _init?: RequestInit,
     ) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([])
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
@@ -384,7 +353,7 @@ describe('AISideQuest API session flow', () => {
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([])
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
@@ -412,7 +381,7 @@ describe('AISideQuest API session flow', () => {
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([])
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
@@ -438,7 +407,7 @@ describe('AISideQuest API session flow', () => {
   it('shows an empty state when the server has no published quests', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(null)
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([])
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
@@ -499,7 +468,7 @@ describe('AISideQuest API session flow', () => {
 
     vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(typeof input === 'string' ? input : input.toString())
-      if (url.pathname.endsWith('/sessions/active')) return jsonResponse(activeSession)
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([activeSession])
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [activeSession], nextCursor: null })
       }

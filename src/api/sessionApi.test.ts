@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClientError } from './apiClient'
 import {
-  getActiveSession,
+  getActiveSessions,
   getAllSessionHistory,
   startManualSession,
 } from './sessionApi'
@@ -89,7 +89,7 @@ describe('session API client', () => {
       message: '로그인이 필요합니다.',
     }, 401)))
 
-    const request = getActiveSession()
+    const request = getActiveSessions()
 
     await expect(request).rejects.toBeInstanceOf(ApiClientError)
     await expect(request).rejects.toMatchObject({
@@ -100,9 +100,9 @@ describe('session API client', () => {
   })
 
   it('rejects a malformed success response instead of trusting it', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => response({ id: 'incomplete' })))
+    vi.stubGlobal('fetch', vi.fn(async () => response([{ id: 'incomplete' }])))
 
-    const request = getActiveSession()
+    const request = getActiveSessions()
 
     await expect(request).rejects.toBeInstanceOf(ApiClientError)
     await expect(request).rejects.toMatchObject({ code: 'INVALID_API_RESPONSE' })
