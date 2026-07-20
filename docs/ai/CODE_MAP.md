@@ -57,3 +57,4 @@ API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts
 | deployment | `deploy/`, `scripts/deploy-release.ps1` | env tests + Docker rehearsal + smoke |
 | privacy/logging | plugin filter, DTOs, observability sanitizer | forbidden-data and redaction tests |
 | local startup | `scripts/dev-local.mjs`, root `package.json` | operations tests + local readiness smoke |
+| planned Discover behavior | `DISCOVER_CONTRACT.md`, then future `server/src/discover/` and `src/pages/DiscoverPage.tsx` | source adapter + server contract + React tests |

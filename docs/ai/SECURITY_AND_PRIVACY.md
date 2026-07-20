@@ -110,6 +110,21 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 90일 integration event 정리, 로그와 백업 만료 job은 운영 구성 작업에서 강제한다. 백업에서 복원할 때 삭제 계정 목록을 다시 적용한다.
 
+## 6.1 Discover 확장 계약(미구현)
+
+Task 21에서 제품·개인정보 계약만 확정했으며 Discover endpoint, cache, 저장, 관심사와 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
+
+- `/discover`와 browser API는 웹 session 인증을 요구하지만 활성 AI session은 요구하지 않는다.
+- 서버는 source별 고정 HTTPS host만 호출하고 사용자가 제공한 URL을 가져오지 않는다. 화면의 외부 원문 link는 서버 fetch 대상이 아니다.
+- 외부 응답 원문과 HTML은 메모리에서 정규화한 뒤 폐기한다. DB cache에는 길이가 제한된 일반 텍스트, 검증된 link, 분류와 freshness metadata만 저장한다.
+- 초기 fresh·stale 기준은 Hacker News 10분·24시간, Remotive 6시간·72시간이다. 정규화 cache는 마지막 성공 갱신 후 최대 7일 안에 교체하거나 삭제한다.
+- 운영 로그와 metric label에는 외부 응답, 전체 원문 URL, item ID·제목·tag, 사용자 관심 기술을 남기지 않는다.
+- Task 32에서 제품 분석을 구현하기 전에는 Discover 방문·클릭을 수집하지 않는다. 이후에도 고정 event 이름과 source·category만 허용하며 item 정보는 수집하지 않는다.
+- 반복 방문 계산용 사용자 ID는 소유권이 있는 분석 row에만 저장할 수 있고 로그·metric label에는 금지한다. 이 row는 90일 후 만료하고 계정 내보내기와 primary 삭제에 포함한다.
+- Task 27 저장 snapshot과 Task 28 관심 기술은 계정 소유 데이터로 분류해 내보내기·삭제에 포함하고, 사용자가 삭제하거나 계정을 유지하는 동안만 보존한다.
+
+보상·출시·source 이용 조건까지 포함한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md)를 따른다.
+
 ## 7. 검증과 배포 차단 기준
 
 - CORS allow/deny preflight, CSRF, OAuth state 1회 소비, 만료·폐기 token을 자동 검사한다.
@@ -118,3 +133,4 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 - 16 KiB 초과, 허용하지 않은 필드, turn event 500개 초과를 거부한다.
 - 금지 데이터 fixture는 응답과 공통 redaction 결과에 token·경로가 남지 않는지 검사한다.
 - 2026-07-18 `npm audit --audit-level=high`: 취약점 0건. 이후 high·critical이 발견되면 영향과 보완 통제를 문서화한 기한부 예외가 없는 한 배포를 차단한다.
+- Discover 구현 이후에는 fetch host·redirect 제한, 외부 HTML 정제, cache 만료, 부분 장애, 금지 분석 dimension, source attribution을 추가 배포 gate로 검사한다.

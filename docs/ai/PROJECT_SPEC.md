@@ -1,527 +1,295 @@
 # AISideQuest - Project Specification
 
-> AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 플랫폼
+> AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 1~16번 완료, 서버 통계와 Dashboard 전환 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21 제품 계약 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-20
 
 ---
 
-# 1. 문서 역할
+# 1. 문서 역할과 기준
 
-이 문서는 AISideQuest의 요구사항과 현재 구현을 설명하는 기준 문서다.
+이 문서는 AISideQuest의 현재 제품 형태와 확정된 다음 범위를 설명한다.
 
-- 기능을 구현하거나 변경할 때 실제 코드와 함께 이 문서를 현행화한다.
-- 현재 동작과 향후 계획을 명확히 구분한다.
-- 구현되지 않은 기능을 현재 기능처럼 작성하지 않는다.
-- 정확한 패키지 버전과 실행 스크립트의 최종 기준은 `package.json`과 `package-lock.json`이다.
-
----
-
-# 2. 프로젝트 개요
-
-AISideQuest는 Codex, Cursor, Claude Code, GitHub Copilot 등 AI 도구가 작업하는 동안 발생하는 대기 시간을 활용해 사용자가 짧은 활동을 수행하도록 돕는 서비스다.
-
-대기 시간을 다음과 같은 가치로 전환하는 것을 목표로 한다.
-
-- 설문조사
-- 개발 퀴즈
-- 학습
-- 뉴스 읽기
-- 마이크로태스크
-- 예상 리워드
-
-현재 MVP에서 리워드는 실제 지급하지 않으며 더미 포인트만 표시한다.
+- 현재 동작과 계획을 분리하고 구현되지 않은 기능을 현재 기능처럼 쓰지 않는다.
+- DB constraint와 migration, server type·guard·service, 자동 테스트, canonical domain 문서 순으로 실제 동작을 판단한다.
+- 기능을 변경할 때 코드, 테스트, 관련 `docs/ai/` 계약과 사용자용 한국어 문서를 같은 변경에서 현행화한다.
+- 세부 상태 전이와 보안 규칙은 [`DOMAIN_CONTRACTS.md`](./DOMAIN_CONTRACTS.md), endpoint 목록은 [`API_CONTRACTS.md`](./API_CONTRACTS.md)를 따른다.
+- 정확한 패키지 버전과 실행 script는 `package.json`과 `package-lock.json`이 최종 기준이다.
 
 ---
 
-# 3. 핵심 사용자 흐름
+# 2. 제품 개요
 
-1. 사용자가 Home에서 `AI 작업 시작`을 선택한다.
-2. AI 작업 세션이 생성되고 경과 시간 측정이 시작된다.
-3. 사용자는 Side Quest에서 원하는 퀘스트를 완료한다.
-4. 사용자가 `AI 작업 종료`를 선택한다.
-5. 세션 종료 시각과 최종 작업 시간이 확정된다.
-6. Home과 Dashboard 통계가 세션 및 퀘스트 완료 이력에서 다시 계산된다.
+AISideQuest는 Windows ChatGPT 데스크톱 앱의 Codex 작업을 감지하고, 개발자가 AI 작업 중 짧은 개발 퀴즈를 수행하도록 돕는 도구다. 기본 제품 경로는 사용자가 저장소를 내려받아 자신의 PC에서 무료로 실행하는 local-first 방식이다.
 
-진행 중인 세션과 퀘스트 완료 이력은 LocalStorage에 저장되므로 새로고침 후에도 복구된다.
+현재 제품이 제공하는 가치는 다음과 같다.
 
----
+- Codex 작업 turn 자동 감지와 경과 시간 확인
+- 장애 중에도 유실을 줄이는 local durable queue와 server recovery
+- 실제 객관식 개발 퀴즈, 답안 복구와 server 채점
+- 최초 통과에 한 번만 지급하는 100P service point
+- 사용자 time zone 기준 작업·퀘스트·point 통계
+- 기기 연결·폐기, 데이터 내보내기와 계정 삭제
 
-# 4. 현재 MVP 범위
-
-## 4.1 구현 완료
-
-- React SPA 기본 구성
-- Home, Side Quest, Dashboard 화면
-- 반응형 데스크톱·모바일 내비게이션
-- 인증 사용자 AI 작업 수동 시작·종료 API 연동
-- 서버 시각 보정 실시간 경과 시간 표시
-- 화면 이동 중 타이머 유지
-- DB에 게시된 개발 퀘스트 5개 목록·상세 표시
-- 활성 세션 내 퀘스트 완료 처리
-- 세션별 퀘스트 중복 완료 차단
-- 서버 세션 자동 저장, 새로고침·다른 인증 브라우저 복구
-- 기존 LocalStorage 감지, 참고 요약 또는 초기화 전환
-- 오늘·이번 주·이번 달 통계
-- 실행 중 세션의 정제된 프로젝트명과 최근 명령 분류 표시
-- 자동 테스트와 프로덕션 빌드 검증
-
-## 4.2 MVP 제외 범위
-
-- 로그인 및 사용자 계정
-- 다중 사용자 데이터 분리
-- NestJS 백엔드
-- PostgreSQL
-- 실제 포인트 또는 현금성 리워드 지급
-- AI 작업 자동 감지
-- Codex, Cursor, Claude Code API 연동
-- 브라우저 및 IDE 확장 프로그램
-- 퀘스트별 실제 설문·퀴즈·뉴스 콘텐츠 실행
+100P는 AISideQuest 내부의 비현금 service point다. 환전·양도·구매할 수 없고, 외부 채용·바운티 지급과 관계가 없다.
 
 ---
 
-# 5. 화면 및 라우팅
+# 3. 현재 사용자 흐름
 
-## 5.1 Home (`/`)
+1. 사용자가 `npm.cmd run dev:local`로 PostgreSQL, migration·seed, API와 web을 실행한다.
+2. GitHub OAuth로 로그인한다. Server는 GitHub numeric ID로 사용자를 식별하고 OAuth access token과 email을 저장하지 않는다.
+3. Codex plugin 연결을 요청하고 browser에서 10분 유효 연결 요청을 승인한다.
+4. 사용자가 Codex에 prompt를 제출하면 plugin과 server가 AI session을 자동 생성·갱신한다.
+5. Home은 현재 실행 중인 여러 Codex turn을 read-only card로 표시한다. Card는 server 시각 기준 경과 시간, 정제된 마지막 folder명과 고정 operation 분류만 보여준다.
+6. 활성 AI session이 있을 때 게시된 개발 퀴즈를 시작하고 답안을 저장·제출한다.
+7. Server가 답안을 채점하고 최초 통과 transaction에서 100P를 한 번 적립한다.
+8. Dashboard에서 time zone 기준 오늘·주·월·직접 선택 기간의 AI 시간, 퀘스트와 point를 확인한다.
+9. Devices에서 연결 token을 교체·폐기하고, 계정에서 data export 또는 delete를 수행할 수 있다.
 
-표시 정보
-
-- 현재 AI 작업 상태
-- 현재 또는 최근 세션 시간
-- 전체 경로를 제거한 프로젝트 폴더명과 허용 목록 기반 최근 명령 분류
-- 오늘 AI 대기 시간
-- 오늘 완료한 퀘스트 수
-- 오늘 예상 리워드
-
-사용자 동작
-
-- AI 작업 시작
-- AI 작업 종료
-- Side Quest 이동
-- Dashboard 이동
-
-동작 규칙
-
-- 활성 세션이 있으면 시작 버튼을 비활성화한다.
-- 활성 세션이 없으면 종료 버튼을 비활성화한다.
-- 세션 종료 후 타이머 영역에는 최근 세션 시간을 유지한다.
-
-## 5.2 Side Quest (`/quests`)
-
-표시 정보
-
-- 이용 가능한 퀘스트 목록
-- 퀘스트 제목과 설명
-- 예상 소요 시간
-- 예상 보상
-- 현재 세션 완료 수
-- 퀘스트별 완료 상태
-
-동작 규칙
-
-- 활성 AI 세션이 있을 때만 퀘스트를 완료할 수 있다.
-- 완료된 퀘스트는 현재 세션에서 다시 완료할 수 없다.
-- 새 세션에서는 같은 퀘스트를 다시 완료할 수 있다.
-- 퀘스트 완료 취소는 제공하지 않는다.
-
-## 5.3 Dashboard (`/dashboard`)
-
-조회 기간
-
-- 오늘
-- 이번 주
-- 이번 달
-
-표시 정보
-
-- 총 AI 대기 시간
-- 완료한 퀘스트 수
-- 누적 예상 포인트
-- 예상 절약 시간
-- 선택 기간 활동 요약
-
-예상 절약 시간은 계산 기준이 정의되지 않았으므로 현재 `-`로 표시한다.
-
-## 5.4 잘못된 경로
-
-정의되지 않은 경로로 접근하면 Home(`/`)으로 이동한다.
+Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 자동 감지가 불가능한 환경을 위한 recovery API 호환성으로만 남는다.
 
 ---
 
-# 6. 기능 규칙
+# 4. 현재 구현 범위
 
-## 6.1 AI 작업 세션
+## 4.1 Web과 인증
 
-- 동시에 하나의 세션만 실행할 수 있다.
-- 시작 시 고유 ID와 ISO 8601 형식의 `startedAt`을 생성한다.
-- 진행 중에는 `endedAt`과 `duration`이 `null`이다.
-- 종료 시 `endedAt`과 밀리초 단위 `duration`을 확정한다.
-- 실행 중 중복 시작과 대기 중 중복 종료는 상태 변경 없이 무시한다.
-- 경과 시간은 매초 값을 누적하지 않고 `현재 시각 - startedAt`으로 계산한다.
-- 브라우저가 비활성화되거나 새로고침되어도 실제 시작 시각을 기준으로 시간을 복구한다.
-- 예상 대기 시간은 산정 기준이 없으므로 표시하지 않는다.
+- React SPA와 desktop·mobile navigation
+- GitHub OAuth state + PKCE
+- hash-only server session과 secure cookie
+- browser mutation의 CSRF 검증
+- 최근 인증을 요구하는 export·account delete
+- device browser 승인, rotation과 revoke
 
-## 6.2 게시 퀘스트 catalog
+## 4.2 AI session과 plugin
 
-| code | 제목 | 예상 시간 | 보상 |
-|---|---|---:|---:|
-| `typescript-type-narrowing` | TypeScript 타입 좁히기 | 2분 | 100P |
-| `http-idempotency` | HTTP 멱등성 | 2분 | 100P |
-| `postgresql-unique-constraint` | PostgreSQL 유일성 제약 | 2분 | 100P |
-| `git-safe-history` | Git 안전한 이력 관리 | 2분 | 100P |
-| `testing-boundary-values` | 경계값 테스트 | 2분 | 100P |
+- `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Stop`, `Heartbeat` lifecycle 처리
+- 서로 다른 hashed Codex session key의 동시 자동 session
+- 같은 turn의 중복·역순 event 멱등 처리
+- 30초 heartbeat와 120초 자동 timeout
+- append-only JSONL FIFO queue, retry, tail recovery와 dead-letter
+- same-device late `Stop` recovery와 `DEGRADED` timing 구분
+- Home의 여러 active session polling과 server-time elapsed display
+- plugin 연결 장애 시 recovery-only manual API
 
-목록과 상세 API는 로그인 사용자에게만 제공하며 사용자의 최근 응시 상태를 포함한다. 문제와 선택지는 활성 AI 세션에서 응시를 시작한 뒤 제공하며 정답은 클라이언트에 노출하지 않는다.
+## 4.3 퀴즈와 point
 
-## 6.3 실제 퀴즈 응시와 완료
+- PostgreSQL에 게시된 객관식 개발 퀴즈 5개
+- 활성 AI session에 고정되는 quest attempt와 version snapshot
+- 원자적 답안 교체와 새로고침 복구
+- server-only 정답과 채점
+- AI session 종료 후 정확히 5분 submission grace
+- retry policy와 이미 통과한 version의 재응시 차단
+- 최초 통과 100P transaction
+- user + quest version과 attempt별 DB uniqueness
+- balance와 immutable cursor ledger
 
-- 활성 AI 세션에서 게시 퀘스트 version에 고정된 응시를 시작한다.
-- 선택한 전체 답안 집합은 서버에서 원자적으로 교체하며 새로고침 후 복구한다.
-- 제출 시 저장 답안을 서버에서만 채점하고 `floor(정답 수 × 100 / 전체 문항 수)`로 점수를 계산한다.
-- AI 세션 종료 후 정확히 5분까지 제출할 수 있으며 이후 응시는 점수 없이 `EXPIRED` 처리한다.
-- 실패·만료는 퀘스트의 `retryAllowed` 정책에 따라 재응시하고, 이미 통과한 version은 다시 응시하지 않는다.
-- 시작과 제출은 멱등성 key와 DB row lock으로 중복·동시 요청에도 하나의 상태만 확정한다.
+## 4.4 통계와 운영
+
+- 저장된 IANA time zone 기준 today·week·month·custom 통계
+- DST와 기간 경계를 반영한 PostgreSQL 집계
+- active session을 동일 응답의 `serverTime`까지만 계산
+- `DEGRADED` timing 별도 count
+- request ID, structured privacy-safe logs와 protected Prometheus metrics
+- liveness·readiness, rate limit, alerts, backup·restore tooling
+- PostgreSQL integration, migration upgrade와 Chromium E2E CI gate
+- immutable API·web image, staging·production template, smoke와 rollback tooling
+
+## 4.5 현재 제외 범위
+
+- 현금 지급, 환전, 구매, escrow와 외부 결제
+- Codex 외 Cursor·Claude Code·Copilot 자동 감지
+- VS Code·Chrome·Cursor extension
+- 외부 application 자동 제출
+- 공개 service 운영을 기본 사용 경로로 강제하는 기능
+- 실제 staging·production과 초대 사용자 pilot을 완료했다는 주장
+- Discover API·adapter·cache·screen·saved item·interest·analytics 구현
 
 ---
 
-# 7. 데이터 모델
+# 5. 현재 화면과 route
 
-## 7.1 Session
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `id` | `string` | 세션 고유 ID |
-| `startedAt` | `string` | ISO 8601 시작 시각 |
-| `endedAt` | `string \| null` | ISO 8601 종료 시각 |
-| `duration` | `number \| null` | 밀리초 단위 최종 작업 시간 |
-
-## 7.2 Quest
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `id` | `string` | 퀘스트 고유 ID |
-| `title` | `string` | 제목 |
-| `description` | `string` | 설명 |
-| `rewardPoints` | `number` | 예상 포인트 |
-| `estimatedMinutes` | `number` | 예상 소요 시간(분) |
-
-## 7.3 QuestAttempt
-
-| 필드 | 타입 | 설명 |
-|---|---|---|
-| `id` | `string` | 완료 이력 고유 ID |
-| `quest.id`, `quest.version` | `string`, `number` | 시작 시 고정된 퀘스트 version |
-| `aiSessionId` | `string` | 시작 시 연결된 AI 작업 세션 |
-| `status` | `string` | `IN_PROGRESS`, `COMPLETED`, `FAILED`, `EXPIRED` |
-| `questions` | `array` | 정답 표시가 없는 문제·선택지와 저장 선택 |
-| `result` | `object \| null` | 서버 점수·통과 여부와 재응시 정책 |
-
-## 7.4 서버 User
-
-프런트엔드 MVP 상태에는 아직 연결되지 않았지만 서버는 GitHub OAuth 로그인 사용자를 다음 정보로 관리한다.
-
-| 필드 | 설명 |
+| Route | 현재 기능 |
 |---|---|
-| `id` | 내부 UUID |
-| `displayName` | GitHub 표시 이름 또는 사용자명 |
-| `avatarUrl` | GitHub 프로필 이미지 URL |
-| `githubLogin` | GitHub 사용자명 |
+| `/` | 모든 active AI session의 상태·경과 시간과 오늘 요약 |
+| `/quests` | 게시 quest catalog와 최근 응시 상태 |
+| `/quests/:code` | quest detail 확인과 attempt 시작 |
+| `/quest-attempts/:attemptId` | 답안 복구·저장·제출 |
+| `/dashboard` | 기간 통계, point balance와 ledger |
+| `/devices` | 연결 device 조회, rotation과 revoke |
+| `/devices/connect/:requestId` | local Codex device 연결 승인 |
 
-GitHub 숫자 ID는 `user_auth_accounts.provider_account_id`에 저장해 사용자명 변경과 관계없이 같은 사용자를 식별한다. 이메일과 GitHub access token은 저장하지 않는다.
+정의되지 않은 route는 `/`로 이동한다. `/discover`는 Task 26 전까지 존재하지 않는다.
 
 ---
 
-# 8. 브라우저 저장소와 기존 데이터 전환
+# 6. 핵심 기능 계약
 
-## 8.1 저장 키
+## 6.1 인증과 소유권
 
-| 키 | 저장 내용 |
+- GitHub numeric user ID가 안정적인 외부 identity다.
+- Browser resource는 authenticated user의 `user_id`를 SQL 조건에 포함한다.
+- Browser mutation은 session cookie와 CSRF를 함께 검증한다.
+- Device event는 browser cookie가 아닌 device bearer token hash로 인증한다.
+- Account delete는 owned primary data를 한 transaction으로 지우고, 사용자가 local plugin data를 별도로 삭제하도록 안내한다.
+
+## 6.2 AI session
+
+- 상태는 `RUNNING`, `WAITING_FOR_USER`, `COMPLETED`, `FAILED`, `ABANDONED`다.
+- 자동 session은 hashed Codex session key별 active turn 하나를 허용하고 서로 다른 key는 동시에 실행할 수 있다.
+- 순수 manual session은 user별 하나만 허용한다.
+- 자동 session은 마지막 valid activity 후 120초, 순수 manual session은 시작 후 12시간에 만료한다.
+- Heartbeat timeout으로 abandon된 same-device, same-turn session만 24시간 안의 late `Stop`으로 복구할 수 있다.
+- 진행 시간은 browser counter가 아니라 server-owned timestamp와 response `serverTime`을 기준으로 표시한다.
+
+## 6.3 Quest와 point
+
+- Catalog와 detail은 published current version과 사용자의 최근 상태만 노출하고 문제·option·정답을 미리 노출하지 않는다.
+- Attempt는 시작 시 quest version과 content를 고정한다.
+- 제출은 row lock과 transaction 안에서 server-only grading과 point ledger insertion을 함께 처리한다.
+- 동일 user + quest version의 첫 pass만 pinned 100P를 지급한다.
+- Reward kill switch가 꺼져 있으면 grading 전에 submission을 차단한다.
+
+## 6.4 통계
+
+- 한 통계 request는 DB의 하나의 기준 시각을 모든 aggregate와 pagination에 사용한다.
+- 기간은 user의 검증된 IANA time zone으로 만든 반열린 UTC interval이다.
+- Active session은 request 기준 시각까지만, 경계를 넘는 session은 실제 겹친 구간만 합산한다.
+- 완료 quest count와 point는 최초 pass ledger의 생성 시각을 기준으로 집계한다.
+
+---
+
+# 7. 데이터와 저장소
+
+## 7.1 Server-owned primary data
+
+- user와 GitHub authentication account
+- web authentication session과 CSRF state
+- device, 연결 request와 hash-only credential
+- AI session과 allowlist integration event
+- published quest, question과 option
+- quest attempt, answer와 point ledger
+- shared rate-limit과 idempotency record
+
+DB의 정확한 table, FK, UK, check와 index는 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.
+
+## 7.2 Browser LocalStorage
+
+AI session, quest attempt, point와 통계의 현재 source of truth는 server다. Browser LocalStorage에는 과거 browser-only MVP 전환을 위한 다음 값만 남을 수 있다.
+
+| Key | 역할 |
 |---|---|
-| `aisidequest.sessions` | 구형 세션 데이터, 9번 전환 후 삭제 |
-| `aisidequest.questHistories` | 구형 퀘스트 이력, 9번 전환 후 삭제 |
-| `aisidequest.legacyMigration` | 초기화 또는 참고 보관 1회 완료 marker |
-| `aisidequest.legacyReference` | 통계·포인트에 미반영하는 구형 참고 요약 |
-| `aisidequest.questHistories.v2` | 16번 runtime 제거 이전의 임시 이력, 서버 통계에는 미반영 |
+| `aisidequest.legacyMigration` | 구형 data 처리 완료 marker |
+| `aisidequest.legacyReference` | server 통계에 포함하지 않는 구형 참고 요약 |
+| `aisidequest.questHistories.v2` | 과거 임시 history; 현재 통계·point에 미반영 |
 
-## 8.2 저장 형식
+구형 `aisidequest.sessions`와 `aisidequest.questHistories`는 전환 후 삭제하며 current session 복구에 사용하지 않는다.
 
-모든 값은 다음 버전 봉투 구조로 저장한다.
+---
 
-```json
-{
-  "version": 1,
-  "data": {}
-}
+# 8. 보안과 개인정보
+
+수집하지 않는 원문은 다음과 같다.
+
+- prompt와 AI response
+- source code와 diff
+- 전체 file·workspace path
+- raw command, argument, environment와 tool input/output
+- transcript와 raw hook payload
+- raw OAuth·session·CSRF·device token과 연결 code
+
+표시를 위해 허용하는 derivative는 plugin이 local persistence 전에 만든 separator-free 마지막 folder명과 fixed-allowlist operation label뿐이다. Request log에는 body, raw query, credential과 사용자 content를 남기지 않는다.
+
+AI session과 allowlist event는 beta 기준 90일, 운영 log와 encrypted backup은 최대 30일 보존한다. 상세 matrix, export·delete와 retention은 [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md)를 따른다.
+
+---
+
+# 9. 실행과 검증
+
+## 9.1 Local 실행
+
+```powershell
+npm.cmd install
+npm.cmd run dev:local
 ```
 
-현재 저장 봉투 스키마 버전은 `1`이다. AI 세션은 LocalStorage에 저장하지 않고 세션 API만 사용한다.
+기본 web은 `http://localhost:5173`, API는 `http://localhost:3000/api/v1`를 사용한다.
 
-## 8.3 검증 및 실패 처리
+## 9.2 Repository gate
 
-- JSON 파싱 실패 시 구형 값을 서버 상태로 사용하지 않는다.
-- 지원하지 않는 스키마 버전은 사용하지 않는다.
-- 필수 필드, 날짜 형식, 음수 시간, 세션 ID 중복을 검증한다.
-- 퀘스트 완료 이력 ID와 `(sessionId, questId)` 중복을 검증한다.
-- 검증에 실패한 구형 데이터는 참고 보관을 차단하고 초기화만 허용한다.
-- LocalStorage 접근이 막혀도 서버 세션 기능은 계속 동작한다.
-- 전환 완료 marker를 먼저 기록한 뒤 구형 원본을 삭제하고, 삭제 실패 시 다음 실행에서 정리를 반복한다.
-- 구형 활성 세션, 예상 포인트와 개별 퀘스트 보상은 이전하지 않는다.
-- 참고 보관은 완료 세션 수, 총 시간, 퀘스트 완료 수만 이 브라우저에 남긴다.
-
-참고 요약과 남아 있는 임시 퀘스트 이력은 현재 브라우저 프로필에만 저장되며 서버 데이터와 통계에 사용하지 않는다.
-
----
-
-# 9. 통계 계산
-
-## 9.1 기간 기준
-
-- 통계 요청의 DB `transaction_timestamp()`를 응답 `meta.serverTime`과 모든 집계의 단일 기준 시각으로 사용한다.
-- 오늘·주·월 경계는 사용자가 서버에 저장한 검증된 IANA time zone을 사용하고 미검증 상태는 `UTC`와 수정 안내를 제공한다.
-- 오늘은 로컬 자정부터 다음 자정 직전까지다.
-- 이번 주는 월요일 00:00부터 다음 월요일 직전까지다.
-- 이번 달은 매월 1일 00:00부터 다음 달 1일 직전까지다.
-
-## 9.2 AI 대기 시간
-
-- 상태와 관계없이 완료·실패·복구·진행 중 세션을 포함한다.
-- 진행 중 세션은 같은 응답의 `meta.serverTime`까지만 계산한다.
-- 기간 경계를 넘는 세션은 서버가 선택 기간과 실제로 겹치는 `[startedAt, endedAt)` 구간만 합산한다.
-- `DEGRADED` timing 세션 수를 별도 반환해 복구된 시간을 정확한 측정치와 구분한다.
-
-## 9.3 완료 퀘스트와 포인트
-
-- 최초 통과 transaction에서 생성된 `point_ledger.created_at`이 반열린 기간에 포함될 때만 집계한다.
-- 완료 퀘스트 수는 사용자·quest version별 최초 통과 원장 수다.
-- 포인트는 같은 원장의 `points` 합계이며 LocalStorage 참고 이력은 포함하지 않는다.
-
-## 9.4 예상 절약 시간
-
-계산 규칙이 정의되지 않아 현재 값은 `null`이며 화면에는 `-`로 표시한다.
-
----
-
-# 10. 상태 구조와 데이터 흐름
-
-- `SessionContext`가 세션 API를 통해 활성 세션과 cursor 이력을 관리한다.
-- `SessionContext`는 5초 polling과 focus·visibility 복귀 시 서버 활성 세션을 다시 조회한다.
-- `LegacyDataMigrationGate`가 Context 마운트 전에 구형 LocalStorage를 처리한다.
-- `useStatisticsSummary`가 서버의 기간 통계와 IANA time zone 초기 저장·변경 상태를 관리한다.
-- Home과 Dashboard는 LocalStorage나 기기 시계로 통계를 다시 계산하지 않는다.
-- 애플리케이션 전용 상태 관리 라이브러리는 사용하지 않는다.
-
----
-
-# 11. 기술 스택
-
-## 11.1 현재 구현
-
-- React 19
-- React DOM 19
-- TypeScript 7
-- Vite 8
-- TailwindCSS 4
-- React Router 7
-- Lucide React
-- Node.js 22
-- NestJS 11
-- NestJS Config 4
-- class-validator
-- class-transformer
-- cookie-parser
-
-## 11.2 테스트
-
-- Vitest 4
-- React Testing Library 16
-- Testing Library DOM
-- Testing Library Jest DOM
-- jsdom 29
-- Node.js test runner
-- Supertest 7
-
-## 11.3 백엔드 데이터베이스 구성
-
-- PostgreSQL 16
-- TypeORM 1.1 SQL migration
-- 로컬 Docker Compose 실행 환경
-
-현재 저장소에는 NestJS API, PostgreSQL 스키마·migration·개발 seed, GitHub OAuth 인증, AI 세션 API, 게시 퀘스트 목록·상세와 실제 응시·서버 채점 API가 있다. 포인트 비즈니스 API는 후속 작업에서 구현한다.
-
----
-
-# 12. 실행 및 검증
-
-## 12.1 실행 명령
-
-```bash
-npm install
-npm run dev
-npm run dev:server
+```powershell
+npm.cmd test
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run docs:check
+git diff --check
 ```
 
-## 12.2 검증 명령
+## 9.3 마지막 검증 상태
 
-```bash
-npm test
-npm run typecheck
-npm run build
-```
+2026-07-20 기준 자동 test 157개가 통과했다.
 
-## 12.3 자동 테스트 범위
+| Suite | 통과 |
+|---|---:|
+| React | 50 |
+| Codex plugin | 20 |
+| 운영·local startup script | 17 |
+| Server non-database | 19 |
+| PostgreSQL integration | 51 |
 
-- 경과 시간 계산과 타이머 포맷
-- 음수, 잘못된 시각, 1분 미만, 1시간 이상 경계값
-- 자정을 넘긴 세션의 기간 겹침 계산
-- 오늘·이번 주·이번 달 경계
-- 진행 중 세션 통계
-- 미래 완료 이력 제외
-- 알려지지 않은 퀘스트의 보상 처리
-- 세션 API cursor 이력, 인증 만료, 서버 응답 형식 검증
-- 5초 polling, `WAITING_FOR_USER`, 서버 시각 보정
-- 손상된 구형 JSON, 지원하지 않는 스키마와 LocalStorage 접근 실패 처리
-- 구형 데이터 참고 요약·초기화, 1회 marker와 신규 키 분리
-- `로그인 상태 → 서버 작업 시작 → 타이머 → 새로고침·브라우저 저장소 초기화 복구 → 서버 작업 종료` 통합 흐름
-- API Health Check와 공통 성공 응답
-- 전역 입력 검증과 공통 오류 응답
-- API 환경설정 기본값과 범위 검증
-- 빈 PostgreSQL DB migration 적용·되돌리기·재적용
-- 개발 퀴즈 seed 반복 실행과 DB FK·UK 제약조건
-- GitHub OAuth state·PKCE와 사용자·OAuth 계정 연결
-- 서버 인증 세션, 현재 사용자 조회, CSRF logout과 세션 만료
-- AI 세션 수동 시작·종료, 활성 조회와 cursor 이력
-- Codex event 상태 전이, 동시성·멱등성과 역순 event 재처리
-- Codex lifecycle hook 자동 전송, 개인정보 필터와 로컬 fallback
-- 활성 기기와 마지막 event 기반 자동 감지 상태 계산
-
-## 12.4 현재 검증 결과
-
-2026-07-18 기준
-
-- React 테스트 파일: 9개 통과
-- React 자동 테스트: 44개 통과
-- Codex 플러그인 테스트: 9개 통과
-- NestJS 비DB 테스트: 8개 통과
-- DB·인증·기기·AI 세션·퀘스트 PostgreSQL 통합 테스트: 35개 통과
-- TypeScript 타입 검사 통과
-- Vite 및 NestJS 프로덕션 빌드 통과
-- 실제 `GET /api/v1/health` HTTP 200 확인
-- npm 패키지 취약점 0건
-- `git diff --check` 오류 없음
+Lint, client·server typecheck와 production build, migration 14개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
 
 ---
 
-# 13. 현재 제한사항
+# 10. 현재 제한과 외부 미완료
 
-- AI 세션은 서버에 저장되지만 퀘스트 완료·예상 포인트는 아직 브라우저 임시 데이터다.
-- 기존 MVP 참고 요약은 서버로 이전하지 않아 다른 브라우저와 공유되지 않는다.
-- 자동 세션은 마지막 활동 120초 후, 순수 수동 세션은 시작 12시간 후 고정된 경계 시각으로 만료된다.
-- 퀘스트는 실제 콘텐츠를 실행하지 않고 완료 상태만 기록한다.
-- 퀘스트 완료 취소를 지원하지 않는다.
-- 실제 리워드를 지급하지 않는다.
-- 예상 대기 시간과 예상 절약 시간의 계산 규칙이 없다.
-- GitHub 로그인 진입 UI는 연결됐지만 실제 사용에는 OAuth App 자격 증명이 필요하다.
-- lifecycle event와 30초 heartbeat는 기기별 sequence를 가진 durable JSONL queue에서 FIFO로 재전송된다.
-- 세션, 퀘스트 catalog와 실제 응시는 PostgreSQL 데이터를 사용하며 포인트·통계 API 전환은 후속 작업이다.
+- 기본 사용자는 local service process를 실행 중인 상태로 유지해야 한다.
+- 실제 GitHub 로그인에는 사용자가 만든 OAuth App credential이 필요하다.
+- 자동 감지는 현재 Windows ChatGPT desktop의 Codex lifecycle hook만 지원한다.
+- 강제 종료에는 전용 completion hook이 없어 heartbeat 중단 뒤 timeout으로 정리될 수 있다.
+- 기존 browser-only 참고 summary는 server로 migrate하지 않고 다른 browser와 공유하지 않는다.
+- 예상 절약 시간은 계산 규칙이 없어 `null`이며 화면에는 `-`로 표시한다.
+- Task 20의 deployment package와 local rehearsal은 준비됐지만 real staging·production, backup·rollback evidence와 10-user 7-day pilot은 완료되지 않았다.
 
 ---
 
-# 14. MVP 개발 현황
+# 11. Discover 제품 계약과 다음 단계
 
-구현이 완료될 때마다 실제 동작과 검증 결과를 기준으로 이 문서를 함께 현행화한다.
+Task 21에서 다음 제품 규칙을 확정했지만 Discover 기능 자체는 아직 구현하지 않았다.
 
-1. [x] React + TypeScript + Vite + TailwindCSS 구성 (2026-07-15)
-2. [x] Home, Side Quest, Dashboard 화면 생성 (2026-07-15)
-3. [x] 더미 퀘스트 데이터 작성 (2026-07-15)
-4. [x] AI 작업 시작·종료와 타이머 구현 (2026-07-15)
-5. [x] 퀘스트 완료 처리 (2026-07-15)
-6. [x] LocalStorage 저장 및 새로고침 복구 (2026-07-15)
-7. [x] 오늘·이번 주·이번 달 통계 계산 (2026-07-15)
-8. [x] 테스트·빌드 검증 (2026-07-15)
-9. [x] 실제 구현 내용에 맞춰 `PROJECT_SPEC.md` 최종 점검 (2026-07-15)
+- `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
+- AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
+- AISideQuest point, job compensation, verified cash bounty와 reputation bounty를 별도 개념으로 표시한다.
+- 외부 item 조회·click·save에는 AISideQuest point를 지급하지 않는다.
+- Server만 고정 source API host를 fetch하고 raw response·HTML은 저장하거나 log하지 않는다.
+- Shared PostgreSQL cache에는 normalized item만 저장한다. 초기 fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간이며 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
+- Task 32 전에는 visit·click analytics를 암묵적으로 수집하지 않는다. Pilot용 owned analytics를 구현하면 item detail 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
+- Tasks 22~26 완료는 `Discover MVP implementation complete`인 release candidate다. Real source smoke, attribution, failure, accessibility와 privacy evidence가 있어야 release할 수 있다.
+- Discover 완료는 별도 track인 Task 20 완료 증거가 아니다.
 
----
+정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-# 15. 다음 개발 단계
-
-MVP 이후의 실사용 베타 개발은 [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md)를 기준으로 20개 작업을 순서대로 진행한다.
-
-2026-07-18 기준 진행 상태
-
-1. [x] 실사용 베타 범위 확정
-2. [x] AI 작업 자동 감지 기술 검증 - 정상 turn 자동 감지 및 fallback 범위 확정
-3. [x] 세션 상태와 데이터 흐름 설계 - 상태 전이, 책임 분리, API 계약 확정
-4. [x] NestJS 백엔드 기본 구성 - Health Check 및 공통 API 기반 구현
-5. [x] PostgreSQL 데이터베이스 구성 - migration, 개발 seed, DB 제약 통합 테스트 완료
-6. [x] 사용자 로그인 구현 - GitHub OAuth, 서버 세션, 현재 사용자 조회와 logout 완료
-7. [x] AI 세션 API 구현 - 상태 전이, 멱등성, 동시성 및 이력 조회 완료
-8. [x] 프런트엔드 세션 상태를 API로 전환 - polling, 시각 보정, 인증·오류 상태 완료
-9. [x] 기존 LocalStorage 데이터 처리 - 참고 요약·초기화, 손상·재실행 처리 완료
-10. [x] AISideQuest Codex 플러그인 기본 구성 - 연결 코드, 기기 token, 테스트 event 완료
-11. [x] AI 작업 자동 감지 연동 - lifecycle event 자동 전송, 웹 상태 반영과 수동 fallback 완료
-12. [x] Heartbeat와 장애 복구 구현 - PostgreSQL 통합 테스트 완료
-13. [x] 퀘스트 목록 API 구현 - 게시 catalog, 최근 응시 상태, pagination과 프런트엔드 전환 완료
-14. [x] 실제 개발 퀴즈 구현 - 답안 복구, 서버 채점, 멱등 제출과 만료·재응시 완료
-15. [x] 포인트 원장 구현 - 최초 통과 100P transaction, 잔액·cursor 이력과 중복 적립 방어 완료
-16. [x] 통계 API와 대시보드 전환 - IANA 기간 경계, 서버 집계와 저품질 세션 표시 완료
-17. [x] 보안과 개인정보 보호 최종 점검 - endpoint matrix, Rate Limit, redaction, 내보내기·삭제 완료
-18. [x] 운영 로그와 장애 대응 구성 - request ID, probe, 지표·경보, migration, backup·복원 완료
-19. [x] 통합 테스트와 CI 구성 - PostgreSQL 16·Chromium gate와 branch protection 기준 완료
-20. [ ] 운영 배포와 파일럿 진행 - 배포 패키지·검증 도구 완료, 실제 환경·사용자 파일럿 대기
-
-확정된 최초 베타 범위
-
-- 최초 지원 도구: Windows ChatGPT 데스크톱 앱의 Codex 작업
-- 최초 지원 환경: Windows 11, Windows native agent 및 PowerShell
-- 로그인: GitHub OAuth
-- 최초 퀘스트: 객관식 개발 퀴즈
-- 포인트: 현금 가치가 없는 서비스 포인트
-- 파일럿: 초대 기반 폐쇄형 베타
-- 개인정보 원칙: 프롬프트, Codex 응답, 소스 코드, 전체 경로와 원본 명령을 수집하지 않음. 표시용 마지막 폴더명과 고정 명령 분류만 로컬 정제 후 허용
-
-세션 상태와 데이터 흐름의 상세 계약은 [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)를 따른다.
-PostgreSQL 구조와 실행 방법은 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.
-사용자 인증 계약과 설정 방법은 [`AUTHENTICATION.md`](./AUTHENTICATION.md)를 따른다.
-
-기존 베타 이후의 신규 제품 확장은 [`Discover 개발 계획`](../Discover_개발_계획.md)의 21~33번 작업을 따른다. 첫 구현 범위는 문서 계약, 공통 외부 source Adapter, Hacker News, Remotive와 `/discover` 화면까지인 21~26번이다. 기존 20번 운영 배포·파일럿은 별도 트랙으로 유지한다.
+다음 작업은 Task 22의 common model과 API contract 설계다.
 
 ---
 
-# 16. 향후 기능
+# 12. Roadmap 상태
 
-- Discover 수익 기회·개발 소식·커뮤니티 피드
-- 관심 항목 저장과 사용자가 직접 선택한 기술 기반 정렬
-- DEV, Stack Overflow, GitHub, Algora source 확장
-- VS Code Extension
-- Chrome Extension
-- Cursor Extension
-- Codex API 연동
-- Claude Code 연동
-- 사용자별 퀘스트 추천
-- 생산성 분석 고도화
+## 기존 실사용 beta
 
----
+- Task 1~19: 구현·repository 검증 완료
+- Task 20: repository package와 local rehearsal 완료, 외부 staging·production과 pilot evidence 대기
 
-# 17. 확장 아이디어
+## Discover 확장
 
-- Stack Overflow 질문·평판 bounty 탐색
-- GitHub Issue와 오픈소스 기여 기회 탐색
-- 검증된 외부 현금 bounty 탐색
-- 데이터 라벨링
-- 영어 번역
-- 코드 리뷰
-- AI 학습 데이터 제작
+- Task 21: 제품·개인정보·분류·release 계약 완료
+- Task 22~26: API model, adapter, Hacker News, Remotive와 screen 미구현
+- Task 27~28: saved item과 explicit interest 미구현
+- Task 29~31: additional source 미구현
+- Task 32~33: Discover observability와 product pilot 미구현
 
-구체적인 순서, 제외 범위와 완료 조건은 [`Discover 개발 계획`](../Discover_개발_계획.md)을 따른다.
-
----
-
-# 18. 최종 목표
-
-AI가 일하는 동안 사람도 성장하거나 수익을 얻을 수 있는 플랫폼을 만든다.
-
-기다림은 더 이상 낭비되는 시간이 아니다.
-
-AISideQuest는 AI 시대의 유휴 시간을 가장 가치 있게 사용하는 서비스를 목표로 한다.
+최종 목표는 AI가 일하는 동안 개발자가 안전하게 학습하거나 외부 기회를 발견하도록 돕는 것이다. AISideQuest는 사용자의 작업 content를 수집하거나 외부 보상을 보장하는 방식으로 이 목표를 달성하지 않는다.
