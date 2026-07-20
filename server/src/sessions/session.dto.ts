@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator'
 
 import { SESSION_STATUSES, type SessionStatus } from './session.types'
@@ -48,6 +49,23 @@ export class SessionHistoryQueryDto {
   cursor?: string
 }
 
+export class PluginDiagnosticsDto {
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  queueDepth!: number
+
+  @IsInt()
+  @Min(0)
+  @Max(86_400)
+  oldestAgeSeconds!: number
+
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  deadLetterCount!: number
+}
+
 export class IntegrationEventDto {
   @IsInt()
   @Equals(1)
@@ -55,6 +73,13 @@ export class IntegrationEventDto {
 
   @IsUUID('4')
   eventId!: string
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  sequence?: number
 
   @Equals('CODEX')
   provider!: 'CODEX'
@@ -75,4 +100,9 @@ export class IntegrationEventDto {
 
   @IsISO8601({ strict: true })
   observedAt!: string
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PluginDiagnosticsDto)
+  diagnostics?: PluginDiagnosticsDto
 }

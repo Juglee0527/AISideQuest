@@ -1,9 +1,12 @@
 import {
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Post,
+  Patch,
+  Body,
   Query,
   Req,
   Res,
@@ -11,13 +14,18 @@ import {
   UseGuards,
 } from '@nestjs/common'
 import type { Request, Response } from 'express'
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+import { Equals, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator'
 
 import { AuthCookieService } from './auth-cookie.service'
 import { AuthService } from './auth.service'
 import type { AuthenticatedRequest } from './auth.types'
 import { CsrfGuard } from './csrf.guard'
 import { SessionAuthGuard } from './session-auth.guard'
+import { RecentAuthenticationGuard } from './recent-authentication.guard'
+import { UserDataService } from './user-data.service'
+import { RateLimit } from '../security/rate-limit.decorator'
+import { RateLimitGuard } from '../security/rate-limit.guard'
+import { assertEmptyBody } from '../sessions/session-input'
 
 class GithubCallbackQueryDto {
   @IsOptional()
@@ -49,22 +57,50 @@ class GithubCallbackQueryDto {
   error_uri?: string
 }
 
+class GithubStartQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @Matches(/^\/(?!\/)[^\r\n]*$/)
+  returnTo?: string
+}
+
+class UpdateTimeZoneDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
+  timeZone!: string
+}
+
+class DeleteAccountDto {
+  @Equals('DELETE')
+  confirmation!: 'DELETE'
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly authCookieService: AuthCookieService,
+    private readonly userDataService: UserDataService,
   ) {}
 
   @Get('github')
-  async startGithubLogin(@Res() response: Response) {
-    const login = await this.authService.beginGithubLogin()
+  @RateLimit({ scope: 'OAUTH_START', limit: 10, windowSeconds: 600, identity: 'IP' })
+  @UseGuards(RateLimitGuard)
+  async startGithubLogin(
+    @Query() query: GithubStartQueryDto,
+    @Res() response: Response,
+  ) {
+    const login = await this.authService.beginGithubLogin(query.returnTo)
 
     this.authCookieService.setOauthState(response, login.state)
     response.redirect(HttpStatus.FOUND, login.authorizationUrl)
   }
 
   @Get('github/callback')
+  @RateLimit({ scope: 'OAUTH_CALLBACK', limit: 20, windowSeconds: 600, identity: 'IP_AND_STATE' })
+  @UseGuards(RateLimitGuard)
   async completeGithubLogin(
     @Query() query: GithubCallbackQueryDto,
     @Req() request: Request,
@@ -101,13 +137,22 @@ export class AuthController {
       login.csrfToken,
       login.expiresAt,
     )
-    response.redirect(HttpStatus.FOUND, this.authService.successRedirectUrl)
+    response.redirect(HttpStatus.FOUND, login.redirectUrl)
   }
 
   @Get('me')
   @UseGuards(SessionAuthGuard)
   getCurrentUser(@Req() request: AuthenticatedRequest) {
     return request.auth.user
+  }
+
+  @Patch('me/time-zone')
+  @UseGuards(SessionAuthGuard, CsrfGuard)
+  updateTimeZone(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateTimeZoneDto,
+  ) {
+    return this.authService.updateTimeZone(request.auth.user.id, body.timeZone)
   }
 
   @Post('logout')
@@ -119,5 +164,39 @@ export class AuthController {
   ) {
     await this.authService.logout(request.auth)
     this.authCookieService.clearAuthenticatedSession(response)
+  }
+
+  @Post('me/export')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit({ scope: 'ACCOUNT_EXPORT', limit: 10, windowSeconds: 3_600, identity: 'USER_AND_IP' })
+  @UseGuards(
+    SessionAuthGuard,
+    CsrfGuard,
+    RecentAuthenticationGuard,
+    RateLimitGuard,
+  )
+  exportUserData(@Req() request: AuthenticatedRequest) {
+    assertEmptyBody(request.body, 'user data export does not accept a request body')
+    return this.userDataService.exportUserData(request.auth.user.id)
+  }
+
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  @RateLimit({ scope: 'ACCOUNT_DELETE', limit: 5, windowSeconds: 3_600, identity: 'USER_AND_IP' })
+  @UseGuards(
+    SessionAuthGuard,
+    CsrfGuard,
+    RecentAuthenticationGuard,
+    RateLimitGuard,
+  )
+  async deleteAccount(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: DeleteAccountDto,
+  ) {
+    void body
+    const result = await this.userDataService.deleteAccount(request.auth.user.id)
+    this.authCookieService.clearAuthenticatedSession(response)
+    return result
   }
 }

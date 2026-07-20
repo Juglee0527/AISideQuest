@@ -1,0 +1,66 @@
+groups:
+  - name: aisidequest-api
+    rules:
+      - alert: AISideQuestAlertPipelineTest
+        expr: vector(0)
+        for: 1m
+        labels: { severity: info, owner: beta-oncall }
+        annotations:
+          summary: "staging alert 전달 경로 시험용; runbook에 따라 일시적으로 vector(1) 사용"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#경보-검증"
+      - alert: AISideQuestReadinessDown
+        expr: probe_success{job="aisidequest-readiness"} == 0
+        for: 2m
+        labels: { severity: critical, owner: beta-oncall }
+        annotations:
+          summary: "AISideQuest readiness가 2분 이상 실패"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#readiness-장애"
+      - alert: AISideQuestHigh5xxRate
+        expr: sum(rate(aisidequest_http_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(aisidequest_http_requests_total[5m])), 0.001) > 0.01
+        for: 5m
+        labels: { severity: critical, owner: beta-oncall }
+        annotations:
+          summary: "API 5xx 비율이 1% 초과"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#api-5xx-장애"
+      - alert: AISideQuestHeartbeatExpirationHigh
+        expr: aisidequest_heartbeat_expiration_ratio > 0.05 and aisidequest_automatic_terminals_15m >= 10
+        for: 15m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "자동 세션 heartbeat 만료율이 5% 초과"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#heartbeatqueue-장애"
+      - alert: AISideQuestDeferredEventOld
+        expr: aisidequest_deferred_event_oldest_age_seconds > 300
+        for: 5m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "deferred event 최고 age가 5분 초과"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#heartbeatqueue-장애"
+      - alert: AISideQuestPluginQueueBacklog
+        expr: aisidequest_plugin_queue_oldest_age_seconds > 300 or aisidequest_plugin_dead_letters > 0
+        for: 5m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "플러그인 queue backlog 또는 dead-letter 감지"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#heartbeatqueue-장애"
+      - alert: AISideQuestDatabasePoolWaiting
+        expr: aisidequest_db_pool_waiting > 0
+        for: 5m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "DB pool 대기가 5분 지속"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#database-장애"
+      - alert: AISideQuestAuthFailureBurst
+        expr: sum(rate(aisidequest_auth_failures_total[5m])) > 1
+        for: 5m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "인증 실패가 초당 1건 초과"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#인증rate-limit-이상"
+      - alert: AISideQuestRateLimitBurst
+        expr: sum(rate(aisidequest_rate_limited_total[5m])) > 2
+        for: 5m
+        labels: { severity: info, owner: beta-oncall }
+        annotations:
+          summary: "Rate Limit 응답이 초당 2건 초과"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#인증rate-limit-이상"

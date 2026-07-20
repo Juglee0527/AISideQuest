@@ -801,4 +801,185 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     ])
     assert.equal(device.last_seen_at, null)
   })
+
+  test('accepts bounded privacy-safe queue diagnostics only on heartbeat', async () => {
+    await sendIntegrationEvent({
+      event: 'PostToolUse',
+      body: {
+        diagnostics: { queueDepth: 1, oldestAgeSeconds: 2, deadLetterCount: 3 },
+      },
+    }).request.expect(400)
+
+    await sendIntegrationEvent({
+      event: 'Heartbeat',
+      body: {
+        diagnostics: { queueDepth: 4, oldestAgeSeconds: 5, deadLetterCount: 6 },
+      },
+    }).request.expect(200)
+
+    const [device] = await databaseService.query<Array<{
+      queue_depth: number
+      queue_oldest_age_seconds: number
+      dead_letter_count: number
+      diagnostics_reported_at: Date | null
+    }>>(`
+      SELECT queue_depth, queue_oldest_age_seconds,
+             dead_letter_count, diagnostics_reported_at
+      FROM devices WHERE user_id = $1
+    `, [firstIdentity.userId])
+    assert.equal(device.queue_depth, 4)
+    assert.equal(device.queue_oldest_age_seconds, 5)
+    assert.equal(device.dead_letter_count, 6)
+    assert.ok(device.diagnostics_reported_at instanceof Date)
+  })
+
+  test('rejects more than 500 stored events for one turn', async () => {
+    await databaseService.query(
+      `
+        INSERT INTO integration_events (
+          event_id, device_id, user_id, event,
+          external_session_key, external_turn_key, observed_at,
+          processing_result, request_hash
+        )
+        SELECT gen_random_uuid(), device.id, device.user_id, 'Heartbeat',
+               $2, $3, now(), 'IGNORED_ORPHAN', $4
+        FROM devices device
+        CROSS JOIN generate_series(1, 500)
+        WHERE device.user_id = $1
+      `,
+      [firstIdentity.userId, SESSION_KEY, FIRST_TURN_KEY, 'd'.repeat(64)],
+    )
+
+    const response = await sendIntegrationEvent({ event: 'Heartbeat' })
+      .request.expect(422)
+    assert.equal(response.body.error.code, 'TURN_EVENT_LIMIT_EXCEEDED')
+  })
+
+  test('device event sequence is unique and included in idempotency hashing', async () => {
+    const eventId = randomUUID()
+    const first = await sendIntegrationEvent({
+      event: 'SessionStart',
+      eventId,
+      turnKey: null,
+      body: { sequence: 1 },
+    }).request.expect(200)
+    assert.equal(first.body.data.result, 'APPLIED')
+
+    await sendIntegrationEvent({
+      event: 'SessionStart',
+      eventId,
+      turnKey: null,
+      body: { sequence: 2 },
+    }).request.expect(409)
+
+    const reused = await sendIntegrationEvent({
+      event: 'SessionStart',
+      turnKey: null,
+      body: { sequence: 1 },
+    }).request.expect(409)
+    assert.equal(reused.body.error.code, 'DEVICE_SEQUENCE_REUSED')
+  })
+
+  test('recovery cleanup expires automatic and manual sessions at fixed boundaries and ignores orphan events', async () => {
+    const automatic = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+    }).request.expect(200)
+    const automaticId = automatic.body.data.session.id as string
+    await databaseService.query(
+      `UPDATE ai_sessions
+       SET started_at = clock_timestamp() - interval '10 minutes',
+           last_activity_at = clock_timestamp() - interval '3 minutes'
+       WHERE id = $1`,
+      [automaticId],
+    )
+
+    const manual = await startManual(secondIdentity, randomUUID()).expect(200)
+    const manualId = manual.body.data.session.id as string
+    await databaseService.query(
+      `UPDATE ai_sessions
+       SET started_at = clock_timestamp() - interval '13 hours',
+           last_activity_at = clock_timestamp() - interval '13 hours'
+       WHERE id = $1`,
+      [manualId],
+    )
+
+    const orphan = sendIntegrationEvent({
+      event: 'Stop',
+      turnKey: SECOND_TURN_KEY,
+    })
+    await orphan.request.expect(200)
+    await databaseService.query(
+      `UPDATE integration_events
+       SET received_at = clock_timestamp() - interval '25 hours'
+       WHERE event_id = $1`,
+      [orphan.eventId],
+    )
+
+    const result = await sessionRecoveryService.runCleanup()
+    assert.deepEqual(result, {
+      skipped: false,
+      automaticSessionsExpired: 1,
+      manualSessionsExpired: 1,
+      orphanEventsIgnored: 1,
+    })
+
+    const sessions = await databaseService.query<Array<{
+      id: string
+      terminal_reason: string
+      duration_seconds: number
+    }>>(
+      `SELECT id, terminal_reason,
+              extract(epoch FROM ended_at - CASE
+                WHEN id = $1 THEN last_activity_at
+                ELSE started_at
+              END)::integer AS duration_seconds
+       FROM ai_sessions
+       WHERE id IN ($1, $2)
+       ORDER BY id`,
+      [automaticId, manualId],
+    )
+    const byId = new Map(sessions.map((session) => [session.id, session]))
+    assert.equal(byId.get(automaticId)?.terminal_reason, 'HEARTBEAT_TIMEOUT')
+    assert.equal(byId.get(automaticId)?.duration_seconds, 120)
+    assert.equal(byId.get(manualId)?.terminal_reason, 'MANUAL_TIMEOUT')
+    assert.equal(byId.get(manualId)?.duration_seconds, 43_200)
+
+    const [ignored] = await databaseService.query<Array<{
+      processing_result: string
+      response_body: { result: string }
+    }>>(
+      'SELECT processing_result, response_body FROM integration_events WHERE event_id = $1',
+      [orphan.eventId],
+    )
+    assert.equal(ignored.processing_result, 'IGNORED_ORPHAN')
+    assert.equal(ignored.response_body.result, 'IGNORED_ORPHAN')
+  })
+
+  test('a same-device late Stop recovers only a heartbeat timeout and preserves endedAt', async () => {
+    const started = await sendIntegrationEvent({
+      event: 'UserPromptSubmit',
+    }).request.expect(200)
+    const sessionId = started.body.data.session.id as string
+    await databaseService.query(
+      `UPDATE ai_sessions
+       SET started_at = clock_timestamp() - interval '10 minutes',
+           last_activity_at = clock_timestamp() - interval '3 minutes'
+       WHERE id = $1`,
+      [sessionId],
+    )
+    await sessionRecoveryService.runCleanup()
+
+    const [timedOut] = await databaseService.query<Array<{ ended_at: Date }>>(
+      'SELECT ended_at FROM ai_sessions WHERE id = $1',
+      [sessionId],
+    )
+    const stopped = await sendIntegrationEvent({
+      event: 'Stop',
+    }).request.expect(200)
+
+    assert.equal(stopped.body.data.session.status, 'COMPLETED')
+    assert.equal(stopped.body.data.session.terminalReason, 'RECOVERED_LATE_STOP')
+    assert.equal(stopped.body.data.session.timingQuality, 'DEGRADED')
+    assert.equal(stopped.body.data.session.endedAt, timedOut.ended_at.toISOString())
+  })
 }

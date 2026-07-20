@@ -13,3 +13,13 @@ export interface DeviceLink {
   deviceId: string | null
   expiresAt: string
 }
+
+export interface BrowserDeviceLinkRequest {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'EXPIRED'
+  deviceName: string
+  pluginVersion: string
+  expiresAt: string
+  approvedAt: string | null
+  verificationUrl: string
+}

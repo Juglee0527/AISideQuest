@@ -3,10 +3,11 @@ import {
   Catch,
   HttpException,
   HttpStatus,
-  Logger,
   type ExceptionFilter,
 } from '@nestjs/common'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
+import { OperationalLoggerService } from '../../observability/operational-logger.service'
+import type { OperationalRequest } from '../../observability/operational-request'
 
 interface ApiError {
   code: string
@@ -18,6 +19,7 @@ interface ApiErrorResponse {
   error: ApiError
   meta: {
     serverTime: string
+    requestId: string
   }
 }
 
@@ -47,6 +49,8 @@ function getErrorCode(status: number, payload: Record<string, unknown>) {
   }
 
   switch (status) {
+    case HttpStatus.PAYLOAD_TOO_LARGE:
+      return 'PAYLOAD_TOO_LARGE'
     case HttpStatus.BAD_REQUEST:
       return 'BAD_REQUEST'
     case HttpStatus.UNAUTHORIZED:
@@ -91,29 +95,36 @@ function getErrorMessage(status: number, payload: Record<string, unknown>) {
 
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(ApiExceptionFilter.name)
+  constructor(private readonly operationalLogger: OperationalLoggerService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>()
+    const request = host.switchToHttp().getRequest<Request>() as OperationalRequest
     const isHttpException = exception instanceof HttpException
     const status = isHttpException
       ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR
+      : this.getStatus(exception)
     const payload = isHttpException
       ? getHttpExceptionPayload(exception)
       : {}
     const validationDetails = getValidationDetails(payload)
+    const errorCode = getErrorCode(status, payload)
+    response.locals.apiErrorCode = errorCode
 
-    if (!isHttpException) {
-      this.logger.error(
-        'Unhandled API exception',
-        exception instanceof Error ? exception.stack : undefined,
-      )
+    if (!isHttpException && status >= 500) {
+      this.operationalLogger.error({
+        event: 'error_tracking_event',
+        requestId: request.requestId,
+        method: request.method,
+        route: request.route?.path ?? 'UNMATCHED',
+        status,
+        errorCode,
+      }, exception)
     }
 
     const body: ApiErrorResponse = {
       error: {
-        code: getErrorCode(status, payload),
+        code: errorCode,
         message: getErrorMessage(status, payload),
         ...(validationDetails.length === 0
           ? {}
@@ -121,9 +132,23 @@ export class ApiExceptionFilter implements ExceptionFilter {
       },
       meta: {
         serverTime: new Date().toISOString(),
+        requestId: request.requestId,
       },
     }
 
     response.status(status).json(body)
+  }
+
+  private getStatus(exception: unknown) {
+    if (
+      isRecord(exception)
+      && typeof exception.status === 'number'
+      && exception.status >= 400
+      && exception.status < 600
+    ) {
+      return exception.status
+    }
+
+    return HttpStatus.INTERNAL_SERVER_ERROR
   }
 }

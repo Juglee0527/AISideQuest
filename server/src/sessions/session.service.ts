@@ -61,6 +61,7 @@ const INTEGRATION_EVENTS = new Set<IntegrationEventName>([
 
 const MAX_OBSERVED_AT_FUTURE_MS = 5 * 60 * 1_000
 const DEFERRED_EVENT_TTL_MS = 24 * 60 * 60 * 1_000
+const MAX_EVENTS_PER_TURN = 500
 
 interface StoredIntegrationEventRow {
   ai_session_id: string | null
@@ -72,8 +73,8 @@ interface StoredIntegrationEventRow {
 interface DeferredEventRow {
   id: string
   event_id: string
-  device_id: string
   event: IntegrationEventName
+  device_id: string
   received_at: Date
 }
 
@@ -308,15 +309,27 @@ export class SessionService {
       validationError('observedAt cannot be more than 5 minutes in the future')
     }
 
+    if (dto.diagnostics && event !== 'Heartbeat') {
+      validationError('diagnostics are allowed only on Heartbeat events')
+    }
+
     const requestHash = hashToken(
       JSON.stringify({
         schemaVersion: dto.schemaVersion,
         eventId: dto.eventId,
+        sequence: dto.sequence ?? null,
         provider: dto.provider,
         event,
         sessionKey: dto.sessionKey,
         turnKey: dto.turnKey ?? null,
         observedAt: dto.observedAt,
+        diagnostics: dto.diagnostics
+          ? {
+              queueDepth: dto.diagnostics.queueDepth,
+              oldestAgeSeconds: dto.diagnostics.oldestAgeSeconds,
+              deadLetterCount: dto.diagnostics.deadLetterCount,
+            }
+          : null,
       }),
     )
 
@@ -387,6 +400,64 @@ export class SessionService {
         }
       }
 
+      if (dto.sequence !== undefined) {
+        const sequenceEvents = (await manager.query(
+          `
+            SELECT event_id
+            FROM integration_events
+            WHERE device_id = $1 AND sequence = $2
+            LIMIT 1
+          `,
+          [deviceAuth.deviceId, dto.sequence],
+        )) as Array<{ event_id: string }>
+
+        if (sequenceEvents.length > 0) {
+          throw new ConflictException({ code: 'DEVICE_SEQUENCE_REUSED' })
+        }
+      }
+
+      if (dto.diagnostics) {
+        await manager.query(
+          `
+            UPDATE devices
+            SET queue_depth = $2,
+                queue_oldest_age_seconds = $3,
+                dead_letter_count = $4,
+                diagnostics_reported_at = $5,
+                updated_at = $5
+            WHERE id = $1 AND user_id = $6
+          `,
+          [
+            deviceAuth.deviceId,
+            dto.diagnostics.queueDepth,
+            dto.diagnostics.oldestAgeSeconds,
+            dto.diagnostics.deadLetterCount,
+            receivedAt,
+            deviceAuth.userId,
+          ],
+        )
+      }
+
+      if (dto.turnKey) {
+        const [turnEventCount] = (await manager.query(
+          `
+            SELECT count(*)::integer AS count
+            FROM integration_events
+            WHERE user_id = $1
+              AND provider = 'CODEX'
+              AND external_turn_key = $2
+          `,
+          [deviceAuth.userId, dto.turnKey],
+        )) as Array<{ count: number }>
+
+        if ((turnEventCount?.count ?? 0) >= MAX_EVENTS_PER_TURN) {
+          throw new UnprocessableEntityException({
+            code: 'TURN_EVENT_LIMIT_EXCEEDED',
+            message: '한 AI turn에서 허용된 이벤트 수를 초과했습니다.',
+          })
+        }
+      }
+
       let applied = await this.applyIntegrationEvent(
         manager,
         deviceAuth.userId,
@@ -426,6 +497,7 @@ export class SessionService {
         `
           INSERT INTO integration_events (
             event_id,
+            sequence,
             device_id,
             user_id,
             ai_session_id,
@@ -440,12 +512,13 @@ export class SessionService {
             response_body
           )
           VALUES (
-            $1, $2, $3, $4, 'CODEX', $5, $6, $7,
-            $8, $9, $10, $11, $12::jsonb
+            $1, $2, $3, $4, $5, 'CODEX', $6, $7, $8,
+            $9, $10, $11, $12, $13::jsonb
           )
         `,
         [
           dto.eventId,
+          dto.sequence ?? null,
           deviceAuth.deviceId,
           deviceAuth.userId,
           applied.session?.id ?? null,
@@ -607,15 +680,23 @@ export class SessionService {
         session.status === 'ABANDONED' &&
         session.terminal_reason === 'HEARTBEAT_TIMEOUT' &&
         session.ended_at &&
-        await this.wasSessionStartedByDevice(
-          manager,
-          session.id,
-          deviceId,
-        ) &&
-        receivedAt.getTime() >= session.ended_at.getTime() &&
         receivedAt.getTime() - session.ended_at.getTime() <=
           DEFERRED_EVENT_TTL_MS
       ) {
+        const priorDeviceEvents = (await manager.query(
+          `
+            SELECT 1
+            FROM integration_events
+            WHERE ai_session_id = $1 AND device_id = $2
+            LIMIT 1
+          `,
+          [session.id, deviceId],
+        )) as unknown[]
+
+        if (priorDeviceEvents.length === 0) {
+          return { result: 'IGNORED_TERMINAL', session }
+        }
+
         const [sessions] = (await manager.query(
           `
             UPDATE ai_sessions
@@ -684,7 +765,7 @@ export class SessionService {
   ) {
     const deferredEvents = (await manager.query(
       `
-        SELECT id, event_id, device_id, event, received_at
+        SELECT id, event_id, event, device_id, received_at
         FROM integration_events
         WHERE user_id = $1
           AND provider = 'CODEX'
@@ -853,27 +934,6 @@ export class SessionService {
     )) as SessionRow[]
 
     return rows[0] ?? null
-  }
-
-  private async wasSessionStartedByDevice(
-    manager: EntityManager,
-    sessionId: string,
-    deviceId: string,
-  ) {
-    const rows = (await manager.query(
-      `
-        SELECT EXISTS (
-          SELECT 1
-          FROM integration_events
-          WHERE ai_session_id = $1
-            AND device_id = $2
-            AND event = 'UserPromptSubmit'
-        ) AS matches
-      `,
-      [sessionId, deviceId],
-    )) as Array<{ matches: boolean }>
-
-    return rows[0]?.matches === true
   }
 
   private async lockUserSessions(manager: EntityManager, userId: string) {

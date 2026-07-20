@@ -173,7 +173,11 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
   test('GitHub OAuth uses state and PKCE, then creates hash-only cookies', async () => {
     const agent = request.agent(app.getHttpServer())
-    const startResponse = await agent.get('/api/v1/auth/github').expect(302)
+    const returnPath = '/devices/connect/123e4567-e89b-42d3-a456-426614174000'
+    const startResponse = await agent
+      .get('/api/v1/auth/github')
+      .query({ returnTo: returnPath })
+      .expect(302)
     const authorizationUrl = new URL(startResponse.headers.location)
     const state = authorizationUrl.searchParams.get('state')
     const codeChallenge = authorizationUrl.searchParams.get('code_challenge')
@@ -207,7 +211,10 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .query({ code: 'temporary-github-code', state })
       .expect(302)
 
-    assert.equal(callbackResponse.headers.location, 'http://localhost:5173/')
+    assert.equal(
+      callbackResponse.headers.location,
+      `http://localhost:5173${returnPath}`,
+    )
     assert.match(callbackCodeVerifier ?? '', /^[A-Za-z0-9_-]{43}$/)
 
     const sessionSetCookie = getSetCookie(
@@ -236,6 +243,29 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       displayName: 'Octo Cat',
       avatarUrl: 'https://avatars.githubusercontent.com/u/123456',
       githubLogin: 'octocat',
+      timeZone: 'UTC',
+      timeZoneVerified: false,
+    })
+
+    await agent.patch('/api/v1/auth/me/time-zone').send({ timeZone: 'Asia/Seoul' }).expect(403)
+    await agent
+      .patch('/api/v1/auth/me/time-zone')
+      .set('x-csrf-token', csrfToken)
+      .send({ timeZone: 'Invalid/Nowhere' })
+      .expect(400)
+      .expect(({ body }) => assert.equal(body.error.code, 'INVALID_TIME_ZONE'))
+    await agent
+      .patch('/api/v1/auth/me/time-zone')
+      .set('x-csrf-token', csrfToken)
+      .send({ timeZone: 'Asia/Seoul' })
+      .expect(200)
+      .expect(({ body }) => assert.deepEqual(body.data, {
+        timeZone: 'Asia/Seoul',
+        timeZoneVerified: true,
+      }))
+    await agent.get('/api/v1/auth/me').expect(200).expect(({ body }) => {
+      assert.equal(body.data.timeZone, 'Asia/Seoul')
+      assert.equal(body.data.timeZoneVerified, true)
     })
 
     const [storedSession] = await databaseService.query<
@@ -335,5 +365,90 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       response.headers.location,
       'http://localhost:5173/?authError=github_oauth_failed',
     )
+  })
+
+  test('OAuth return path rejects external redirects', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/auth/github')
+      .query({ returnTo: '//evil.example/steal' })
+      .expect(400)
+  })
+
+  test('user export excludes secrets and account deletion removes owned server data', async () => {
+    const agent = request.agent(app.getHttpServer())
+    const startResponse = await agent.get('/api/v1/auth/github').expect(302)
+    const state = new URL(startResponse.headers.location).searchParams.get('state')
+    const callbackResponse = await agent
+      .get('/api/v1/auth/github/callback')
+      .query({ code: 'temporary-github-code', state })
+      .expect(302)
+    const csrfCookie = getCookiePair(getSetCookie(callbackResponse, 'aisidequest_csrf'))
+    const csrfToken = csrfCookie.slice(csrfCookie.indexOf('=') + 1)
+    const currentUser = await agent.get('/api/v1/auth/me').expect(200)
+    const userId = currentUser.body.data.id as string
+
+    await agent.post('/api/v1/auth/me/export').send({}).expect(403)
+    const exportResponse = await agent
+      .post('/api/v1/auth/me/export')
+      .set('x-csrf-token', csrfToken)
+      .send({})
+      .expect(200)
+    const exported = JSON.stringify(exportResponse.body.data)
+
+    assert.equal(exportResponse.body.data.schemaVersion, 1)
+    assert.equal(exportResponse.body.data.profile.id, userId)
+    assert.doesNotMatch(exported, /tokenHash|csrfToken|requestHash|responseBody|externalSessionKey|externalTurnKey/i)
+
+    await databaseService.query(`
+      UPDATE auth_sessions
+      SET created_at = now() - interval '16 minutes'
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+    `, [userId])
+    await agent
+      .post('/api/v1/auth/me/export')
+      .set('x-csrf-token', csrfToken)
+      .send({})
+      .expect(403)
+      .expect(({ body }) => assert.equal(body.error.code, 'RECENT_AUTHENTICATION_REQUIRED'))
+    await databaseService.query(`
+      UPDATE auth_sessions SET created_at = now() - interval '1 minute'
+      WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()
+    `, [userId])
+
+    const [otherUser] = await databaseService.query<Array<{ id: string }>>(`
+      INSERT INTO users (display_name) VALUES ('Preserved user') RETURNING id
+    `)
+    const deleted = await agent
+      .delete('/api/v1/auth/me')
+      .set('x-csrf-token', csrfToken)
+      .send({ confirmation: 'DELETE' })
+      .expect(200)
+
+    assert.equal(deleted.body.data.deleted, true)
+    assert.match(deleted.body.data.localPluginAction, /플러그인/)
+    assert.match(getSetCookie(deleted, 'aisidequest_session'), /Expires=Thu, 01 Jan 1970/i)
+    await agent.get('/api/v1/auth/me').expect(401)
+
+    const [counts] = await databaseService.query<Array<{ deleted_user: number; other_user: number }>>(`
+      SELECT
+        (SELECT count(*)::integer FROM users WHERE id = $1) AS deleted_user,
+        (SELECT count(*)::integer FROM users WHERE id = $2) AS other_user
+    `, [userId, otherUser.id])
+    assert.deepEqual(counts, { deleted_user: 0, other_user: 1 })
+  })
+
+  test('OAuth start rate limit is shared in PostgreSQL and returns Retry-After', async () => {
+    await databaseService.query("DELETE FROM rate_limit_buckets WHERE scope = 'OAUTH_START'")
+
+    for (let index = 0; index < 10; index += 1) {
+      await request(app.getHttpServer()).get('/api/v1/auth/github').expect(302)
+    }
+
+    const limited = await request(app.getHttpServer())
+      .get('/api/v1/auth/github')
+      .expect(429)
+
+    assert.equal(limited.body.error.code, 'RATE_LIMITED')
+    assert.equal(limited.headers['retry-after'], '600')
   })
 }

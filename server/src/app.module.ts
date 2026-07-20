@@ -6,7 +6,12 @@ import { validateEnvironment } from './config/environment'
 import { DatabaseModule } from './database/database.module'
 import { DeviceModule } from './devices/device.module'
 import { HealthModule } from './health/health.module'
+import { PointModule } from './points/point.module'
+import { QuestModule } from './quests/quest.module'
 import { SessionModule } from './sessions/session.module'
+import { StatisticsModule } from './statistics/statistics.module'
+import { SecurityModule } from './security/security.module'
+import { ObservabilityModule } from './observability/observability.module'
 
 @Module({
   imports: [
@@ -16,9 +21,14 @@ import { SessionModule } from './sessions/session.module'
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    SecurityModule,
+    ObservabilityModule,
     AuthModule,
     DeviceModule,
     SessionModule,
+    QuestModule,
+    PointModule,
+    StatisticsModule,
     HealthModule,
   ],
 })

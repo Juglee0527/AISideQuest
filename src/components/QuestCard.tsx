@@ -1,23 +1,29 @@
 import { Check, Clock3, Coins } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import type { Quest } from '../types/quest'
 
 interface QuestCardProps {
   quest: Quest
   sequence: number
-  isSessionActive: boolean
-  isCompleted: boolean
-  onComplete: () => void
 }
 
 function QuestCard({
   quest,
   sequence,
-  isSessionActive,
-  isCompleted,
-  onComplete,
 }: QuestCardProps) {
-  const isCompletionDisabled = !isSessionActive || isCompleted
+  const isCompleted = quest.completionStatus === 'PASSED'
+  const hasActiveAttempt = quest.completionStatus === 'IN_PROGRESS'
+  const actionLabel = isCompleted
+    ? '결과 보기'
+    : hasActiveAttempt
+      ? '이어서 응시'
+      : quest.completionStatus === 'FAILED'
+        ? quest.retryAllowed ? '결과 및 재응시' : '결과 보기'
+        : '퀴즈 시작'
+  const actionPath = quest.latestAttempt
+    ? `/quest-attempts/${quest.latestAttempt.id}`
+    : `/quests/${quest.code}`
 
   return (
     <article
@@ -34,6 +40,14 @@ function QuestCard({
         {isCompleted ? (
           <span className="grid size-7 place-items-center rounded-full bg-emerald-400 text-slate-950">
             <Check size={16} strokeWidth={3} aria-hidden="true" />
+          </span>
+        ) : quest.completionStatus === 'IN_PROGRESS' ? (
+          <span className="rounded-full bg-sky-400/10 px-2.5 py-1 text-xs font-bold text-sky-300">
+            응시 진행 중
+          </span>
+        ) : quest.completionStatus === 'FAILED' ? (
+          <span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-xs font-bold text-amber-300">
+            {quest.retryAllowed ? '재도전 가능' : '응시 종료'}
           </span>
         ) : (
           <span className="size-2 rounded-full bg-emerald-400/70" aria-hidden="true" />
@@ -56,20 +70,18 @@ function QuestCard({
             <Coins size={14} aria-hidden="true" />
             예상 보상
           </dt>
-          <dd className="mt-1.5 font-bold text-amber-300">{quest.reward.toLocaleString('ko-KR')}P</dd>
+          <dd className="mt-1.5 font-bold text-amber-300">{quest.rewardPoints.toLocaleString('ko-KR')}P</dd>
         </div>
       </dl>
 
-      <button
-        type="button"
-        onClick={onComplete}
-        disabled={isCompletionDisabled}
-        aria-label={isCompleted ? `${quest.title} 완료됨` : `${quest.title} 완료하기`}
-        className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500"
+      <Link
+        to={actionPath}
+        aria-label={`${quest.title} ${actionLabel}`}
+        className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-300"
       >
         <Check size={17} aria-hidden="true" />
-        {isCompleted ? '완료됨' : isSessionActive ? '퀘스트 완료' : '세션 시작 후 완료 가능'}
-      </button>
+        {actionLabel}
+      </Link>
     </article>
   )
 }

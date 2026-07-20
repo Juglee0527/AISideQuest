@@ -62,6 +62,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'api_idempotency_keys',
       'auth_sessions',
       'device_link_codes',
+      'device_link_requests',
       'devices',
       'integration_events',
       'oauth_login_states',
@@ -71,6 +72,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'quest_options',
       'quest_questions',
       'quests',
+      'rate_limit_buckets',
       'user_auth_accounts',
       'users',
     ]
@@ -91,21 +93,141 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(await dataSource.runMigrations(), [])
 
     await dataSource.undoLastMigration()
-    const [recoveryIndexReverted] = (await dataSource.query(`
+    const [browserLinkingReverted] = (await dataSource.query(`
       SELECT
-        to_regclass(
-          'public.ix_ai_sessions_manual_expiration'
-        ) AS recovery_index,
-        to_regclass('public.device_link_codes') AS device_link_codes_table
+        to_regclass('public.device_link_requests') AS request_table,
+        (SELECT count(*)::integer
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'oauth_login_states'
+           AND column_name = 'return_path') AS return_path_column
+    `)) as Array<{ request_table: string | null; return_path_column: number }>
+    assert.deepEqual(browserLinkingReverted, {
+      request_table: null,
+      return_path_column: 0,
+    })
+
+    await dataSource.undoLastMigration()
+    const [diagnosticsReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'devices'
+        AND column_name = 'diagnostics_reported_at'
+    `)) as Array<{ count: number }>
+    assert.equal(diagnosticsReverted.count, 0)
+
+    await dataSource.undoLastMigration()
+    const [securityReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.rate_limit_buckets') AS rate_limit_table
+    `)) as Array<{ rate_limit_table: string | null }>
+    assert.equal(securityReverted.rate_limit_table, null)
+
+    await dataSource.undoLastMigration()
+    const [statisticsReverted] = (await dataSource.query(`
+      SELECT
+        (SELECT count(*)::integer
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users'
+           AND column_name = 'time_zone_verified') AS verified_column,
+        to_regclass('public.ix_ai_sessions_user_interval') AS session_index,
+        to_regclass('public.ix_quest_attempts_user_completed_passed') AS attempt_index
     `)) as Array<{
-      recovery_index: string | null
-      device_link_codes_table: string | null
+      verified_column: number
+      session_index: string | null
+      attempt_index: string | null
     }>
-    assert.equal(recoveryIndexReverted.recovery_index, null)
-    assert.equal(
-      recoveryIndexReverted.device_link_codes_table,
-      'device_link_codes',
-    )
+    assert.deepEqual(statisticsReverted, {
+      verified_column: 0,
+      session_index: null,
+      attempt_index: null,
+    })
+
+    await dataSource.undoLastMigration()
+    const [legacyLedgerIndex] = (await dataSource.query(`
+      SELECT indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'ix_point_ledger_user_created'
+    `)) as Array<{ indexdef: string }>
+    assert.doesNotMatch(legacyLedgerIndex.indexdef, /id DESC/)
+
+    await seedDevelopmentQuests(dataSource)
+    const [migrationUser] = (await dataSource.query(`
+      INSERT INTO users (display_name)
+      VALUES ('Point migration user')
+      RETURNING id
+    `)) as Array<{ id: string }>
+    const [migrationSession] = (await dataSource.query(`
+      INSERT INTO ai_sessions (
+        user_id, status, origin, ended_at, terminal_reason
+      ) VALUES ($1, 'COMPLETED', 'MANUAL', now(), 'MANUAL_COMPLETED')
+      RETURNING id
+    `, [migrationUser.id])) as Array<{ id: string }>
+    const [migrationQuest] = (await dataSource.query(`
+      SELECT id FROM quests WHERE code = 'typescript-type-narrowing'
+    `)) as Array<{ id: string }>
+    const [migrationAttempt] = (await dataSource.query(`
+      INSERT INTO quest_attempts (
+        user_id, quest_id, ai_session_id, status,
+        submitted_at, completed_at, score, passed, reward_points_snapshot
+      ) VALUES ($1, $2, $3, 'COMPLETED', now(), now(), 100, true, 100)
+      RETURNING id
+    `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
+
+    const pointMigrations = await dataSource.runMigrations()
+    assert.equal(pointMigrations.length, 5)
+    const [backfill] = (await dataSource.query(`
+      SELECT points, quest_attempt_id
+      FROM point_ledger
+      WHERE user_id = $1
+    `, [migrationUser.id])) as Array<{ points: number; quest_attempt_id: string }>
+    assert.deepEqual(backfill, { points: 100, quest_attempt_id: migrationAttempt.id })
+    const [ledgerIndex] = (await dataSource.query(`
+      SELECT indexdef
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND indexname = 'ix_point_ledger_user_created'
+    `)) as Array<{ indexdef: string }>
+    assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
+
+    await dataSource.undoLastMigration()
+    await dataSource.undoLastMigration()
+    await dataSource.undoLastMigration()
+    await dataSource.query('DELETE FROM point_ledger')
+    await dataSource.query('DELETE FROM quest_attempts WHERE id = $1', [migrationAttempt.id])
+    await dataSource.query('DELETE FROM ai_sessions WHERE id = $1', [migrationSession.id])
+    await dataSource.query('DELETE FROM users WHERE id = $1', [migrationUser.id])
+
+    await dataSource.undoLastMigration()
+    await dataSource.undoLastMigration()
+    await dataSource.undoLastMigration()
+    const [attemptFlowReverted] = (await dataSource.query(`
+      SELECT is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quest_attempt_answers'
+        AND column_name = 'is_correct'
+    `)) as Array<{ is_nullable: string }>
+    assert.equal(attemptFlowReverted.is_nullable, 'NO')
+
+    await dataSource.undoLastMigration()
+    const [questListingReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'quests'
+        AND column_name = 'retry_allowed'
+    `)) as Array<{ count: number }>
+    assert.equal(questListingReverted.count, 0)
+
+    await dataSource.undoLastMigration()
+    const [heartbeatReverted] = (await dataSource.query(`
+      SELECT count(*)::integer AS count
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'integration_events'
+        AND column_name = 'sequence'
+    `)) as Array<{ count: number }>
+    assert.equal(heartbeatReverted.count, 0)
 
     await dataSource.undoLastMigration()
     const [deviceLinkingReverted] = (await dataSource.query(`
@@ -153,7 +275,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 5)
+    assert.equal(reappliedMigrations.length, 12)
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
@@ -251,25 +373,43 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'd'.repeat(64),
     ]
 
-    const insertEvent = () =>
+    const insertEvent = (sequence = 1) =>
       dataSource.query(
         `
           INSERT INTO integration_events (
-            event_id, device_id, user_id, event,
+            event_id, sequence, device_id, user_id, event,
             external_session_key, external_turn_key,
             observed_at, processing_result, request_hash
           )
           VALUES (
-            $1, $2, $3, 'UserPromptSubmit', $4, $5,
+            $1, $7, $2, $3, 'UserPromptSubmit', $4, $5,
             now(), 'APPLIED', $6
           )
         `,
-        eventParameters,
+        [...eventParameters, sequence],
       )
 
     await insertEvent()
     await assert.rejects(insertEvent(), (error: unknown) =>
       hasPostgresCode(error, '23505'),
+    )
+
+    await assert.rejects(
+      dataSource.query(
+        `
+          INSERT INTO integration_events (
+            event_id, sequence, device_id, user_id, event,
+            external_session_key, external_turn_key,
+            observed_at, processing_result, request_hash
+          )
+          VALUES (
+            $1, 1, $2, $3, 'UserPromptSubmit', $4, $5,
+            now(), 'APPLIED', $6
+          )
+        `,
+        [randomUUID(), ...eventParameters.slice(1)],
+      ),
+      (error: unknown) => hasPostgresCode(error, '23505'),
     )
 
     await assert.rejects(

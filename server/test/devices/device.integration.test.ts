@@ -9,7 +9,10 @@ import request from 'supertest'
 import { DataSource } from 'typeorm'
 
 import { AppModule } from '../../src/app.module'
-import { hashToken } from '../../src/auth/auth-crypto'
+import {
+  createPkceChallenge,
+  hashToken,
+} from '../../src/auth/auth-crypto'
 import { configureApplication } from '../../src/bootstrap/configure-application'
 import { validateEnvironment } from '../../src/config/environment'
 import { createDataSourceOptions } from '../../src/database/data-source'
@@ -138,6 +141,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
   beforeEach(async () => {
     await databaseService.query(`
       DELETE FROM integration_events;
+      DELETE FROM device_link_requests;
       DELETE FROM device_link_codes;
       DELETE FROM api_idempotency_keys;
       DELETE FROM devices;
@@ -175,6 +179,30 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
         deviceName: 'Windows Codex',
         pluginVersion: '0.1.0',
       })
+  }
+
+  function createBrowserLinkRequest(
+    requestId: string,
+    verifier: string,
+    token: string,
+    idempotencyKey = requestId,
+  ) {
+    return request(app.getHttpServer())
+      .post('/api/v1/device-link-requests')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({
+        requestId,
+        verifierChallenge: createPkceChallenge(verifier),
+        deviceTokenHash: hashToken(token),
+        deviceName: 'Browser Codex',
+        pluginVersion: '0.2.0',
+      })
+  }
+
+  function completeBrowserLinkRequest(requestId: string, verifier: string) {
+    return request(app.getHttpServer())
+      .post(`/api/v1/device-link-requests/${requestId}/complete`)
+      .send({ verifier })
   }
 
   async function linkDevice(identity: TestIdentity): Promise<LinkedDevice> {
@@ -264,6 +292,87 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.notEqual(stored.code_hash, code)
     assert.notEqual(stored.token_hash, token)
     assert.equal(stored.devices, 1)
+  })
+
+  test('approves a browser request without exposing a code or raw device token', async () => {
+    const requestId = randomUUID()
+    const verifier = randomBytes(32).toString('base64url')
+    const token = randomBytes(32).toString('base64url')
+    const created = await createBrowserLinkRequest(
+      requestId,
+      verifier,
+      token,
+    ).expect(200)
+
+    assert.equal(created.body.data.request.status, 'PENDING')
+    assert.equal(
+      created.body.data.request.verificationUrl,
+      `http://localhost:5173/devices/connect/${requestId}`,
+    )
+
+    const pending = await completeBrowserLinkRequest(
+      requestId,
+      verifier,
+    ).expect(200)
+    assert.equal(pending.body.data.request.status, 'PENDING')
+    assert.equal(pending.body.data.retryAfterMs, 1_000)
+
+    await completeBrowserLinkRequest(
+      requestId,
+      randomBytes(32).toString('base64url'),
+    ).expect(401)
+
+    const approvalKey = randomUUID()
+    const approve = () => request(app.getHttpServer())
+      .post(`/api/v1/device-link-requests/${requestId}/approve`)
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', approvalKey)
+
+    const approved = await approve().expect(200)
+    const replayed = await approve().expect(200)
+    assert.deepEqual(replayed.body.data, approved.body.data)
+    assert.equal(approved.body.data.request.status, 'APPROVED')
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/device-link-requests/${requestId}`)
+      .set('Cookie', cookieHeader(secondIdentity))
+      .expect(404)
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/device-link-requests/${requestId}/approve`)
+      .set('Cookie', cookieHeader(secondIdentity))
+      .set('x-csrf-token', secondIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .expect(409)
+
+    const completed = await completeBrowserLinkRequest(
+      requestId,
+      verifier,
+    ).expect(200)
+    assert.equal(completed.body.data.request.status, 'APPROVED')
+    assert.equal(completed.body.data.device.id, approved.body.data.device.id)
+    await sendTestEvent(token).expect(200)
+
+    const [stored] = await databaseService.query<Array<{
+      verifier_challenge: string
+      device_token_hash: string
+      token_hash: string
+    }>>(`
+      SELECT
+        device_link_requests.verifier_challenge,
+        device_link_requests.device_token_hash,
+        devices.token_hash
+      FROM device_link_requests
+      JOIN devices ON devices.id = device_link_requests.device_id
+      WHERE device_link_requests.id = $1
+    `, [requestId])
+
+    assert.equal(stored.verifier_challenge, createPkceChallenge(verifier))
+    assert.equal(stored.device_token_hash, hashToken(token))
+    assert.equal(stored.token_hash, hashToken(token))
+    assert.notEqual(stored.verifier_challenge, verifier)
+    assert.notEqual(stored.device_token_hash, token)
   })
 
   test('isolates owners and rotates a token before accepting a test event', async () => {

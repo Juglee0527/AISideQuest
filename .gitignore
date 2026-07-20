@@ -6,5 +6,10 @@ server/dist-test
 !.env.example
 *.local
 *.log
+backups/
+e2e-artifacts/
+playwright-report/
+test-results/
+ops/release-state/
 .DS_Store
 Thumbs.db

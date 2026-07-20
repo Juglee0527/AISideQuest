@@ -12,14 +12,18 @@ export interface AuthUser {
   displayName: string
   avatarUrl: string | null
   githubLogin: string
+  timeZone: string
+  timeZoneVerified: boolean
 }
 
 export interface AuthSessionContext {
   sessionId: string
   csrfTokenHash: string
+  authenticatedAt: Date
   user: AuthUser
 }
 
 export interface AuthenticatedRequest extends Request {
   auth: AuthSessionContext
+  responseServerTime?: string
 }

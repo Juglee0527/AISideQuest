@@ -3,7 +3,7 @@ function isRecord(value) {
 }
 
 export class ApiRequestError extends Error {
-  constructor(message, { status, code, retryAfterMs = null }) {
+  constructor(message, { status = null, code = 'NETWORK_ERROR', retryAfterMs = null } = {}) {
     super(message)
     this.name = 'ApiRequestError'
     this.status = status
@@ -20,11 +20,11 @@ function parseRetryAfter(value, now = Date.now()) {
   const seconds = Number(value)
 
   if (Number.isFinite(seconds) && seconds >= 0) {
-    return Math.floor(seconds * 1_000)
+    return Math.round(seconds * 1_000)
   }
 
-  const date = Date.parse(value)
-  return Number.isFinite(date) ? Math.max(0, date - now) : null
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now) : null
 }
 
 export function normalizeApiUrl(value) {
@@ -45,33 +45,37 @@ export async function postApi(
   fetchImpl = fetch,
   signal,
 ) {
-  const response = await fetchImpl(`${apiUrl}${path}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: JSON.stringify(body),
-    signal,
-  })
+  let response
+
+  try {
+    response = await fetchImpl(`${apiUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: JSON.stringify(body),
+      signal,
+    })
+  } catch (error) {
+    throw new ApiRequestError(
+      error instanceof Error ? error.message : 'AISideQuest API 네트워크 요청에 실패했습니다.',
+    )
+  }
   let payload
 
   try {
     payload = await response.json()
   } catch {
-    if (!response.ok) {
-      throw new ApiRequestError(
-        `AISideQuest API가 JSON이 아닌 오류 응답을 반환했습니다. (${response.status})`,
-        {
-          status: response.status,
-          code: 'NON_JSON_ERROR_RESPONSE',
-          retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
-        },
-      )
-    }
-
-    throw new Error(`AISideQuest API가 JSON이 아닌 응답을 반환했습니다. (${response.status})`)
+    throw new ApiRequestError(
+      `AISideQuest API가 JSON이 아닌 응답을 반환했습니다. (${response.status})`,
+      {
+        status: response.status,
+        code: 'INVALID_RESPONSE',
+        retryAfterMs: parseRetryAfter(response.headers.get('retry-after')),
+      },
+    )
   }
 
   if (!response.ok) {

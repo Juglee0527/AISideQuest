@@ -82,24 +82,24 @@ async function findOrCreateQuest(
     `
       INSERT INTO quests (
         code, version, type, status, title, description,
-        estimated_minutes, reward_points, pass_score, published_at
+        estimated_minutes, reward_points, pass_score
       )
-      VALUES ($1, 1, 'MULTIPLE_CHOICE', 'PUBLISHED', $2, $3, 2, 100, 100, $4)
+      VALUES ($1, 1, 'MULTIPLE_CHOICE', 'DRAFT', $2, $3, 2, 100, 100)
       ON CONFLICT (code, version) DO NOTHING
     `,
-    [seed.code, seed.title, seed.description, '2026-07-16T00:00:00.000Z'],
+    [seed.code, seed.title, seed.description],
   )
 
   const rows = (await manager.query(
-    'SELECT id FROM quests WHERE code = $1 AND version = 1',
+    'SELECT id, status FROM quests WHERE code = $1 AND version = 1',
     [seed.code],
-  )) as Array<{ id: string }>
+  )) as Array<{ id: string; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' }>
 
   if (!rows[0]) {
     throw new Error(`Failed to find seeded quest: ${seed.code}`)
   }
 
-  return rows[0].id
+  return rows[0]
 }
 
 async function findOrCreateQuestion(
@@ -150,14 +150,26 @@ async function seedOptions(
 export async function seedDevelopmentQuests(dataSource: DataSource) {
   await dataSource.transaction(async (manager) => {
     for (const seed of DEVELOPMENT_QUESTS) {
-      const questId = await findOrCreateQuest(manager, seed)
+      const quest = await findOrCreateQuest(manager, seed)
+      if (quest.status !== 'DRAFT') {
+        continue
+      }
+
       const questionId = await findOrCreateQuestion(
         manager,
-        questId,
+        quest.id,
         seed.question,
       )
 
       await seedOptions(manager, questionId, seed)
+      await manager.query(
+        `UPDATE quests
+         SET status = 'PUBLISHED',
+             published_at = $2,
+             updated_at = now()
+         WHERE id = $1 AND status = 'DRAFT'`,
+        [quest.id, '2026-07-16T00:00:00.000Z'],
+      )
     }
   })
 }

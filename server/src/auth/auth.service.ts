@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import type { EntityManager } from 'typeorm'
 
@@ -19,6 +19,7 @@ import { GithubOAuthClient } from './github-oauth.client'
 
 interface OAuthStateRow {
   code_verifier: string
+  return_path: string | null
 }
 
 interface UserRow {
@@ -26,11 +27,14 @@ interface UserRow {
   display_name: string
   avatar_url: string | null
   provider_login: string
+  time_zone: string
+  time_zone_verified: boolean
 }
 
 interface AuthSessionRow extends UserRow {
   session_id: string
   csrf_token_hash: string
+  authenticated_at: Date
 }
 
 interface CreatedSessionRow {
@@ -43,6 +47,7 @@ export interface CompletedLogin {
   sessionToken: string
   csrfToken: string
   expiresAt: Date
+  redirectUrl: string
 }
 
 @Injectable()
@@ -53,7 +58,7 @@ export class AuthService {
     private readonly configService: ConfigService<AppEnvironment, true>,
   ) {}
 
-  async beginGithubLogin() {
+  async beginGithubLogin(returnPath?: string) {
     this.githubOAuthClient.assertConfigured()
 
     const state = createRandomToken()
@@ -65,11 +70,11 @@ export class AuthService {
     await this.databaseService.query(
       `
         INSERT INTO oauth_login_states (
-          state_hash, code_verifier, expires_at
+          state_hash, code_verifier, return_path, expires_at
         )
-        VALUES ($1, $2, now() + interval '10 minutes')
+        VALUES ($1, $2, $3, now() + interval '10 minutes')
       `,
-      [hashToken(state), codeVerifier],
+      [hashToken(state), codeVerifier, returnPath ?? null],
     )
 
     return {
@@ -90,14 +95,14 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'OAUTH_CALLBACK_INVALID' })
     }
 
-    const codeVerifier = await this.consumeOAuthState(
+    const oauthState = await this.consumeOAuthState(
       returnedState,
       stateCookie,
     )
 
     const profile = await this.githubOAuthClient.getAuthenticatedUser(
       code,
-      codeVerifier,
+      oauthState.codeVerifier,
     )
     const sessionToken = createRandomToken()
     const csrfToken = createRandomToken()
@@ -135,6 +140,7 @@ export class AuthService {
         sessionToken,
         csrfToken,
         expiresAt: session.expires_at,
+        redirectUrl: this.resolveSuccessRedirect(oauthState.returnPath),
       }
     })
   }
@@ -156,9 +162,12 @@ export class AuthService {
         SELECT
           auth_sessions.id AS session_id,
           auth_sessions.csrf_token_hash,
+          auth_sessions.created_at AS authenticated_at,
           users.id,
           users.display_name,
           users.avatar_url,
+          users.time_zone,
+          users.time_zone_verified,
           user_auth_accounts.provider_login
         FROM auth_sessions
         JOIN users ON users.id = auth_sessions.user_id
@@ -191,6 +200,7 @@ export class AuthService {
     return {
       sessionId: session.session_id,
       csrfTokenHash: session.csrf_token_hash,
+      authenticatedAt: session.authenticated_at,
       user: this.mapUser(session),
     }
   }
@@ -211,6 +221,39 @@ export class AuthService {
       `,
       [session.sessionId],
     )
+  }
+
+  async updateTimeZone(userId: string, timeZone: string) {
+    if (
+      timeZone.length > 100
+      || !/^[A-Za-z0-9._+-]+(?:\/[A-Za-z0-9._+-]+)*$/.test(timeZone)
+    ) {
+      throw new BadRequestException({
+        code: 'INVALID_TIME_ZONE',
+        message: '유효한 IANA time zone ID를 입력해 주세요.',
+      })
+    }
+
+    const zones = await this.databaseService.query<Array<{ name: string }>>(
+      'SELECT name FROM pg_timezone_names WHERE name = $1 LIMIT 1',
+      [timeZone],
+    )
+    if (!zones[0]) {
+      throw new BadRequestException({
+        code: 'INVALID_TIME_ZONE',
+        message: '서버에서 지원하는 IANA time zone ID가 아닙니다.',
+      })
+    }
+
+    await this.databaseService.query(
+      `UPDATE users
+       SET time_zone = $2,
+           time_zone_verified = true,
+           updated_at = now()
+       WHERE id = $1 AND deleted_at IS NULL`,
+      [userId, zones[0].name],
+    )
+    return { timeZone: zones[0].name, timeZoneVerified: true }
   }
 
   get successRedirectUrl() {
@@ -236,6 +279,8 @@ export class AuthService {
           users.id,
           users.display_name,
           users.avatar_url,
+          users.time_zone,
+          users.time_zone_verified,
           user_auth_accounts.provider_login
         FROM user_auth_accounts
         JOIN users ON users.id = user_auth_accounts.user_id
@@ -256,7 +301,7 @@ export class AuthService {
               updated_at = now()
           WHERE id = $1
             AND deleted_at IS NULL
-          RETURNING id, display_name, avatar_url
+          RETURNING id, display_name, avatar_url, time_zone, time_zone_verified
         `,
         [existingUser.id, displayName, profile.avatarUrl],
       )) as Array<Omit<UserRow, 'provider_login'>>
@@ -281,6 +326,8 @@ export class AuthService {
         displayName,
         avatarUrl: profile.avatarUrl,
         githubLogin: profile.login,
+        timeZone: existingUser.time_zone,
+        timeZoneVerified: existingUser.time_zone_verified,
       }
     }
 
@@ -288,7 +335,7 @@ export class AuthService {
       `
         INSERT INTO users (display_name, avatar_url)
         VALUES ($1, $2)
-        RETURNING id, display_name, avatar_url
+        RETURNING id, display_name, avatar_url, time_zone, time_zone_verified
       `,
       [displayName, profile.avatarUrl],
     )) as Array<Omit<UserRow, 'provider_login'>>
@@ -313,6 +360,8 @@ export class AuthService {
       displayName: user.display_name,
       avatarUrl: user.avatar_url,
       githubLogin: profile.login,
+      timeZone: user.time_zone,
+      timeZoneVerified: user.time_zone_verified,
     }
   }
 
@@ -322,6 +371,8 @@ export class AuthService {
       displayName: row.display_name,
       avatarUrl: row.avatar_url,
       githubLogin: row.provider_login,
+      timeZone: row.time_zone,
+      timeZoneVerified: row.time_zone_verified,
     }
   }
 
@@ -345,7 +396,7 @@ export class AuthService {
         DELETE FROM oauth_login_states
         WHERE state_hash = $1
           AND expires_at > now()
-        RETURNING code_verifier
+        RETURNING code_verifier, return_path
       `,
       [hashToken(returnedState)],
     )
@@ -355,6 +406,22 @@ export class AuthService {
       throw new UnauthorizedException({ code: 'OAUTH_STATE_INVALID' })
     }
 
-    return oauthState.code_verifier
+    return {
+      codeVerifier: oauthState.code_verifier,
+      returnPath: oauthState.return_path,
+    }
+  }
+
+  private resolveSuccessRedirect(returnPath: string | null) {
+    if (!returnPath) {
+      return this.successRedirectUrl
+    }
+
+    const origin = this.configService.getOrThrow('CORS_ORIGIN')
+    const redirectUrl = new URL(returnPath, origin)
+
+    return redirectUrl.origin === origin
+      ? redirectUrl.toString()
+      : this.successRedirectUrl
   }
 }

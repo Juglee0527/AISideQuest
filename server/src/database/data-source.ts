@@ -7,7 +7,14 @@ import { InitialSchema1784160000000 } from './migrations/1784160000000-initial-s
 import { AddAuthentication1784163600000 } from './migrations/1784163600000-add-authentication'
 import { AddSessionApiIdempotency1784167200000 } from './migrations/1784167200000-add-session-api-idempotency'
 import { AddDeviceLinking1784170800000 } from './migrations/1784170800000-add-device-linking'
-import { AddSessionRecoveryIndex1784257200000 } from './migrations/1784257200000-add-session-recovery-index'
+import { AddHeartbeatRecovery1784174400000 } from './migrations/1784174400000-add-heartbeat-recovery'
+import { AddQuestListing1784178000000 } from './migrations/1784178000000-add-quest-listing'
+import { AddQuestAttemptFlow1784181600000 } from './migrations/1784181600000-add-quest-attempt-flow'
+import { AddPointLedger1784185200000 } from './migrations/1784185200000-add-point-ledger'
+import { AddServerStatistics1784188800000 } from './migrations/1784188800000-add-server-statistics'
+import { AddSecurityControls1784192400000 } from './migrations/1784192400000-add-security-controls'
+import { AddOperationalDiagnostics1784196000000 } from './migrations/1784196000000-add-operational-diagnostics'
+import { AddBrowserDeviceLinking1784199600000 } from './migrations/1784199600000-add-browser-device-linking'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -25,7 +32,14 @@ export function createDataSourceOptions(
       AddAuthentication1784163600000,
       AddSessionApiIdempotency1784167200000,
       AddDeviceLinking1784170800000,
-      AddSessionRecoveryIndex1784257200000,
+      AddHeartbeatRecovery1784174400000,
+      AddQuestListing1784178000000,
+      AddQuestAttemptFlow1784181600000,
+      AddPointLedger1784185200000,
+      AddServerStatistics1784188800000,
+      AddSecurityControls1784192400000,
+      AddOperationalDiagnostics1784196000000,
+      AddBrowserDeviceLinking1784199600000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

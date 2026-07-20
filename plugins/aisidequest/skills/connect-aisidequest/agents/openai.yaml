@@ -1,0 +1,4 @@
+interface:
+  display_name: "AISideQuest 연결"
+  short_description: "브라우저 승인으로 AISideQuest 기기를 연결합니다."
+  default_prompt: "AISideQuest를 이 Codex에 연결해 주세요."

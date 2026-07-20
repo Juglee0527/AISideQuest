@@ -1,4 +1,4 @@
-import { postApi } from './api-client.mjs'
+import { ApiRequestError, postApi } from './api-client.mjs'
 import { readDeviceConfig } from './device-config.mjs'
 
 const DEFAULT_DELIVERY_TIMEOUT_MS = 3_000
@@ -11,7 +11,15 @@ export async function sendIntegrationEvent(
     timeoutMs = DEFAULT_DELIVERY_TIMEOUT_MS,
   } = {},
 ) {
-  const config = await readDeviceConfig(environment)
+  let config
+  try {
+    config = await readDeviceConfig(environment)
+  } catch (error) {
+    throw new ApiRequestError(
+      error instanceof Error ? error.message : 'AISideQuest 기기 연결 정보가 없습니다.',
+      { status: 401, code: 'DEVICE_NOT_CONNECTED' },
+    )
+  }
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
