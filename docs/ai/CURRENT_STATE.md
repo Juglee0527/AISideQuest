@@ -34,11 +34,11 @@ Optional external deployment remains unverified:
 | Suite | Passed |
 |---|---:|
 | React | 49 |
-| Codex plugin | 16 |
+| Codex plugin | 18 |
 | operations and local startup scripts | 17 |
 | server non-database | 19 |
 | PostgreSQL integration | 50 |
-| total | 151 |
+| total | 153 |
 
 Also passed: lint, client/server typecheck, client/server production build, 13 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 

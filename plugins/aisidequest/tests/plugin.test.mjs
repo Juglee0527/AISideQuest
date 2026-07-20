@@ -23,6 +23,12 @@ import {
   sanitizeHookPayload,
 } from '../scripts/event-recorder.mjs'
 import { sendTestEvent } from '../scripts/send-test-event.mjs'
+import {
+  HEARTBEAT_FALLBACK_LEASE_MS,
+  HEARTBEAT_MAX_TURN_MS,
+  isTurnAlive,
+  readActiveTurn,
+} from '../scripts/turn-state.mjs'
 
 const LINK_CODE = '123e4567-e89b-42d3-a456-426614174000'
 const recorderScriptPath = fileURLToPath(
@@ -84,11 +90,36 @@ function runRecorder(payload, environment) {
 async function waitFor(predicate, timeoutMs = 2_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (predicate()) return
+    if (await predicate()) return
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
   throw new Error('Timed out waiting for plugin worker')
 }
+
+test('bounds heartbeat liveness by the Codex host process and fallback lease', () => {
+  const activatedAt = new Date('2026-07-20T00:00:00.000Z')
+  const turn = {
+    hostPid: 1234,
+    activatedAt: activatedAt.toISOString(),
+    lastHookAt: activatedAt.toISOString(),
+  }
+
+  assert.equal(isTurnAlive(turn, activatedAt, () => true), true)
+  assert.equal(isTurnAlive(turn, activatedAt, () => false), false)
+  assert.equal(isTurnAlive(
+    { ...turn, hostPid: null },
+    new Date(activatedAt.getTime() + HEARTBEAT_FALLBACK_LEASE_MS - 1),
+  ), true)
+  assert.equal(isTurnAlive(
+    { ...turn, hostPid: null },
+    new Date(activatedAt.getTime() + HEARTBEAT_FALLBACK_LEASE_MS),
+  ), false)
+  assert.equal(isTurnAlive(
+    turn,
+    new Date(activatedAt.getTime() + HEARTBEAT_MAX_TURN_MS),
+    () => true,
+  ), false)
+})
 
 test('keeps only the server event contract and hashed identifiers', () => {
   const event = sanitizeHookPayload(
@@ -545,6 +576,49 @@ test('emits heartbeats while a turn is active and stops after Stop', async () =>
       received.filter((body) => body.event === 'Heartbeat').length,
       countAfterStop,
     )
+  } finally {
+    await api.close()
+    await rm(dataDirectory, { recursive: true, force: true })
+  }
+})
+
+test('stops heartbeats when the Codex hook host process is gone', async () => {
+  const dataDirectory = await mkdtemp(join(tmpdir(), 'aisidequest-plugin-'))
+  const environment = {
+    AISIDEQUEST_DATA_DIR: dataDirectory,
+    AISIDEQUEST_HEARTBEAT_INTERVAL_MS: '25',
+    AISIDEQUEST_HOST_PID: '2147483647',
+  }
+  const received = []
+  const api = await startApiServer(async (request, response) => {
+    const body = await readRequest(request)
+    received.push(body)
+    response.writeHead(200, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({
+      data: request.url?.endsWith('/device-links/redeem')
+        ? { device: { id: randomUUID(), name: 'Stopped host device' } }
+        : { eventId: body.eventId, result: 'APPLIED', session: null },
+      meta: { serverTime: new Date().toISOString() },
+    }))
+  })
+
+  try {
+    await connectDevice({
+      code: LINK_CODE,
+      apiUrl: api.apiUrl,
+      deviceName: 'Stopped host device',
+      environment,
+    })
+    await runRecorder({
+      hook_event_name: 'UserPromptSubmit',
+      session_id: 'stopped-host-session',
+      turn_id: 'stopped-host-turn',
+    }, environment)
+
+    await waitFor(async () => await readActiveTurn(environment) === null)
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    assert.equal(received.some((body) => body.event === 'Heartbeat'), false)
   } finally {
     await api.close()
     await rm(dataDirectory, { recursive: true, force: true })

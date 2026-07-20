@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 
-function processExists(pid) {
+export function isProcessAlive(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false
   try {
     process.kill(pid, 0)
@@ -23,7 +23,7 @@ export async function acquireProcessLock(path) {
       owner = null
     }
 
-    if (processExists(owner?.pid)) return null
+    if (isProcessAlive(owner?.pid)) return null
     await rm(path, { recursive: true, force: true })
     await mkdir(path)
   }

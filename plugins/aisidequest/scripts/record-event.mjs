@@ -4,7 +4,7 @@ import {
   sanitizeHookPayload,
 } from './event-recorder.mjs'
 import { enqueueEvent, processNextEvent } from './delivery-queue.mjs'
-import { activateTurn, deactivateTurn } from './turn-state.mjs'
+import { activateTurn, deactivateTurn, refreshTurn } from './turn-state.mjs'
 import { launchHeartbeatWorker, launchQueueWorker } from './worker-launcher.mjs'
 
 const MAX_INPUT_BYTES = 64 * 1024
@@ -45,6 +45,7 @@ async function main() {
     await appendEvent(event, resolveDataDirectory())
     await enqueueEvent(event)
     await activateTurn(event)
+    await refreshTurn(event)
     await deactivateTurn(event)
     await processNextEvent()
     launchQueueWorker()

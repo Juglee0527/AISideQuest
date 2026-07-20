@@ -31,7 +31,7 @@ Codex hook 자동 감지와 웹의 수동 시작·종료가 하나의 세션 기
 | 사용자 확인 대기 | `PermissionRequest` |
 | 실행 복귀 | `PostToolUse` |
 | 자동 완료 | 같은 turn의 `Stop` |
-| 자동 heartbeat | 30초 간격 |
+| 자동 heartbeat | Codex 훅 호스트가 살아 있는 동안 30초 간격. 호스트 PID가 없으면 마지막 실제 훅 이후 최대 120초 |
 | 자동 세션 만료 | 마지막 유효 event 또는 heartbeat 이후 120초 |
 | 순수 수동 세션 만료 | 시작 후 12시간 |
 | 웹 동기화 | 활성 탭에서 5초 polling, 창 focus 시 즉시 갱신 |
@@ -103,7 +103,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 | `PermissionRequest` | `RUNNING` → `WAITING_FOR_USER` | 사용자 확인 필요 상태로 변경 |
 | `PostToolUse` | `WAITING_FOR_USER` → `RUNNING` | 실행 복귀로 처리. 이미 `RUNNING`이면 시각만 갱신 |
 | `Stop` | 활성 → `COMPLETED` | 같은 turn만 정상 완료 처리 |
-| `Heartbeat` | 현재 상태 유지 | 플러그인이 생성하는 내부 event로 `lastActivityAt` 갱신 |
+| `Heartbeat` | 현재 상태 유지 | 플러그인이 생성하는 내부 event로 `lastActivityAt` 갱신. heartbeat 자체는 로컬 생존 lease를 연장하지 않음 |
 
 `PermissionRequest` 이후 승인 완료 전용 hook은 없다. 따라서 실제 승인 직후가 아니라 `PostToolUse` 수신 시점에 `RUNNING`으로 돌아가며, 전체 세션 시간에는 사용자 승인 대기가 포함된다.
 
@@ -153,6 +153,10 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 ## 6.3 heartbeat 만료
 
 - 자동 연결 세션은 30초마다 heartbeat를 전송한다.
+- 플러그인은 `UserPromptSubmit` 시점의 Codex 훅 호스트 PID와 마지막 실제 훅 시각을 로컬 활성 turn 상태에 기록한다.
+- Codex 훅 호스트 프로세스가 종료되면 heartbeat worker는 로컬 활성 turn을 제거하고 더 이상 heartbeat를 보내지 않는다. 사용자 강제 중단처럼 전용 종료 훅이 없는 흐름도 이 경로로 무한 연장되지 않는다.
+- 호스트 PID를 얻지 못한 환경에서는 마지막 실제 훅 이후 120초까지만 heartbeat를 보낸다. 플러그인이 만든 heartbeat는 이 lease를 연장하지 않는다.
+- 비정상 상태가 무기한 유지되지 않도록 한 turn의 heartbeat에는 12시간 절대 상한을 둔다.
 - `lastActivityAt` 이후 120초 동안 hook event와 heartbeat가 모두 없으면 `ABANDONED/HEARTBEAT_TIMEOUT`으로 종료한다.
 - 만료 작업이 늦게 실행돼도 `endedAt`은 작업 실행 시각이 아니라 `lastActivityAt + 120초`로 기록한다.
 - `WAITING_FOR_USER`에서도 플러그인이 실행 중이면 heartbeat를 계속 보내므로 사용자 승인 시간이 길다는 이유만으로 종료하지 않는다.
@@ -164,6 +168,7 @@ Codex 공식 hook은 turn 범위 event에 `turn_id`를 제공하고, 플러그�
 - `delivery-diagnostic.json`은 상태를 쓸 때마다 `updatedAt`을 갱신하며, 전송이 `READY`로 회복되면 과거 `lastErrorCode`를 제거한다.
 - 서버는 event가 오지 않는 동안 상태를 추측해 `COMPLETED`로 변경하지 않는다.
 - heartbeat 만료 시 `ABANDONED` 처리한다.
+- 현재 Codex 훅에는 사용자 중단 전용 event가 없다. 따라서 강제 중단을 `COMPLETED`로 추측하지 않고, 훅 호스트 생존 확인 실패 후 heartbeat timeout으로 `ABANDONED` 처리한다.
 - 같은 turn의 `Stop`이 24시간 안에 지연 도착하면 `COMPLETED/RECOVERED_LATE_STOP`으로 정정하지만 기존 종료 시각은 유지한다.
 - 24시간 이후 도착한 event는 기록만 남기고 상태를 변경하지 않는다.
 

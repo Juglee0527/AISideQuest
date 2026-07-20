@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import { enqueueEvent, readDeliveryDiagnostic } from './delivery-queue.mjs'
 import { resolveDataDirectory } from './event-recorder.mjs'
 import { acquireProcessLock } from './process-lock.mjs'
-import { readActiveTurn, markHeartbeat } from './turn-state.mjs'
+import {
+  isTurnAlive,
+  markHeartbeat,
+  readActiveTurn,
+  removeTurnIfCurrent,
+} from './turn-state.mjs'
 import { launchQueueWorker } from './worker-launcher.mjs'
 
 function positiveNumber(value, fallback) {
@@ -28,6 +33,10 @@ async function main() {
       const turn = await readActiveTurn()
       if (turn === null) return
       const now = new Date()
+      if (!isTurnAlive(turn, now)) {
+        await removeTurnIfCurrent(turn)
+        return
+      }
       const lastHeartbeatAt = Date.parse(turn.lastHeartbeatAt ?? turn.activatedAt)
 
       if (!Number.isFinite(lastHeartbeatAt) || now.getTime() - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {

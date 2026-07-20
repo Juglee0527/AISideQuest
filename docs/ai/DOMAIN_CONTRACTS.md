@@ -36,7 +36,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 | `PreToolUse` | activity only; preserves current active state |
 | `PermissionRequest` | transitions active session to `WAITING_FOR_USER` |
 | `PostToolUse` | transitions active session to `RUNNING` |
-| `Heartbeat` | activity only; may carry bounded queue diagnostics |
+| `Heartbeat` | activity only; may carry bounded queue diagnostics; emitted only while the recorded Codex hook host is alive, with a 120-second real-hook fallback lease when no host PID is available |
 | `Stop` | transitions to `COMPLETED` with `HOOK_STOP` |
 
 - PostgreSQL permits different hashed Codex session keys to run concurrently, while allowing at most one active turn per hashed Codex session key and one active manual fallback session per user.

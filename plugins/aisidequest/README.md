@@ -38,7 +38,7 @@ node .\scripts\connect-device.mjs --code <연결-코드> --api-url https://examp
 
 ## 현재 범위
 
-`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Stop` 훅은 개인정보 필터링 후 로컬 `events.jsonl`과 durable JSONL delivery queue에 먼저 기록합니다. 활성 turn에는 30초 간격 `Heartbeat`를 생성합니다.
+`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Stop` 훅은 개인정보 필터링 후 로컬 `events.jsonl`과 durable JSONL delivery queue에 먼저 기록합니다. 활성 turn에는 30초 간격 `Heartbeat`를 생성합니다. 훅 호스트 프로세스가 종료되면 heartbeat도 중단하며, 호스트 PID가 없는 환경에서는 마지막 실제 훅 이후 120초까지만 heartbeat를 허용합니다.
 
 기기별 FIFO worker는 같은 event ID를 유지해 재전송하며 네트워크 오류, `408`, `429`, `5xx`에 지수 backoff와 full jitter를 적용합니다. 영구 실패와 손상 record는 7일 dead-letter에 보관하고 `401`·`403`은 자동 재시도를 멈춰 기기 재연결을 기다립니다. queue와 worker 상태는 플러그인 데이터 디렉터리의 `delivery-diagnostic.json`에서 확인할 수 있습니다.
 
