@@ -17,6 +17,7 @@ Read documents in this order before changing code:
    - sessions and event recovery: [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md)
    - database: [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)
    - security and privacy: [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md)
+   - planned Discover product and privacy contract: [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md)
    - operations: [`OPERATIONS_RUNBOOK.md`](./OPERATIONS_RUNBOOK.md)
    - deployment and pilot: [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md)
 6. Use [`PROJECT_SPEC.md`](./PROJECT_SPEC.md), [`BETA_IMPLEMENTATION_PLAN.md`](./BETA_IMPLEMENTATION_PLAN.md), [`../Discover_개발_계획.md`](../Discover_개발_계획.md), and [`IMPLEMENTATION_PROGRESS_SUMMARY.md`](./IMPLEMENTATION_PROGRESS_SUMMARY.md) only for product rationale, ordered implementation scope, and historical decisions.
@@ -58,6 +59,7 @@ Every behavioral code change must include the relevant documentation update:
 | table, constraint, index, migration | `DATABASE_SCHEMA.md` |
 | environment variable, health, metrics, alerts | `CURRENT_STATE.md` and `OPERATIONS_RUNBOOK.md` |
 | deploy, rollback, image, pilot gate | `DEPLOYMENT_AND_PILOT.md` |
+| Discover source, reward, cache, analytics, release rule | `DISCOVER_CONTRACT.md` and `../Discover_개발_계획.md` |
 | user-visible workflow | the matching Korean document in `docs/` |
 
 Keep human documentation task-oriented and concise. Keep AI documentation explicit about invariants, edge cases, paths, commands, and completion conditions.

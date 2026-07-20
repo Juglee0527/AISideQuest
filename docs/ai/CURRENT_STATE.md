@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover task 21 has its documentation and product contract complete; tasks 22–33 are not implemented.
 
 Implemented:
 
@@ -71,4 +71,4 @@ Also passed: lint, client/server typecheck, client/server production build, 14 m
 
 ## Immediate next action
 
-Begin task 21 in the ordered [`Discover development plan`](../Discover_개발_계획.md): reconcile the stale product-spec sections and lock the Discover product, privacy, and reward-classification contract before implementation. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 22 in the ordered [`Discover development plan`](../Discover_개발_계획.md): define the common Discover model and browser API against [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md). Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

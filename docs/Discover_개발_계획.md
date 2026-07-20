@@ -3,10 +3,10 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: 계획 확정, 구현 전
+- 상태: Task 21 제품 계약 완료, Task 22 구현 전
 - 작업 번호: 21~33
-- 첫 구현 작업: 21. 문서 정합성 수정 및 Discover 제품 계약 확정
-- 1차 출시 범위: 21~26
+- 다음 작업: 22. Discover API와 공통 데이터 모델 설계
+- 1차 구현 범위: 21~26
 
 ---
 
@@ -54,9 +54,9 @@ AISideQuest는 수익을 보장하거나 직접 지급하지 않는다. 외부 �
 | 수익 기회 | 채용·계약·프리랜스 기회 탐색 | Remotive, Hacker News Jobs |
 | 개발 소식 | 인기 개발 글과 기술 사례 확인 | Hacker News Top·Show |
 | 커뮤니티 | 질문과 토론 주제 확인 | Ask HN |
-| 저장됨 | 사용자가 나중에 볼 항목 관리 | AISideQuest 서버 |
+| 저장됨 | 사용자가 나중에 볼 항목 관리 | AISideQuest 서버(Task 27에서 추가) |
 
-Discover는 활성 AI session이 없어도 조회할 수 있다. 활성 session이 있을 때만 대기 시간 활용 안내를 강조하며, 조회 자체를 session 상태로 제한하지 않는다.
+Discover 화면과 browser API는 기존 GitHub login을 요구하지만 활성 AI session은 요구하지 않는다. 활성 session이 있을 때만 대기 시간 활용 안내를 강조하며 조회 자체를 session 상태로 제한하지 않는다. Login은 기존 사용자 소유권 경계를 위한 것이며 외부 공고를 이용한 email·marketing 가입 유도에 사용하지 않는다.
 
 ### 2.2 가치와 보상 분류
 
@@ -75,11 +75,12 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 
 ```text
 외부 API
-  -> 소스별 Adapter
-  -> URL allowlist 및 일반 텍스트 정제
+  -> source별 고정 fetch host allowlist와 Adapter
+  -> 응답 field 제한 및 일반 text 정제
   -> 공통 DiscoverItem 변환
-  -> TTL cache 및 stale fallback
+  -> shared PostgreSQL TTL cache 및 stale fallback
   -> GET /api/v1/discover
+  -> 표시 link의 HTTPS·제어문자 검증
   -> Discover 화면
 ```
 
@@ -104,6 +105,8 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 
 #### 21. 문서 정합성 수정 및 Discover 제품 계약 확정
 
+상태: 완료(2026-07-20)
+
 작업:
 
 - `PROJECT_SPEC.md`의 현재 구현 상태를 실제 코드·테스트와 일치시킨다.
@@ -118,13 +121,28 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 - 외부 항목을 AISideQuest 포인트 지급 근거로 사용하지 않는다고 명시한다.
 - 구현 전에 미결정 제품 규칙이 남지 않는다.
 
+확정 결과:
+
+- `/discover`와 browser API는 GitHub login을 요구하고 active AI session은 요구하지 않는다.
+- AISideQuest는 외부 기회를 중계할 뿐 채용, 수익, 자격과 지급을 보장하지 않는다.
+- AISideQuest point, source가 제공한 채용 급여, 검증된 cash bounty와 reputation bounty를 별도 개념으로 분류한다.
+- 외부 item 조회·원문 이동·저장에는 AISideQuest point를 지급하지 않는다.
+- Raw upstream payload와 HTML은 저장하지 않는다. Shared PostgreSQL cache에는 normalized item만 저장하고 초기 fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간으로 한다. Cache row는 마지막 성공 refresh 후 최대 7일 안에 교체·삭제한다.
+- Task 32 전에는 Discover 방문·click analytics를 수집하지 않는다. Pilot용 분석을 구현하면 item 정보 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
+- Tasks 22~26 완료는 `Discover MVP 구현 완료`인 release candidate다. Real source smoke, attribution, 부분 장애, 접근성·mobile과 개인정보 gate를 통과해야 release로 판정한다.
+- Discover 진행과 기존 Task 20의 external staging·production·pilot 완료는 별도 track이다.
+
+Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 따른다.
+
 #### 22. Discover API와 공통 데이터 모델 설계
 
 작업:
 
 - `DiscoverItem`, source, kind, reward 모델을 정의한다.
 - `GET /api/v1/discover`, `GET /api/v1/discover/sources` 계약을 작성한다.
+- 두 endpoint에 browser session 인증을 적용하고 active AI session은 요구하지 않는다.
 - category, source, cursor 필터와 공통 오류 응답을 정의한다.
+- 목록 응답에 source별 `FRESH`, `STALE`, `UNAVAILABLE` 상태와 nullable 성공 갱신 시각을 포함한다.
 - 외부 서비스별 원본 DTO가 Controller와 프런트엔드에 노출되지 않도록 경계를 정한다.
 
 완료 조건:
@@ -139,7 +157,9 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 
 - source Adapter interface와 공통 HTTP client를 구현한다.
 - timeout, 제한된 재시도, TTL cache, stale fallback을 구현한다.
-- 허용된 host와 `https` 원문 URL만 통과시킨다.
+- Fetch는 source별 고정 HTTPS host만 허용하고 redirect를 차단하거나 매 hop 재검증한다.
+- 화면 이동 URL은 server fetch 대상과 분리하고 HTTPS·parse·제어문자 검증을 통과시킨다.
+- Normalized item만 shared PostgreSQL cache에 저장하고 동시 miss를 single-flight 또는 동등한 lock으로 합친다.
 - 외부 HTML을 렌더링하지 않고 제목·요약을 일반 텍스트로 정제한다.
 
 완료 조건:
@@ -148,6 +168,7 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 - 요청이 무한 대기하거나 무한 재시도하지 않는다.
 - 임의 host 호출과 악성 URL을 차단한다.
 - 외부 응답 원문을 로그에 남기지 않는다.
+- Maximum stale age를 넘긴 item은 반환하지 않고 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
 
 #### 24. Hacker News 커뮤니티 연동
 
@@ -170,7 +191,7 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 - Software Development 중심의 원격 공고를 가져온다.
 - 계약직, 프리랜스, 정규직, 지역과 급여 제공 여부를 구분한다.
 - Remotive 출처와 원문 링크를 항상 표시한다.
-- 공개 API 권고에 맞춰 낮은 동기화 빈도와 긴 TTL을 사용한다.
+- 공개 API 권고에 맞춰 fresh TTL 6시간과 maximum stale 72시간을 기본값으로 사용한다.
 
 완료 조건:
 
@@ -193,9 +214,10 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 - 데스크톱과 모바일에서 기존 navigation을 포함해 정상 동작한다.
 - 원문 링크에 `noopener`와 `noreferrer`를 적용한다.
 - 외부 이동임을 사용자에게 명확히 알린다.
+- GitHub login을 요구하고 login을 email·marketing 가입 유도에 사용하지 않는다.
 - 활성 AI session 유무와 관계없이 조회할 수 있다.
 
-Task 26까지 완료하면 Discover MVP 1차 출시 범위가 완성된다.
+Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release candidate가 된다. 실제 release 판정에는 real Hacker News·Remotive smoke, source attribution·호출량, desktop·mobile·접근성, 부분·전체 장애와 개인정보 gate 증거가 추가로 필요하다.
 
 ### 3.2 2차 마일스톤: 저장과 명시적 개인화
 
@@ -283,12 +305,16 @@ Task 26까지 완료하면 Discover MVP 1차 출시 범위가 완성된다.
 - source 요청, 실패, cache hit, stale 응답, 반환 item 수 지표를 추가한다.
 - source별 timeout, rate limit, parsing 실패를 구분한다.
 - 외부 응답 원문과 전체 원문 URL을 운영 로그에서 제외한다.
+- Pilot에 필요한 `DISCOVER_VIEW`, `TAB_VIEW`, `OUTBOUND_CLICK`, `SAVE`만 owned 분석 event로 추가한다.
+- 분석 dimension은 fixed source·category만 허용하고 item ID·제목·URL·tag·검색어·관심 기술은 수집하지 않는다.
+- Owned 분석 row에 90일 expiry, account export와 primary delete를 적용한다.
 
 완료 조건:
 
 - source 장애 원인을 운영 지표로 구분할 수 있다.
 - 로그와 metrics label에 금지 데이터나 높은 cardinality 값이 없다.
 - 기존 health와 readiness 의미를 외부 source 장애가 훼손하지 않는다.
+- 사용자·item 식별자가 Prometheus label이나 운영 로그에 없고 분석 row의 소유권·만료·내보내기·삭제가 검증된다.
 
 #### 33. Discover 파일럿과 다음 범위 결정
 
@@ -326,14 +352,19 @@ export type DiscoverKind =
 export interface DiscoverItem {
   id: string
   source: 'REMOTIVE' | 'HACKER_NEWS' | 'DEV' | 'STACK_EXCHANGE' | 'GITHUB' | 'ALGORA'
+  category: 'EARNING' | 'NEWS' | 'COMMUNITY'
   kind: DiscoverKind
   title: string
   summary: string | null
   tags: string[]
   reward: {
-    type: 'CASH' | 'REPUTATION'
-    amount: number | null
+    type: 'CASH_BOUNTY' | 'REPUTATION_BOUNTY'
+    amountMinor: number
     currency: string | null
+  } | null
+  compensation: {
+    provided: boolean
+    text: string | null
   } | null
   originalUrl: string
   attribution: string
@@ -342,7 +373,7 @@ export interface DiscoverItem {
 }
 ```
 
-이 코드는 구현 확정본이 아니라 Task 22에서 검증할 공통 계약 초안이다. 실제 타입은 server DTO, 외부 source 응답, 테스트 fixture를 확인한 뒤 확정한다.
+이 코드는 구현 확정본이 아니라 Task 21의 보상 분리 결정을 반영해 Task 22에서 검증할 공통 계약 초안이다. `compensation`은 source가 제공한 채용 급여 문구이고 `reward`는 검증된 cash·reputation bounty만 표현한다. 실제 타입은 server DTO, 외부 source 응답, 테스트 fixture를 확인한 뒤 확정한다.
 
 ---
 
