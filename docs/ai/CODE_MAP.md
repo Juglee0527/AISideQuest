@@ -27,6 +27,7 @@
 | `server/src/quests/` | catalog, attempts, answers, grading, retry, reward transaction |
 | `server/src/points/` | balance and immutable ledger reads |
 | `server/src/statistics/` | time-zone-aware summary and activity |
+| `server/src/discover/` | common Discover types, validated read filters, safe source catalog and future adapter boundary |
 | `server/src/security/` | shared PostgreSQL rate limits |
 | `server/src/observability/` | structured logging, metrics, sanitization |
 | `server/src/health/` | liveness, readiness, protected metrics endpoint |
@@ -45,6 +46,8 @@
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
+Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. Source adapters and cache arrive in task 23; Hacker News and Remotive are enabled only by tasks 24-25.
+
 ## Change routing
 
 | Requested change | Start here | Verify with |
@@ -57,4 +60,4 @@ API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts
 | deployment | `deploy/`, `scripts/deploy-release.ps1` | env tests + Docker rehearsal + smoke |
 | privacy/logging | plugin filter, DTOs, observability sanitizer | forbidden-data and redaction tests |
 | local startup | `scripts/dev-local.mjs`, root `package.json` | operations tests + local readiness smoke |
-| planned Discover behavior | `DISCOVER_CONTRACT.md`, then future `server/src/discover/` and `src/pages/DiscoverPage.tsx` | source adapter + server contract + React tests |
+| Discover behavior | `DISCOVER_CONTRACT.md`, `server/src/discover/`, `src/api/discoverApi.ts`; future `src/pages/DiscoverPage.tsx` | source adapter + server contract + React tests |

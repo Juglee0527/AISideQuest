@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21 제품 계약 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~22 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-20
 
@@ -98,7 +98,18 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - PostgreSQL integration, migration upgrade와 Chromium E2E CI gate
 - immutable API·web image, staging·production template, smoke와 rollback tooling
 
-## 4.5 현재 제외 범위
+## 4.5 Discover API baseline
+
+- Server·client 공통 개념의 source, category, kind, reward, compensation과 source status type
+- GitHub login을 요구하고 active AI session은 요구하지 않는 `GET /api/v1/discover`
+- Safe source catalog를 반환하는 `GET /api/v1/discover/sources`
+- Category·source enum, limit 1~50과 versioned opaque cursor 검증
+- Strict client response parser와 HTTPS original URL 검증
+- Adapter 구현 전 명시적 empty item과 disabled·`UNAVAILABLE` source 상태
+
+현재 endpoint는 외부 network를 호출하거나 cache를 읽지 않는다. Source adapter와 shared PostgreSQL cache는 Task 23 범위다.
+
+## 4.6 현재 제외 범위
 
 - 현금 지급, 환전, 구매, escrow와 외부 결제
 - Codex 외 Cursor·Claude Code·Copilot 자동 감지
@@ -106,7 +117,7 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - 외부 application 자동 제출
 - 공개 service 운영을 기본 사용 경로로 강제하는 기능
 - 실제 staging·production과 초대 사용자 pilot을 완료했다는 주장
-- Discover API·adapter·cache·screen·saved item·interest·analytics 구현
+- Discover source adapter·외부 호출·cache·screen·saved item·interest·analytics 구현
 
 ---
 
@@ -231,14 +242,14 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-20 기준 자동 test 157개가 통과했다.
+2026-07-20 기준 자동 test 166개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
-| React | 50 |
+| React | 54 |
 | Codex plugin | 20 |
 | 운영·local startup script | 17 |
-| Server non-database | 19 |
+| Server non-database | 24 |
 | PostgreSQL integration | 51 |
 
 Lint, client·server typecheck와 production build, migration 14개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
@@ -259,7 +270,7 @@ Lint, client·server typecheck와 production build, migration 14개 revert·reap
 
 # 11. Discover 제품 계약과 다음 단계
 
-Task 21에서 다음 제품 규칙을 확정했지만 Discover 기능 자체는 아직 구현하지 않았다.
+Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를 구현했다. 외부 source item과 화면은 아직 제공하지 않는다.
 
 - `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
 - AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
@@ -273,7 +284,7 @@ Task 21에서 다음 제품 규칙을 확정했지만 Discover 기능 자체는 
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 22의 common model과 API contract 설계다.
+다음 작업은 Task 23의 safe source Adapter, bounded HTTP client, shared normalized cache와 stale fallback 구현이다.
 
 ---
 
@@ -287,7 +298,8 @@ Task 21에서 다음 제품 규칙을 확정했지만 Discover 기능 자체는 
 ## Discover 확장
 
 - Task 21: 제품·개인정보·분류·release 계약 완료
-- Task 22~26: API model, adapter, Hacker News, Remotive와 screen 미구현
+- Task 22: common model, authenticated read API, source catalog와 strict client parser 완료
+- Task 23~26: adapter, Hacker News, Remotive와 screen 미구현
 - Task 27~28: saved item과 explicit interest 미구현
 - Task 29~31: additional source 미구현
 - Task 32~33: Discover observability와 product pilot 미구현

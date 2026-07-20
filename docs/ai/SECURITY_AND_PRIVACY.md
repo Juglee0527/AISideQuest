@@ -46,6 +46,7 @@
 | `POST /quest-attempts/:id/submissions` | 웹 세션 | 예 | 본인 응시 | body 없음, Idem | 없음 |
 | `GET /points/balance`, `GET /points/ledger` | 웹 세션 | 아니오 | 본인 | cursor, 최대 100건 | 없음 |
 | `GET /stats/summary`, `GET /stats/activity` | 웹 세션 | 아니오 | 본인 | 기간 최대 366일, cursor 최대 100건 | 없음 |
+| `GET /discover`, `GET /discover/sources` | 웹 세션 | 아니오 | 로그인 경계, active AI session 불필요 | category·source enum, cursor 1,000자, 최대 50건 | 없음 |
 
 Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도 공유된다. state·연결 code·기기 token을 바꾸는 우회를 막기 위해 복합 식별자 bucket과 별도의 IP ceiling을 함께 소비한다. 초과 응답은 `429 RATE_LIMITED`와 `Retry-After`를 포함한다.
 
@@ -112,7 +113,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 6.1 Discover 확장 계약(미구현)
 
-Task 21에서 제품·개인정보 계약만 확정했으며 Discover endpoint, cache, 저장, 관심사와 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
+Task 22에서 공통 model과 인증된 Discover read endpoint를 구현했다. Source adapter, 외부 호출, DB cache, 저장, 관심사, 분석 event와 화면은 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
 
 - `/discover`와 browser API는 웹 session 인증을 요구하지만 활성 AI session은 요구하지 않는다.
 - 서버는 source별 고정 HTTPS host만 호출하고 사용자가 제공한 URL을 가져오지 않는다. 화면의 외부 원문 link는 서버 fetch 대상이 아니다.

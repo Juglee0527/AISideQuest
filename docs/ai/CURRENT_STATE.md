@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover task 21 has its documentation and product contract complete; tasks 22–33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-22 have the product contract, common model, and authenticated read API complete; tasks 23-33 are not implemented.
 
 Implemented:
 
@@ -21,6 +21,7 @@ Implemented:
 - Security matrix, rate limits, export/delete, redaction, structured logs, metrics, alerts, backup/restore tooling.
 - CI, PostgreSQL integration, migration/upgrade, Chromium core flow, immutable deployment image workflow.
 - Staging/production deployment templates, validation, migration-first deploy, smoke, rollback, kill switches, and pilot evaluator.
+- Discover common server/client types plus authenticated `GET /discover` and `GET /discover/sources`; all source adapters remain disabled and return an explicit safe unavailable baseline.
 
 Optional external deployment remains unverified:
 
@@ -34,12 +35,12 @@ Optional external deployment remains unverified:
 
 | Suite | Passed |
 |---|---:|
-| React | 50 |
+| React | 54 |
 | Codex plugin | 20 |
 | operations and local startup scripts | 17 |
-| server non-database | 19 |
+| server non-database | 24 |
 | PostgreSQL integration | 51 |
-| total | 157 |
+| total | 166 |
 
 Also passed: lint, client/server typecheck, client/server production build, 14 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
@@ -62,6 +63,7 @@ Also passed: lint, client/server typecheck, client/server production build, 14 m
 | plugin dead letter | 7 days |
 | primary runtime | developer-owned local repository and services |
 | integrated local start | `npm run dev:local` |
+| Discover list | browser session, no active AI session; default 20 and maximum 50 items |
 
 ## Kill switches
 
@@ -71,4 +73,4 @@ Also passed: lint, client/server typecheck, client/server production build, 14 m
 
 ## Immediate next action
 
-Begin task 22 in the ordered [`Discover development plan`](../Discover_개발_계획.md): define the common Discover model and browser API against [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md). Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 23 in the ordered [`Discover development plan`](../Discover_개발_계획.md): implement the safe source adapter, bounded HTTP client, shared normalized cache, and stale fallback against [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md). Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

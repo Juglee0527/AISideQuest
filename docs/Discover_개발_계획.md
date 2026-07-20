@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21 제품 계약 완료, Task 22 구현 전
+- 상태: Task 21~22 완료, Task 23 구현 전
 - 작업 번호: 21~33
-- 다음 작업: 22. Discover API와 공통 데이터 모델 설계
+- 다음 작업: 23. 외부 source Adapter 기반 구현
 - 1차 구현 범위: 21~26
 
 ---
@@ -136,6 +136,8 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 
 #### 22. Discover API와 공통 데이터 모델 설계
 
+상태: 완료(2026-07-20)
+
 작업:
 
 - `DiscoverItem`, source, kind, reward 모델을 정의한다.
@@ -150,6 +152,15 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - 기존 `/api/v1` 응답 envelope, cursor, 입력 검증 규칙과 일치한다.
 - 현금, 평판, 채용, 정보 분류가 명시적이다.
 - source별 필드 누락을 `null`과 빈 배열로 안전하게 표현한다.
+
+구현 결과:
+
+- `server/src/discover/`에 source, category, kind, cash·reputation reward, job compensation, item, source status와 versioned cursor 계약을 추가했다.
+- `GET /api/v1/discover`와 `GET /api/v1/discover/sources`는 browser session을 요구하고 active AI session은 요구하지 않는다.
+- Category·source enum, limit 1~50과 cursor를 검증하며 기존 API envelope와 `Cache-Control: no-store`를 유지한다.
+- Source adapter 전에는 item을 빈 배열로 반환하고 여섯 planned source를 `enabled: false`, `UNAVAILABLE`, `fetchedAt: null`로 명시한다.
+- Client parser는 item ID·분류·reward·compensation 조합, ISO8601 시각, HTTPS URL, 중복 item·source와 freshness metadata를 신뢰하지 않고 다시 검증한다.
+- 실제 source 호출, shared cache와 stale fallback은 Task 23으로 유지한다.
 
 #### 23. 외부 소스 Adapter 기반 구현
 
@@ -357,11 +368,10 @@ export interface DiscoverItem {
   title: string
   summary: string | null
   tags: string[]
-  reward: {
-    type: 'CASH_BOUNTY' | 'REPUTATION_BOUNTY'
-    amountMinor: number
-    currency: string | null
-  } | null
+  reward:
+    | { type: 'CASH_BOUNTY'; amountMinor: number; currency: string }
+    | { type: 'REPUTATION_BOUNTY'; amount: number }
+    | null
   compensation: {
     provided: boolean
     text: string | null
@@ -373,7 +383,7 @@ export interface DiscoverItem {
 }
 ```
 
-이 코드는 구현 확정본이 아니라 Task 21의 보상 분리 결정을 반영해 Task 22에서 검증할 공통 계약 초안이다. `compensation`은 source가 제공한 채용 급여 문구이고 `reward`는 검증된 cash·reputation bounty만 표현한다. 실제 타입은 server DTO, 외부 source 응답, 테스트 fixture를 확인한 뒤 확정한다.
+이 코드는 Task 22에서 확정한 공통 item 계약의 요약이다. `compensation`은 source가 제공한 채용 급여 문구이고 `reward`는 검증된 cash·reputation bounty만 표현한다. 전체 source status, page와 cursor type은 `server/src/discover/discover.types.ts`, client mirror는 `src/types/discover.ts`를 기준으로 한다.
 
 ---
 

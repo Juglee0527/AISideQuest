@@ -1,12 +1,33 @@
 # Discover Product Contract
 
-Status: task 21 complete; tasks 22-33 are not implemented.  
+Status: tasks 21-22 complete; tasks 23-33 are not implemented.
 Contract date: 2026-07-20
 
 This document is the canonical product, privacy, and release contract for the
-planned Discover expansion. It defines decisions that later API, database,
-adapter, UI, and pilot work must preserve. It does not describe shipped
-endpoints or screens.
+Discover expansion. It defines decisions that later database, adapter, UI, and
+pilot work must preserve. Task 22 has shipped the common types and authenticated
+read endpoints; no external source, cache, item, or screen is enabled yet.
+
+## Common model and API baseline
+
+- `GET /api/v1/discover` accepts optional `category`, `source`, opaque `cursor`,
+  and `limit` from 1 to 50 (default 20).
+- `GET /api/v1/discover/sources` returns the safe source catalog.
+- Both endpoints require a browser session and never require an active AI
+  session.
+- List data is `{ items, nextCursor, sources }`; source-list data is
+  `{ sources }`. The common API envelope remains unchanged.
+- Source snapshots contain source, display name, categories, `enabled`, status,
+  and nullable successful fetch time. Status is `FRESH`, `STALE`, or
+  `UNAVAILABLE`; no raw upstream error is returned.
+- The model separates category from kind and uses discriminated cash and
+  reputation reward shapes. Compensation is a separate job-only union.
+- Items use a stable namespaced ID, a validated HTTPS original URL, bounded
+  normalized text, nullable publication time, and required fetch time.
+- The future item order is `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`.
+  The versioned cursor binds this tuple and remains opaque to clients.
+- Before adapters exist, all six planned sources are `enabled: false` and
+  `UNAVAILABLE`; both endpoints return successfully without external calls.
 
 ## Product boundary
 
@@ -125,8 +146,8 @@ specific record remains.
 
 ## Release terminology and gates
 
-- Task 21 complete means the product contract is fixed; it does not ship a
-  Discover feature.
+- Task 21 complete means the product contract is fixed. Task 22 adds the common
+  read contract but does not ship external Discover content or a screen.
 - Tasks 22-26 complete mean `Discover MVP implementation complete` and produce a
   release candidate, not automatic production release.
 - A Discover MVP release additionally requires the repository test gates, real

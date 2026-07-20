@@ -93,6 +93,13 @@ test('GET /api/v1/health returns the common success envelope', async () => {
   assert.equal(response.body.meta.requestId, response.headers['x-request-id'])
 })
 
+test('Discover read endpoints require a browser session', async () => {
+  for (const path of ['/api/v1/discover', '/api/v1/discover/sources']) {
+    const response = await request(app.getHttpServer()).get(path).expect(401)
+    assert.equal(response.body.error.code, 'AUTH_REQUIRED')
+  }
+})
+
 test('request IDs are accepted only in the safe format and echoed consistently', async () => {
   const accepted = await request(app.getHttpServer())
     .get('/api/v1/health/live')
