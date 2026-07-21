@@ -27,7 +27,7 @@
 | `server/src/quests/` | catalog, attempts, answers, grading, retry, reward transaction |
 | `server/src/points/` | balance and immutable ledger reads |
 | `server/src/statistics/` | time-zone-aware summary and activity |
-| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, source aggregation and read API |
+| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, source aggregation, saved-item service and API |
 | `server/src/security/` | shared PostgreSQL rate limits |
 | `server/src/observability/` | structured logging, metrics, sanitization |
 | `server/src/health/` | liveness, readiness, protected metrics endpoint |
@@ -47,7 +47,7 @@
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
-Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, and `src/pages/DiscoverPage.tsx`. The page owns tab, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs.
+Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, and `src/pages/DiscoverPage.tsx`. The page owns explore/saved views, save mutations, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/discover-saved.service.ts` owns snapshot persistence, ownership and cursor logic. `hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs.
 
 ## Change routing
 
@@ -61,4 +61,4 @@ Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, and `src/pages/
 | deployment | `deploy/`, `scripts/deploy-release.ps1` | env tests + Docker rehearsal + smoke |
 | privacy/logging | plugin filter, DTOs, observability sanitizer | forbidden-data and redaction tests |
 | local startup | `scripts/dev-local.mjs`, root `package.json` | operations tests + local readiness smoke |
-| Discover behavior | `DISCOVER_CONTRACT.md`, `server/src/discover/`, `src/api/discoverApi.ts`; future `src/pages/DiscoverPage.tsx` | source adapter + server contract + React tests |
+| Discover behavior | `DISCOVER_CONTRACT.md`, `server/src/discover/`, `src/api/discoverApi.ts`, `src/pages/DiscoverPage.tsx` | source adapter + saved-item integration + React tests |

@@ -9,6 +9,7 @@ import type {
   DiscoverCacheService,
 } from '../../src/discover/discover-cache.service'
 import { DiscoverFetchError } from '../../src/discover/discover-http-client'
+import type { DiscoverSavedService } from '../../src/discover/discover-saved.service'
 import { DiscoverService } from '../../src/discover/discover.service'
 import type { DiscoverItem, DiscoverSource } from '../../src/discover/discover.types'
 import type { OperationalLoggerService } from '../../src/observability/operational-logger.service'
@@ -46,10 +47,14 @@ function createService(
     recordDiscoverFetch: (source: string, result: string, reason?: string) => metricEvents.push(`fetch:${source}:${result}:${reason ?? ''}`),
   } as unknown as OperationalMetricsService
   const logger = { error: () => undefined } as unknown as OperationalLoggerService
+  const savedService = {
+    findSavedItemReferences: async () => [],
+  } as unknown as DiscoverSavedService
   return {
     service: new DiscoverService(
       adapters,
       cache as unknown as DiscoverCacheService,
+      savedService,
       metrics,
       logger,
     ),

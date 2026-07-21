@@ -124,15 +124,17 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Final pilot gate: at least 10 full-flow users, 7 days, 100 eligible automatic sessions, detection ≥95%, reflection p95 ≤5s, zero unrecoverable loss, zero duplicate sessions/points, API 5xx <1%.
 - Retaining optional deployment tooling does not satisfy the pilot gate; task 20 remains incomplete without real external evidence.
 
-## Discover expansion (Hacker News, Remotive, and screen enabled)
+## Discover expansion (Hacker News, Remotive, screen, and saved items enabled)
 
 - Discover requires the existing GitHub-authenticated browser session but never an active AI session.
 - `GET /discover` and `GET /discover/sources` are implemented with validated filters, an opaque versioned cursor contract, safe source status, and strict client parsing. Hacker News Top·Ask·Show·Jobs and Remotive Software Development jobs are enabled through bounded HTTP, normalized cache, single-flight and stale fallback.
 - `/discover` provides accessible earning, news, and community tabs, cursor-based load-more, safe external links, and distinct loading, empty, stale, partial-failure, and total-failure states. Disabled future sources are not presented as failures, and a paging failure preserves loaded items.
+- Saved items are user-owned normalized snapshots. Save and delete mutations require CSRF and UUID idempotency keys, duplicates reuse one `(user, item)` row, and list/delete SQL always scopes by authenticated `user_id`.
+- Saved lists remain available during source/cache failure, are exported in user-data schema version 2, and are removed by account deletion.
 - AISideQuest only indexes and links to external items. It does not guarantee employment, income, bounty payment, eligibility, or availability.
 - AISideQuest points, source-provided job compensation, verified cash bounties, and reputation bounties are separate classifications. An external click or save never awards points.
 - Only the server fetches fixed source API hosts. Display links are never used as server fetch targets, and raw upstream payloads or HTML are never persisted or logged.
 - The shared cache stores normalized items only, applies source-specific fresh and maximum stale ages, and purges normalized cache rows within 7 days of their last successful refresh.
-- Product analytics are not implicit in tasks 22-26. Before a Discover pilot, only fixed low-cardinality view/click/save events may be added; item details and selected interests remain forbidden, owned rows expire after 90 days, and export/deletion must include them.
+- Product analytics are not implicit in tasks 22-27. Before a Discover pilot, only fixed low-cardinality view/click/save events may be added; item details and selected interests remain forbidden, owned rows expire after 90 days, and export/deletion must include them.
 - Completing tasks 22-26 produces a Discover release candidate. Real source smoke, attribution, failure, accessibility, and privacy evidence are still required for release, and none of this completes task 20.
 - The full contract is [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md).

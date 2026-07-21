@@ -80,6 +80,7 @@ Successful `GET /discover` data:
 {
   "items": [],
   "nextCursor": null,
+  "savedItems": [],
   "sources": [
     {
       "source": "REMOTIVE",
@@ -98,6 +99,20 @@ Successful `GET /discover` data:
 Every future `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
+
+## Discover saved-item contract
+
+All endpoints require the authenticated browser session and never require an active AI session.
+
+| Endpoint | Contract |
+|---|---|
+| `GET /discover/saved-items?limit=20&cursor=...` | Own snapshots only; limit 1-50; opaque stable cursor |
+| `POST /discover/saved-items` | Body `{ "itemId": "SOURCE:key" }`; CSRF + UUID `Idempotency-Key` |
+| `DELETE /discover/saved-items/:savedItemId` | Empty body; CSRF + UUID `Idempotency-Key`; ownership-scoped |
+
+Save returns `{ "created": boolean, "savedItem": { "id", "item", "savedAt" } }`. The server resolves the ID from its normalized source cache and never accepts a browser-supplied title, URL, reward, or other snapshot field. Duplicate saves reuse the unique `(user, item)` row and return `created: false`.
+
+Delete returns `{ "deleted": boolean, "savedItemId": "uuid" }`. Missing, already deleted, and another user's IDs return `deleted: false`. Saved list responses are `{ "items": [...], "nextCursor": string | null }` and remain available without the source cache.
 
 Hacker News maps Top and Show to `NEWS/ARTICLE`, Ask to `COMMUNITY/DISCUSSION`, and Jobs to `EARNING/PAID_JOB`. Deleted or incomplete items are omitted. Missing or non-HTTPS story URLs use the canonical HTTPS Hacker News discussion URL. Hacker News compensation and rewards are never inferred.
 

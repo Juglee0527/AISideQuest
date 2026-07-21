@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-26 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, and the Discover screen complete; tasks 27-33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-27 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, the Discover screen, and user-owned saved items complete; tasks 28-33 are not implemented.
 
 Implemented:
 
@@ -25,6 +25,7 @@ Implemented:
 - Enabled Hacker News Top·Ask·Show·Jobs adapter with bounded request volume, duplicate/deleted/incomplete item handling, HTTPS fallback links, 10-minute fresh TTL, and 24-hour maximum stale fallback. Other sources remain disabled.
 - Enabled Remotive Software Development adapter with one shared bounded request, direct source URL and attribution, explicit compensation availability, employment-type tags, 6-hour fresh TTL, and 72-hour maximum stale fallback.
 - Authenticated `/discover` desktop/mobile screen with earning, news, and community tabs, safe external cards, cursor load-more, and distinct loading, empty, stale, partial-failure, total-failure, and paging-error states. It remains independent of active AI sessions and collects no implicit analytics.
+- User-owned Discover saved snapshots with CSRF/idempotent save and delete, unique duplicate protection, stable cursor listing independent of source availability, explore/saved UI, and export/account-deletion handling.
 
 Optional external deployment remains unverified:
 
@@ -38,14 +39,14 @@ Optional external deployment remains unverified:
 
 | Suite | Passed |
 |---|---:|
-| React | 60 |
+| React | 62 |
 | Codex plugin | 20 |
 | operations and local startup scripts | 17 |
 | server non-database | 43 |
-| PostgreSQL integration | 52 |
-| total | 192 |
+| PostgreSQL integration | 55 |
+| total | 197 |
 
-Also passed: lint, client/server typecheck, client/server production build, 15 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
+Also passed: lint, client/server typecheck, client/server production build, 16 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
 ## Operational defaults
 
@@ -76,4 +77,4 @@ Also passed: lint, client/server typecheck, client/server production build, 15 m
 
 ## Immediate next action
 
-Begin task 27 in the ordered [`Discover development plan`](../Discover_개발_계획.md): add user-owned saved items with authenticated ownership, CSRF, idempotency, cursor pagination, export, and account-deletion handling. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 28 in the ordered [`Discover development plan`](../Discover_개발_계획.md): add explicitly selected interest tags and deterministic ordering without using prompts, AI responses, code, paths, or transcripts. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

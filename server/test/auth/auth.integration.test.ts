@@ -386,6 +386,25 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     const csrfToken = csrfCookie.slice(csrfCookie.indexOf('=') + 1)
     const currentUser = await agent.get('/api/v1/auth/me').expect(200)
     const userId = currentUser.body.data.id as string
+    const savedDiscoverItem = {
+      id: 'HACKER_NEWS:export-1',
+      source: 'HACKER_NEWS',
+      category: 'NEWS',
+      kind: 'ARTICLE',
+      title: 'Exported saved item',
+      summary: null,
+      tags: ['typescript'],
+      reward: null,
+      compensation: null,
+      originalUrl: 'https://news.ycombinator.com/item?id=export-1',
+      attribution: 'Hacker News',
+      publishedAt: '2026-07-21T00:00:00.000Z',
+      fetchedAt: '2026-07-21T00:00:00.000Z',
+    }
+    await databaseService.query(`
+      INSERT INTO discover_saved_items (user_id, source, source_item_id, item)
+      VALUES ($1, 'HACKER_NEWS', $2, $3::jsonb)
+    `, [userId, savedDiscoverItem.id, JSON.stringify(savedDiscoverItem)])
 
     await agent.post('/api/v1/auth/me/export').send({}).expect(403)
     const exportResponse = await agent
@@ -395,8 +414,10 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .expect(200)
     const exported = JSON.stringify(exportResponse.body.data)
 
-    assert.equal(exportResponse.body.data.schemaVersion, 1)
+    assert.equal(exportResponse.body.data.schemaVersion, 2)
     assert.equal(exportResponse.body.data.profile.id, userId)
+    assert.equal(exportResponse.body.data.discoverSavedItems.length, 1)
+    assert.equal(exportResponse.body.data.discoverSavedItems[0].item.id, savedDiscoverItem.id)
     assert.doesNotMatch(exported, /tokenHash|csrfToken|requestHash|responseBody|externalSessionKey|externalTurnKey/i)
 
     await databaseService.query(`
@@ -429,12 +450,17 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.match(getSetCookie(deleted, 'aisidequest_session'), /Expires=Thu, 01 Jan 1970/i)
     await agent.get('/api/v1/auth/me').expect(401)
 
-    const [counts] = await databaseService.query<Array<{ deleted_user: number; other_user: number }>>(`
+    const [counts] = await databaseService.query<Array<{
+      deleted_user: number
+      other_user: number
+      saved_items: number
+    }>>(`
       SELECT
         (SELECT count(*)::integer FROM users WHERE id = $1) AS deleted_user,
-        (SELECT count(*)::integer FROM users WHERE id = $2) AS other_user
+        (SELECT count(*)::integer FROM users WHERE id = $2) AS other_user,
+        (SELECT count(*)::integer FROM discover_saved_items WHERE user_id = $1) AS saved_items
     `, [userId, otherUser.id])
-    assert.deepEqual(counts, { deleted_user: 0, other_user: 1 })
+    assert.deepEqual(counts, { deleted_user: 0, other_user: 1, saved_items: 0 })
   })
 
   test('OAuth start rate limit is shared in PostgreSQL and returns Retry-After', async () => {

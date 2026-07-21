@@ -564,6 +564,7 @@ describe('AISideQuest API session flow', () => {
         return jsonResponse({
           items: [],
           nextCursor: null,
+          savedItems: [],
           sources: [{
             source: 'REMOTIVE',
             displayName: 'Remotive',

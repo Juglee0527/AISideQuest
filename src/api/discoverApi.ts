@@ -5,12 +5,15 @@ import type {
   DiscoverKind,
   DiscoverPage,
   DiscoverReward,
+  DiscoverSavedItem,
+  DiscoverSavedItemPage,
+  DiscoverSavedItemReference,
   DiscoverSource,
   DiscoverSourceList,
   DiscoverSourceSnapshot,
   DiscoverSourceStatus,
 } from '../types/discover'
-import { ApiClientError, requestApi } from './apiClient'
+import { ApiClientError, createMutationHeaders, requestApi } from './apiClient'
 
 const SOURCES = new Set<DiscoverSource>([
   'HACKER_NEWS',
@@ -35,6 +38,7 @@ const SOURCE_STATUSES = new Set<DiscoverSourceStatus>([
   'UNAVAILABLE',
 ])
 const ITEM_ID_PATTERN = /^(HACKER_NEWS|REMOTIVE|DEV|STACK_EXCHANGE|GITHUB|ALGORA):[A-Za-z0-9_-]{1,200}$/
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -245,6 +249,7 @@ function parsePage(value: unknown): DiscoverPage {
     || !Array.isArray(value.items)
     || !(value.nextCursor === null || typeof value.nextCursor === 'string')
     || !Array.isArray(value.sources)
+    || !Array.isArray(value.savedItems)
   ) {
     return invalidDiscoverResponse()
   }
@@ -252,11 +257,79 @@ function parsePage(value: unknown): DiscoverPage {
   if (new Set(items.map((item) => item.id)).size !== items.length) {
     invalidDiscoverResponse()
   }
+  const savedItems = value.savedItems.map(parseSavedItemReference)
+  const itemIds = new Set(items.map((item) => item.id))
+  if (
+    new Set(savedItems.map((item) => item.itemId)).size !== savedItems.length
+    || savedItems.some((item) => !itemIds.has(item.itemId))
+  ) {
+    invalidDiscoverResponse()
+  }
   return {
     items,
     nextCursor: value.nextCursor,
     sources: parseSources(value.sources),
+    savedItems,
   }
+}
+
+function parseSavedItemReference(value: unknown): DiscoverSavedItemReference {
+  if (
+    !isRecord(value)
+    || typeof value.itemId !== 'string'
+    || !ITEM_ID_PATTERN.test(value.itemId)
+    || typeof value.savedItemId !== 'string'
+    || !UUID_PATTERN.test(value.savedItemId)
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return { itemId: value.itemId, savedItemId: value.savedItemId }
+}
+
+function parseSavedItem(value: unknown): DiscoverSavedItem {
+  if (
+    !isRecord(value)
+    || typeof value.id !== 'string'
+    || !UUID_PATTERN.test(value.id)
+    || !isDate(value.savedAt)
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return { id: value.id, item: parseItem(value.item), savedAt: value.savedAt }
+}
+
+function parseSavedItemPage(value: unknown): DiscoverSavedItemPage {
+  if (
+    !isRecord(value)
+    || !Array.isArray(value.items)
+    || !(value.nextCursor === null || typeof value.nextCursor === 'string')
+  ) {
+    return invalidDiscoverResponse()
+  }
+  const items = value.items.map(parseSavedItem)
+  if (new Set(items.map((item) => item.id)).size !== items.length) {
+    invalidDiscoverResponse()
+  }
+  return { items, nextCursor: value.nextCursor }
+}
+
+function parseSaveResult(value: unknown) {
+  if (!isRecord(value) || typeof value.created !== 'boolean') {
+    return invalidDiscoverResponse()
+  }
+  return { created: value.created, savedItem: parseSavedItem(value.savedItem) }
+}
+
+function parseDeleteResult(value: unknown) {
+  if (
+    !isRecord(value)
+    || typeof value.deleted !== 'boolean'
+    || typeof value.savedItemId !== 'string'
+    || !UUID_PATTERN.test(value.savedItemId)
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return { deleted: value.deleted, savedItemId: value.savedItemId }
 }
 
 function parseSourceList(value: unknown): DiscoverSourceList {
@@ -284,4 +357,30 @@ export function getDiscoverPage(options: DiscoverQuery = {}) {
 
 export function getDiscoverSources(signal?: AbortSignal) {
   return requestApi('/discover/sources', parseSourceList, { signal })
+}
+
+export function getSavedDiscoverItems(options: Pick<DiscoverQuery, 'limit' | 'cursor' | 'signal'> = {}) {
+  const query = new URLSearchParams({ limit: String(options.limit ?? 20) })
+  if (options.cursor) query.set('cursor', options.cursor)
+  return requestApi(`/discover/saved-items?${query}`, parseSavedItemPage, {
+    signal: options.signal,
+  })
+}
+
+export function saveDiscoverItem(itemId: string) {
+  return requestApi('/discover/saved-items', parseSaveResult, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createMutationHeaders(),
+    },
+    body: JSON.stringify({ itemId }),
+  })
+}
+
+export function deleteSavedDiscoverItem(savedItemId: string) {
+  return requestApi(`/discover/saved-items/${encodeURIComponent(savedItemId)}`, parseDeleteResult, {
+    method: 'DELETE',
+    headers: createMutationHeaders(),
+  })
 }

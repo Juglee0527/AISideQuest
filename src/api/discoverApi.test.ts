@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiClientError } from './apiClient'
-import { getDiscoverPage, getDiscoverSources } from './discoverApi'
+import {
+  deleteSavedDiscoverItem,
+  getDiscoverPage,
+  getDiscoverSources,
+  getSavedDiscoverItems,
+  saveDiscoverItem,
+} from './discoverApi'
 
 const serverTime = '2026-07-20T08:00:00.000Z'
 const unavailableRemotive = {
@@ -27,6 +33,7 @@ describe('Discover API', () => {
     const fetchMock = vi.fn(async (_input: string | URL | Request) => response({
       items: [],
       nextCursor: null,
+      savedItems: [],
       sources: [unavailableRemotive],
     }))
     vi.stubGlobal('fetch', fetchMock)
@@ -46,6 +53,7 @@ describe('Discover API', () => {
     expect(result.data).toEqual({
       items: [],
       nextCursor: null,
+      savedItems: [],
       sources: [unavailableRemotive],
     })
   })
@@ -85,6 +93,7 @@ describe('Discover API', () => {
         },
       ],
       nextCursor: null,
+      savedItems: [],
       sources: [{
         ...unavailableRemotive,
         enabled: true,
@@ -123,6 +132,7 @@ describe('Discover API', () => {
         fetchedAt: serverTime,
       }],
       nextCursor: null,
+      savedItems: [],
       sources: [unavailableRemotive],
     })))
 
@@ -143,5 +153,46 @@ describe('Discover API', () => {
     await expect(getDiscoverSources()).rejects.toMatchObject({
       code: 'INVALID_API_RESPONSE',
     } satisfies Partial<ApiClientError>)
+  })
+
+  it('validates saved snapshots and sends protected idempotent mutations', async () => {
+    document.cookie = 'aisidequest_csrf=test-csrf; path=/'
+    const savedItemId = '00000000-0000-4000-8000-000000000027'
+    const savedItem = {
+      id: savedItemId,
+      savedAt: serverTime,
+      item: {
+        id: 'REMOTIVE:job_123',
+        source: 'REMOTIVE',
+        category: 'EARNING',
+        kind: 'PAID_JOB',
+        title: 'Remote TypeScript Engineer',
+        summary: null,
+        tags: ['typescript'],
+        reward: null,
+        compensation: { provided: false, text: null },
+        originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
+        attribution: 'Remotive',
+        publishedAt: '2026-07-19T08:00:00.000Z',
+        fetchedAt: serverTime,
+      },
+    }
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === 'POST') return response({ created: true, savedItem })
+      if (init?.method === 'DELETE') return response({ deleted: true, savedItemId })
+      return response({ items: [savedItem], nextCursor: null })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect((await getSavedDiscoverItems()).data.items[0]).toEqual(savedItem)
+    expect((await saveDiscoverItem(savedItem.item.id)).data.created).toBe(true)
+    expect((await deleteSavedDiscoverItem(savedItemId)).data.deleted).toBe(true)
+
+    const mutationCalls = fetchMock.mock.calls.filter(([, init]) => init?.method)
+    expect(mutationCalls).toHaveLength(2)
+    for (const [, init] of mutationCalls) {
+      expect(init?.headers).toMatchObject({ 'x-csrf-token': 'test-csrf' })
+      expect(init?.headers).toHaveProperty('Idempotency-Key')
+    }
   })
 })

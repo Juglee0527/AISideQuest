@@ -36,6 +36,9 @@ export const DISCOVER_SOURCE_STATUSES = [
 
 export type DiscoverSourceStatus = (typeof DISCOVER_SOURCE_STATUSES)[number]
 
+export const DISCOVER_ITEM_ID_PATTERN =
+  /^(HACKER_NEWS|REMOTIVE|DEV|STACK_EXCHANGE|GITHUB|ALGORA):[A-Za-z0-9_-]{1,200}$/
+
 export type DiscoverReward =
   | {
       type: 'CASH_BOUNTY'
@@ -80,6 +83,7 @@ export interface DiscoverListResult {
   items: DiscoverItem[]
   nextCursor: string | null
   sources: DiscoverSourceSnapshot[]
+  savedItems: DiscoverSavedItemReference[]
 }
 
 export interface DiscoverSourceListResult {
@@ -91,4 +95,20 @@ export interface DiscoverCursor {
   sortAt: string
   source: DiscoverSource
   id: string
+}
+
+export interface DiscoverSavedItemReference {
+  itemId: string
+  savedItemId: string
+}
+
+export interface DiscoverSavedItem {
+  id: string
+  item: DiscoverItem
+  savedAt: string
+}
+
+export interface DiscoverSavedItemListResult {
+  items: DiscoverSavedItem[]
+  nextCursor: string | null
 }

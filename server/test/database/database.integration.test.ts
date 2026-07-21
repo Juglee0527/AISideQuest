@@ -64,6 +64,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'device_link_codes',
       'device_link_requests',
       'devices',
+      'discover_saved_items',
       'discover_source_cache',
       'integration_events',
       'oauth_login_states',
@@ -92,6 +93,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [discoverSavedItemsReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.discover_saved_items') AS saved_items_table
+    `)) as Array<{ saved_items_table: string | null }>
+    assert.equal(discoverSavedItemsReverted.saved_items_table, null)
 
     await dataSource.undoLastMigration()
     const [discoverCacheReverted] = (await dataSource.query(`
@@ -202,7 +209,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 8)
+    assert.equal(pointMigrations.length, 9)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -217,6 +224,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -306,7 +314,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 15)
+    assert.equal(reappliedMigrations.length, 16)
   })
 
   test('discover cache stores only allowlisted normalized item arrays', async () => {

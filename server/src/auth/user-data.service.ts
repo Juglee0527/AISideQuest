@@ -78,9 +78,15 @@ export class UserDataService {
             JOIN quests quest ON quest.id = ledger.quest_id
             WHERE ledger.user_id = $1 ORDER BY ledger.created_at, ledger.id
           `, userId)
+      const discoverSavedItems = await this.rows(manager, `
+            SELECT id, source, source_item_id, item, saved_at
+            FROM discover_saved_items
+            WHERE user_id = $1
+            ORDER BY saved_at, id
+          `, userId)
 
       return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         exportedAt: new Date().toISOString(),
         profile: this.camelize(profile),
         connectedAccounts: accounts.map((row) => this.camelize(row)),
@@ -90,6 +96,7 @@ export class UserDataService {
         questAttempts: attempts.map((row) => this.camelize(row)),
         questAnswers: answers.map((row) => this.camelize(row)),
         pointLedger: points.map((row) => this.camelize(row)),
+        discoverSavedItems: discoverSavedItems.map((row) => this.camelize(row)),
       }
     })
   }
@@ -112,6 +119,7 @@ export class UserDataService {
       await manager.query('DELETE FROM ai_sessions WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM device_link_codes WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM devices WHERE user_id = $1', [userId])
+      await manager.query('DELETE FROM discover_saved_items WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM api_idempotency_keys WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM user_auth_accounts WHERE user_id = $1', [userId])

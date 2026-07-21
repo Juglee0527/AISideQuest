@@ -1,13 +1,14 @@
 # Discover Product Contract
 
-Status: tasks 21-26 complete; tasks 27-33 are not implemented.
-Contract date: 2026-07-20
+Status: tasks 21-27 complete; tasks 28-33 are not implemented.
+Contract date: 2026-07-21
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
 pilot work must preserve. Tasks 24-25 have enabled Hacker News and Remotive
 through the adapter, cache, stale fallback, and source health boundaries. The
-Task 26 adds the authenticated Discover screen without adding behavioral analytics.
+Task 26 adds the authenticated Discover screen and task 27 adds user-owned saved
+items without adding behavioral analytics.
 
 ## Common model and API baseline
 
@@ -16,7 +17,7 @@ Task 26 adds the authenticated Discover screen without adding behavioral analyti
 - `GET /api/v1/discover/sources` returns the safe source catalog.
 - Both endpoints require a browser session and never require an active AI
   session.
-- List data is `{ items, nextCursor, sources }`; source-list data is
+- List data is `{ items, nextCursor, sources, savedItems }`; source-list data is
   `{ sources }`. The common API envelope remains unchanged.
 - Source snapshots contain source, display name, categories, `enabled`, status,
   and nullable successful fetch time. Status is `FRESH`, `STALE`, or
@@ -208,9 +209,30 @@ not a verified cash bounty.
   infer compensation or claim that an opportunity, reward, or availability is
   guaranteed.
 
+## Saved-item contract
+
+- `GET /api/v1/discover/saved-items` returns only the authenticated user's saved
+  normalized snapshots with an opaque `(savedAt DESC, id DESC)` cursor.
+- `POST /api/v1/discover/saved-items` accepts only a normalized `itemId` already
+  present in the server cache. It requires CSRF and a UUID idempotency key; the
+  server stores its own validated snapshot rather than trusting card fields from
+  the browser.
+- `DELETE /api/v1/discover/saved-items/:savedItemId` requires CSRF and a UUID
+  idempotency key. The ownership predicate is part of the delete statement;
+  missing, already deleted, or another user's IDs return `deleted: false`.
+- `(user_id, source_item_id)` is unique. A duplicate save returns the existing
+  row with `created: false`, and an exact idempotent replay returns the original
+  response.
+- Saved snapshots remain readable when the external source and shared source
+  cache are unavailable. They are included in user export schema version 2 and
+  deleted in the account-deletion transaction.
+- The `/discover` screen provides separate explore and saved views. Save and
+  remove failures remain local to the action and do not hide already loaded
+  cards.
+
 ## Product analytics and privacy
 
-Discover remains functional without behavioral analytics. Tasks 22-26 do not
+Discover remains functional without behavioral analytics. Tasks 22-27 do not
 implicitly authorize collecting visits or clicks. Before the task 33 pilot,
 task 32 may add the following minimal events under the rules below:
 
@@ -225,8 +247,8 @@ task 32 may add the following minimal events under the rules below:
   export and primary account deletion;
 - Prometheus metrics expose aggregates only and never a user or item identifier.
 
-Task 27 saved-item snapshots and task 28 explicitly selected interests are also
-owned user data. They must be included in export and deletion, excluded from
+Task 27 saved-item snapshots are owned user data. Task 28 explicitly selected
+interests will follow the same boundary. They must be included in export and deletion, excluded from
 operational logs and metric labels, and retained only while the account or the
 specific record remains.
 

@@ -1,5 +1,7 @@
 import {
   AlertTriangle,
+  Bookmark,
+  BookmarkCheck,
   BriefcaseBusiness,
   Clock3,
   ExternalLink,
@@ -19,13 +21,19 @@ import {
 } from 'react'
 
 import { ApiClientError } from '../api/apiClient'
-import { getDiscoverPage } from '../api/discoverApi'
+import {
+  deleteSavedDiscoverItem,
+  getDiscoverPage,
+  getSavedDiscoverItems,
+  saveDiscoverItem,
+} from '../api/discoverApi'
 import PageHeader from '../components/PageHeader'
 import { useSession } from '../contexts/SessionContext'
 import type {
   DiscoverCategory,
   DiscoverItem,
   DiscoverKind,
+  DiscoverSavedItem,
   DiscoverSourceSnapshot,
 } from '../types/discover'
 
@@ -127,7 +135,22 @@ function mergeItems(current: DiscoverItem[], incoming: DiscoverItem[]) {
   return [...current, ...incoming.filter((item) => !knownIds.has(item.id))]
 }
 
-function DiscoverCard({ item }: { item: DiscoverItem }) {
+function mergeSavedItems(current: DiscoverSavedItem[], incoming: DiscoverSavedItem[]) {
+  const knownIds = new Set(current.map((item) => item.id))
+  return [...current, ...incoming.filter((item) => !knownIds.has(item.id))]
+}
+
+function DiscoverCard({
+  item,
+  savedItemId,
+  isSaving,
+  onToggleSaved,
+}: {
+  item: DiscoverItem
+  savedItemId: string | null
+  isSaving: boolean
+  onToggleSaved: () => void
+}) {
   const publishedLabel = formatDate(item.publishedAt)
   const itemValue = valueLabel(item)
 
@@ -172,16 +195,34 @@ function DiscoverCard({ item }: { item: DiscoverItem }) {
             '게시일 미제공'
           )}
         </p>
-        <a
-          href={item.originalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-3.5 py-2 text-sm font-bold text-slate-200 transition hover:border-emerald-300/50 hover:text-emerald-200"
-          aria-label={`${item.title} 원문 보기 (${item.attribution})`}
-        >
-          원문 보기
-          <ExternalLink size={15} aria-hidden="true" />
-        </a>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            disabled={isSaving}
+            onClick={onToggleSaved}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-3.5 py-2 text-sm font-bold text-slate-200 transition hover:border-emerald-300/50 hover:text-emerald-200 disabled:cursor-wait disabled:opacity-60"
+            aria-label={`${item.title} ${savedItemId ? '저장 취소' : '저장'}`}
+          >
+            {isSaving ? (
+              <LoaderCircle className="animate-spin" size={15} aria-hidden="true" />
+            ) : savedItemId ? (
+              <BookmarkCheck size={15} aria-hidden="true" />
+            ) : (
+              <Bookmark size={15} aria-hidden="true" />
+            )}
+            {isSaving ? '처리 중' : savedItemId ? '저장됨' : '저장'}
+          </button>
+          <a
+            href={item.originalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-3.5 py-2 text-sm font-bold text-slate-200 transition hover:border-emerald-300/50 hover:text-emerald-200"
+            aria-label={`${item.title} 원문 보기 (${item.attribution})`}
+          >
+            원문 보기
+            <ExternalLink size={15} aria-hidden="true" />
+          </a>
+        </div>
       </div>
     </article>
   )
@@ -276,6 +317,7 @@ function SourceStatusList({ sources }: { sources: DiscoverSourceSnapshot[] }) {
 
 function DiscoverPage() {
   const { loadStatus: sessionStatus } = useSession()
+  const [view, setView] = useState<'EXPLORE' | 'SAVED'>('EXPLORE')
   const [category, setCategory] = useState<DiscoverCategory>('EARNING')
   const [items, setItems] = useState<DiscoverItem[]>([])
   const [sources, setSources] = useState<DiscoverSourceSnapshot[]>([])
@@ -285,10 +327,21 @@ function DiscoverPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [savedReferences, setSavedReferences] = useState<Record<string, string>>({})
+  const [savedItems, setSavedItems] = useState<DiscoverSavedItem[]>([])
+  const [savedNextCursor, setSavedNextCursor] = useState<string | null>(null)
+  const [savedStatus, setSavedStatus] = useState<PageStatus>('idle')
+  const [savedError, setSavedError] = useState<string | null>(null)
+  const [isLoadingMoreSaved, setIsLoadingMoreSaved] = useState(false)
+  const [savedLoadMoreError, setSavedLoadMoreError] = useState<string | null>(null)
+  const [savedReloadKey, setSavedReloadKey] = useState(0)
+  const [savingItemIds, setSavingItemIds] = useState<Set<string>>(() => new Set())
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const requestSequence = useRef(0)
+  const savedRequestSequence = useRef(0)
 
   useEffect(() => {
-    if (sessionStatus !== 'ready') return undefined
+    if (sessionStatus !== 'ready' || view !== 'EXPLORE') return undefined
 
     const sequence = ++requestSequence.current
     const controller = new AbortController()
@@ -305,6 +358,9 @@ function DiscoverPage() {
         setItems(result.data.items)
         setSources(result.data.sources)
         setNextCursor(result.data.nextCursor)
+        setSavedReferences(Object.fromEntries(
+          result.data.savedItems.map((item) => [item.itemId, item.savedItemId]),
+        ))
         setPageStatus('ready')
       })
       .catch((error: unknown) => {
@@ -317,7 +373,40 @@ function DiscoverPage() {
       })
 
     return () => controller.abort()
-  }, [category, reloadKey, sessionStatus])
+  }, [category, reloadKey, sessionStatus, view])
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready' || view !== 'SAVED') return undefined
+
+    const sequence = ++savedRequestSequence.current
+    const controller = new AbortController()
+    setSavedStatus('loading')
+    setSavedError(null)
+    setSavedItems([])
+    setSavedNextCursor(null)
+    setSavedLoadMoreError(null)
+
+    void getSavedDiscoverItems({ limit: PAGE_SIZE, signal: controller.signal })
+      .then((result) => {
+        if (sequence !== savedRequestSequence.current) return
+        setSavedItems(result.data.items)
+        setSavedNextCursor(result.data.nextCursor)
+        setSavedReferences(Object.fromEntries(
+          result.data.items.map((saved) => [saved.item.id, saved.id]),
+        ))
+        setSavedStatus('ready')
+      })
+      .catch((error: unknown) => {
+        if (
+          sequence !== savedRequestSequence.current
+          || (error instanceof ApiClientError && error.code === 'REQUEST_ABORTED')
+        ) return
+        setSavedError(errorMessage(error))
+        setSavedStatus('error')
+      })
+
+    return () => controller.abort()
+  }, [savedReloadKey, sessionStatus, view])
 
   const loadMore = useCallback(async () => {
     if (nextCursor === null || isLoadingMore) return
@@ -334,12 +423,75 @@ function DiscoverPage() {
       setItems((current) => mergeItems(current, result.data.items))
       setSources(result.data.sources)
       setNextCursor(result.data.nextCursor)
+      setSavedReferences((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          result.data.savedItems.map((item) => [item.itemId, item.savedItemId]),
+        ),
+      }))
     } catch (error) {
       if (sequence === requestSequence.current) setLoadMoreError(errorMessage(error))
     } finally {
       if (sequence === requestSequence.current) setIsLoadingMore(false)
     }
   }, [category, isLoadingMore, nextCursor])
+
+  const loadMoreSaved = useCallback(async () => {
+    if (savedNextCursor === null || isLoadingMoreSaved) return
+    const sequence = savedRequestSequence.current
+    setIsLoadingMoreSaved(true)
+    setSavedLoadMoreError(null)
+    try {
+      const result = await getSavedDiscoverItems({
+        cursor: savedNextCursor,
+        limit: PAGE_SIZE,
+      })
+      if (sequence !== savedRequestSequence.current) return
+      setSavedItems((current) => mergeSavedItems(current, result.data.items))
+      setSavedReferences((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          result.data.items.map((saved) => [saved.item.id, saved.id]),
+        ),
+      }))
+      setSavedNextCursor(result.data.nextCursor)
+    } catch (error) {
+      if (sequence === savedRequestSequence.current) setSavedLoadMoreError(errorMessage(error))
+    } finally {
+      if (sequence === savedRequestSequence.current) setIsLoadingMoreSaved(false)
+    }
+  }, [isLoadingMoreSaved, savedNextCursor])
+
+  const toggleSaved = useCallback(async (item: DiscoverItem) => {
+    if (savingItemIds.has(item.id)) return
+    const savedItemId = savedReferences[item.id]
+    setSavingItemIds((current) => new Set(current).add(item.id))
+    setMutationError(null)
+    try {
+      if (savedItemId) {
+        await deleteSavedDiscoverItem(savedItemId)
+        setSavedReferences((current) => {
+          const next = { ...current }
+          delete next[item.id]
+          return next
+        })
+        setSavedItems((current) => current.filter((saved) => saved.id !== savedItemId))
+      } else {
+        const result = await saveDiscoverItem(item.id)
+        const saved = result.data.savedItem
+        setSavedReferences((current) => ({ ...current, [item.id]: saved.id }))
+        setSavedItems((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)])
+      }
+    } catch (error) {
+      setMutationError(errorMessage(error))
+    } finally {
+      setSavingItemIds((current) => {
+        const next = new Set(current)
+        next.delete(item.id)
+        return next
+      })
+    }
+  }, [savedReferences, savingItemIds])
 
   const enabledSources = useMemo(() => sources.filter((source) => source.enabled), [sources])
   const allSourcesUnavailable = enabledSources.length > 0
@@ -368,9 +520,29 @@ function DiscoverPage() {
         eyebrow="Discover"
         title="다음 개발 기회를 발견하세요."
         description="외부 채용·개발 소식·커뮤니티를 한곳에서 살펴보고, 원문에서 최신 조건을 확인하세요."
+        action={(
+          <div className="flex rounded-xl border border-slate-800 bg-slate-900 p-1" aria-label="Discover 보기">
+            <button
+              type="button"
+              aria-pressed={view === 'EXPLORE'}
+              onClick={() => setView('EXPLORE')}
+              className={`rounded-lg px-3 py-2 text-sm font-bold ${view === 'EXPLORE' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+            >
+              탐색
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'SAVED'}
+              onClick={() => setView('SAVED')}
+              className={`rounded-lg px-3 py-2 text-sm font-bold ${view === 'SAVED' ? 'bg-slate-700 text-white' : 'text-slate-400'}`}
+            >
+              저장한 항목
+            </button>
+          </div>
+        )}
       />
 
-      <div
+      {view === 'EXPLORE' ? <div
         className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-800 bg-slate-900 p-1.5"
         role="tablist"
         aria-label="Discover 카테고리"
@@ -400,18 +572,26 @@ function DiscoverPage() {
             </button>
           )
         })}
-      </div>
+      </div> : null}
 
       <section
         id="discover-tab-panel"
-        role="tabpanel"
-        aria-labelledby={`discover-tab-${category.toLowerCase()}`}
+        role={view === 'EXPLORE' ? 'tabpanel' : undefined}
+        aria-labelledby={view === 'EXPLORE' ? `discover-tab-${category.toLowerCase()}` : undefined}
         className="space-y-6"
       >
         <div>
-          <h2 className="text-xl font-bold text-white">{activeTab.label}</h2>
-          <p className="mt-1 text-sm text-slate-500">{activeTab.description}</p>
+          <h2 className="text-xl font-bold text-white">{view === 'SAVED' ? '저장한 항목' : activeTab.label}</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            {view === 'SAVED' ? '나중에 다시 볼 기회를 source 상태와 관계없이 확인하세요.' : activeTab.description}
+          </p>
         </div>
+
+        {mutationError ? (
+          <div className="rounded-2xl border border-rose-400/20 bg-rose-400/5 p-4 text-sm text-rose-100/80" role="alert">
+            저장 상태를 변경하지 못했습니다. {mutationError}
+          </div>
+        ) : null}
 
         {sessionStatus === 'loading' ? (
           <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-slate-900/40" role="status">
@@ -427,6 +607,74 @@ function DiscoverPage() {
           <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-slate-900/40 p-6 text-center">
             <p className="text-sm leading-6 text-slate-400">세션 연결을 복구하면 Discover 항목을 불러옵니다.</p>
           </div>
+        ) : view === 'SAVED' ? (
+          savedStatus === 'loading' || savedStatus === 'idle' ? (
+            <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-slate-900/40" role="status">
+              <p className="flex items-center gap-2 text-sm text-slate-400">
+                <LoaderCircle className="animate-spin" size={18} aria-hidden="true" /> 저장한 항목을 불러오는 중
+              </p>
+            </div>
+          ) : savedStatus === 'error' ? (
+            <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/5 p-6 text-center" role="alert">
+              <AlertTriangle className="text-rose-300" size={28} aria-hidden="true" />
+              <p className="mt-4 font-bold text-rose-100">저장한 항목을 불러오지 못했습니다.</p>
+              <p className="mt-2 text-sm leading-6 text-rose-100/70">{savedError}</p>
+              <button
+                type="button"
+                onClick={() => setSavedReloadKey((current) => current + 1)}
+                className="mt-5 inline-flex items-center gap-2 rounded-xl border border-rose-300/30 px-4 py-2.5 text-sm font-bold text-rose-100 hover:bg-rose-300/10"
+              >
+                <RefreshCw size={16} aria-hidden="true" /> 다시 시도
+              </button>
+            </div>
+          ) : (
+            <>
+              {savedItems.length === 0 ? (
+                <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-slate-700 bg-slate-900/30 p-6 text-center">
+                  <div>
+                    <Bookmark className="mx-auto text-slate-500" size={30} aria-hidden="true" />
+                    <p className="mt-4 font-bold text-slate-300">저장한 항목이 없습니다.</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">탐색에서 다시 보고 싶은 항목을 저장해 보세요.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-2" aria-live="polite">
+                  {savedItems.map((saved) => (
+                    <DiscoverCard
+                      key={saved.id}
+                      item={saved.item}
+                      savedItemId={saved.id}
+                      isSaving={savingItemIds.has(saved.item.id)}
+                      onToggleSaved={() => void toggleSaved(saved.item)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {savedLoadMoreError ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-rose-400/20 bg-rose-400/5 p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+                  <p className="text-sm text-rose-100/80">{savedLoadMoreError}</p>
+                  <button type="button" onClick={() => void loadMoreSaved()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300/30 px-3 py-2 text-sm font-bold text-rose-100">
+                    <RefreshCw size={15} aria-hidden="true" /> 더 보기 재시도
+                  </button>
+                </div>
+              ) : null}
+
+              {savedNextCursor !== null && savedLoadMoreError === null ? (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    disabled={isLoadingMoreSaved}
+                    onClick={() => void loadMoreSaved()}
+                    className="inline-flex min-w-36 items-center justify-center gap-2 rounded-xl border border-slate-700 px-5 py-3 text-sm font-bold text-slate-200 transition hover:border-emerald-300/50 disabled:cursor-wait disabled:opacity-60"
+                  >
+                    {isLoadingMoreSaved ? <LoaderCircle className="animate-spin" size={16} aria-hidden="true" /> : null}
+                    {isLoadingMoreSaved ? '불러오는 중' : '더 보기'}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )
         ) : pageStatus === 'loading' || pageStatus === 'idle' ? (
           <div className="grid min-h-56 place-items-center rounded-2xl border border-slate-800 bg-slate-900/40" role="status">
             <p className="flex items-center gap-2 text-sm text-slate-400">
@@ -464,7 +712,15 @@ function DiscoverPage() {
               </div>
             ) : items.length > 0 ? (
               <div className="grid gap-4 lg:grid-cols-2" aria-live="polite">
-                {items.map((item) => <DiscoverCard key={item.id} item={item} />)}
+                {items.map((item) => (
+                  <DiscoverCard
+                    key={item.id}
+                    item={item}
+                    savedItemId={savedReferences[item.id] ?? null}
+                    isSaving={savingItemIds.has(item.id)}
+                    onToggleSaved={() => void toggleSaved(item)}
+                  />
+                ))}
               </div>
             ) : null}
 

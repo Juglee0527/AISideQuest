@@ -10,7 +10,9 @@ import {
 import { DiscoverCacheService, type DiscoverCacheEntry } from './discover-cache.service'
 import type { DiscoverListQueryDto } from './discover.dto'
 import { DiscoverFetchError, type DiscoverFetchFailure } from './discover-http-client'
+import { DiscoverSavedService } from './discover-saved.service'
 import {
+  DISCOVER_ITEM_ID_PATTERN,
   DISCOVER_SOURCES,
   type DiscoverCategory,
   type DiscoverCursor,
@@ -20,8 +22,6 @@ import {
   type DiscoverSourceListResult,
   type DiscoverSourceSnapshot,
 } from './discover.types'
-
-const DISCOVER_ITEM_ID_PATTERN = /^(HACKER_NEWS|REMOTIVE|DEV|STACK_EXCHANGE|GITHUB|ALGORA):[A-Za-z0-9_-]{1,200}$/
 
 const SOURCE_CATALOG: readonly DiscoverSourceSnapshot[] = [
   { source: 'HACKER_NEWS', displayName: 'Hacker News', categories: ['EARNING', 'NEWS', 'COMMUNITY'], enabled: false, status: 'UNAVAILABLE', fetchedAt: null },
@@ -46,6 +46,7 @@ export class DiscoverService {
     @Inject(DISCOVER_SOURCE_ADAPTERS)
     adapters: readonly DiscoverSourceAdapter[],
     private readonly cacheService: DiscoverCacheService,
+    private readonly savedService: DiscoverSavedService,
     private readonly metrics: OperationalMetricsService,
     private readonly logger: OperationalLoggerService,
   ) {
@@ -58,7 +59,7 @@ export class DiscoverService {
   }
 
   async listDiscover(
-    _userId: string,
+    userId: string,
     query: DiscoverListQueryDto,
   ): Promise<DiscoverListResult> {
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : null
@@ -81,8 +82,9 @@ export class DiscoverService {
     const nextCursor = afterCursor.length > query.limit && items.length > 0
       ? this.encodeCursor(items.at(-1) as DiscoverItem)
       : null
+    const savedItems = await this.savedService.findSavedItemReferences(userId, items)
 
-    return { items, nextCursor, sources: snapshots }
+    return { items, nextCursor, sources: snapshots, savedItems }
   }
 
   async listSources(): Promise<DiscoverSourceListResult> {

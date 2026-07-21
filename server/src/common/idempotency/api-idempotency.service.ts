@@ -11,6 +11,8 @@ export type ApiIdempotencyOperation =
   | 'DEVICE_REVOKE'
   | 'QUEST_ATTEMPT_START'
   | 'QUEST_ATTEMPT_SUBMIT'
+  | 'DISCOVER_ITEM_SAVE'
+  | 'DISCOVER_ITEM_DELETE'
 
 interface StoredIdempotencyRow {
   request_hash: string

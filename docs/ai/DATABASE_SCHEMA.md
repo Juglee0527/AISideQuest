@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784268000000-add-discover-source-cache`까지 15개
+- 기준 migration: `1784160000000`부터 `1784271600000-add-discover-saved-items`까지 16개
 
 ---
 
@@ -41,6 +41,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 | `quest_attempt_answers` | 제출한 선택지와 판정 snapshot |
 | `point_ledger` | 변경하지 않는 퀘스트 보상 원장 |
 | `discover_source_cache` | source별 정규화 Discover item과 마지막 성공 갱신 시각 |
+| `discover_saved_items` | 사용자별 정규화 Discover item snapshot과 저장 시각 |
 
 원래 계획의 5개 핵심 테이블만으로는 GitHub 계정 연결, 기기 인증, event 멱등성, 객관식 답안 저장을 보장할 수 없어 필요한 보조 테이블을 최초 migration에 포함했다.
 
@@ -97,6 +98,14 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `refreshed_at`은 마지막 성공 갱신 시각이며 stale 판정과 최대 7일 보존의 기준이다.
 - 애플리케이션은 source별 PostgreSQL transaction advisory lock으로 동시 refresh를 직렬화한다.
 - 실행 시작과 30분 간격 정리에서 7일을 넘기기 전에 오래된 row를 삭제한다.
+
+## 3.5 Discover 저장 항목
+
+- 각 row는 `user_id`, allowlist `source`, namespaced `source_item_id`, 최대 16 KiB JSON object snapshot, `saved_at`만 저장한다.
+- `(user_id, source_item_id)` unique 제약으로 중복 저장을 방지한다.
+- JSON의 `id`·`source`가 row identity와 일치해야 하며, API는 browser card 전체가 아니라 cache에서 다시 검증한 normalized item만 저장한다.
+- 목록 cursor index는 `(user_id, saved_at DESC, id DESC)`다. Source cache가 삭제되어도 snapshot 목록은 독립적으로 조회된다.
+- 계정 삭제는 FK cascade에 더해 서비스 transaction에서 명시적으로 삭제하며, 계정 내보내기 schema version 2에 포함한다.
 
 # 4. 개발용 퀘스트 seed
 

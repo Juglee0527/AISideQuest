@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~26 완료, Discover MVP 구현 완료
+- 상태: Task 21~27 완료, Discover MVP와 관심 항목 저장 구현 완료
 - 작업 번호: 21~33
-- 다음 작업: 27. 관심 항목 저장
+- 다음 작업: 28. 명시적 관심 기술 설정과 정렬
 - 1차 구현 범위: 21~26
 
 ---
@@ -275,6 +275,8 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 
 #### 27. 관심 항목 저장
 
+상태: 완료 (2026-07-21)
+
 작업:
 
 - 사용자별 저장 table과 소유권 제약을 추가한다.
@@ -287,6 +289,13 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - 다른 사용자의 저장 항목을 조회·삭제할 수 없다.
 - 중복 저장과 반복 삭제가 안전하다.
 - 외부 source 장애 중에도 저장 목록을 조회할 수 있다.
+
+구현 결과:
+
+- Browser는 item 전체가 아니라 `itemId`만 보내며, server가 normalized source cache에서 다시 검증한 snapshot을 저장한다.
+- `(user_id, source_item_id)` unique 제약, UUID idempotency key와 ownership SQL로 중복 저장·재전송·타 사용자 삭제를 안전하게 처리한다.
+- `GET /discover/saved-items`는 source cache와 독립된 cursor 목록을 제공하고 `/discover`는 탐색·저장한 항목 보기를 제공한다.
+- 저장 snapshot은 사용자 data export schema version 2와 account delete transaction에 포함된다.
 
 #### 28. 명시적 관심 기술 설정과 정렬
 

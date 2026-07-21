@@ -95,6 +95,7 @@ describe('Discover page', () => {
             attribution: 'Hacker News',
           })],
           nextCursor: null,
+          savedItems: [],
           sources: [source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY'])],
         })
       }
@@ -102,6 +103,7 @@ describe('Discover page', () => {
       return response({
         items: [item()],
         nextCursor: null,
+        savedItems: [],
         sources: [
           source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY']),
           source('REMOTIVE', 'Remotive', ['EARNING']),
@@ -144,6 +146,7 @@ describe('Discover page', () => {
           attribution: 'Hacker News',
         })],
         nextCursor: null,
+        savedItems: [],
         sources: [
           source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY'], 'STALE'),
           source('REMOTIVE', 'Remotive', ['EARNING'], 'UNAVAILABLE'),
@@ -169,6 +172,7 @@ describe('Discover page', () => {
       return response({
         items: [],
         nextCursor: null,
+        savedItems: [],
         sources: [
           source(
             'HACKER_NEWS',
@@ -207,6 +211,7 @@ describe('Discover page', () => {
       return response({
         items: [],
         nextCursor: null,
+        savedItems: [],
         sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
       })
     })
@@ -231,6 +236,7 @@ describe('Discover page', () => {
         return response({
           items: [],
           nextCursor: null,
+          savedItems: [],
           sources: [source('REMOTIVE', 'Remotive', ['EARNING'], 'UNAVAILABLE')],
         })
       }
@@ -238,6 +244,7 @@ describe('Discover page', () => {
         return response({
           items: [item()],
           nextCursor: 'next-page',
+          savedItems: [],
           sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
         })
       }
@@ -245,6 +252,7 @@ describe('Discover page', () => {
       return response({
         items: [item({ id: 'REMOTIVE:102', title: 'Backend Contract Engineer' })],
         nextCursor: null,
+        savedItems: [],
         sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
       })
     })
@@ -261,5 +269,65 @@ describe('Discover page', () => {
     fireEvent.click(screen.getByRole('button', { name: '더 보기 재시도' }))
     expect(await screen.findByText('Backend Contract Engineer')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument())
+  })
+
+  it('saves an item, reads its snapshot independently, and removes it safely', async () => {
+    document.cookie = 'aisidequest_csrf=test-csrf; path=/'
+    const savedItemId = '00000000-0000-4000-8000-000000000027'
+    let saved = false
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input))
+      const session = sessionResponse(url)
+      if (session) return session
+
+      if (url.pathname.endsWith('/discover/saved-items') && init?.method === 'POST') {
+        saved = true
+        return response({
+          created: true,
+          savedItem: { id: savedItemId, item: item(), savedAt: SERVER_TIME },
+        })
+      }
+      if (url.pathname.endsWith(`/discover/saved-items/${savedItemId}`)) {
+        saved = false
+        return response({ deleted: true, savedItemId })
+      }
+      if (url.pathname.endsWith('/discover/saved-items')) {
+        return response({
+          items: saved ? [{ id: savedItemId, item: item(), savedAt: SERVER_TIME }] : [],
+          nextCursor: null,
+        })
+      }
+      return response({
+        items: [item()],
+        nextCursor: null,
+        savedItems: [],
+        sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
+      })
+    })
+
+    renderDiscover(fetchMock)
+    const saveButton = await screen.findByRole('button', {
+      name: 'Remote TypeScript Engineer 저장',
+    })
+    fireEvent.click(saveButton)
+    expect(await screen.findByRole('button', {
+      name: 'Remote TypeScript Engineer 저장 취소',
+    })).toBeInTheDocument()
+
+    const saveCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    expect(saveCall?.[1]?.headers).toMatchObject({
+      'x-csrf-token': 'test-csrf',
+      'Content-Type': 'application/json',
+    })
+    expect(saveCall?.[1]?.headers).toHaveProperty('Idempotency-Key')
+
+    fireEvent.click(screen.getByRole('button', { name: '저장한 항목' }))
+    expect(await screen.findByText('나중에 다시 볼 기회를 source 상태와 관계없이 확인하세요.')).toBeInTheDocument()
+    expect(screen.getByText('Remote TypeScript Engineer')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Remote TypeScript Engineer 저장 취소',
+    }))
+    expect(await screen.findByText('저장한 항목이 없습니다.')).toBeInTheDocument()
   })
 })

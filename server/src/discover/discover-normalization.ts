@@ -1,12 +1,12 @@
 import {
   DISCOVER_CATEGORIES,
+  DISCOVER_ITEM_ID_PATTERN,
   DISCOVER_KINDS,
   DISCOVER_SOURCES,
   type DiscoverItem,
   type DiscoverSource,
 } from './discover.types'
 
-const ITEM_ID_PATTERN = /^(HACKER_NEWS|REMOTIVE|DEV|STACK_EXCHANGE|GITHUB|ALGORA):[A-Za-z0-9_-]{1,200}$/
 const TAGS = /<[^>]*>/g
 const UNSAFE_BLOCKS = /<(script|style|template|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi
 const ENTITY_PATTERN = /&(#x[0-9a-f]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);/gi
@@ -41,7 +41,7 @@ export function normalizeDiscoverItem(
   if (
     value.source !== expectedSource
     || !DISCOVER_SOURCES.includes(value.source)
-    || !ITEM_ID_PATTERN.test(value.id)
+    || !DISCOVER_ITEM_ID_PATTERN.test(value.id)
     || !value.id.startsWith(`${value.source}:`)
     || !DISCOVER_CATEGORIES.includes(value.category)
     || !DISCOVER_KINDS.includes(value.kind)

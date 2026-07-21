@@ -55,8 +55,25 @@ export interface DiscoverPage {
   items: DiscoverItem[]
   nextCursor: string | null
   sources: DiscoverSourceSnapshot[]
+  savedItems: DiscoverSavedItemReference[]
 }
 
 export interface DiscoverSourceList {
   sources: DiscoverSourceSnapshot[]
+}
+
+export interface DiscoverSavedItemReference {
+  itemId: string
+  savedItemId: string
+}
+
+export interface DiscoverSavedItem {
+  id: string
+  item: DiscoverItem
+  savedAt: string
+}
+
+export interface DiscoverSavedItemPage {
+  items: DiscoverSavedItem[]
+  nextCursor: string | null
 }

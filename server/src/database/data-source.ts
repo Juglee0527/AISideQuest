@@ -18,6 +18,7 @@ import { AddBrowserDeviceLinking1784199600000 } from './migrations/1784199600000
 import { AllowConcurrentHookSessions1784260800000 } from './migrations/1784260800000-allow-concurrent-hook-sessions'
 import { AddSanitizedSessionContext1784264400000 } from './migrations/1784264400000-add-sanitized-session-context'
 import { AddDiscoverSourceCache1784268000000 } from './migrations/1784268000000-add-discover-source-cache'
+import { AddDiscoverSavedItems1784271600000 } from './migrations/1784271600000-add-discover-saved-items'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -46,6 +47,7 @@ export function createDataSourceOptions(
       AllowConcurrentHookSessions1784260800000,
       AddSanitizedSessionContext1784264400000,
       AddDiscoverSourceCache1784268000000,
+      AddDiscoverSavedItems1784271600000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',
