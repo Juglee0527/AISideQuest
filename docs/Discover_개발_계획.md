@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~22 완료, Task 23 구현 전
+- 상태: Task 21~23 완료, Task 24 구현 전
 - 작업 번호: 21~33
-- 다음 작업: 23. 외부 source Adapter 기반 구현
+- 다음 작업: 24. Hacker News 커뮤니티 연동
 - 1차 구현 범위: 21~26
 
 ---
@@ -180,6 +180,16 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - 임의 host 호출과 악성 URL을 차단한다.
 - 외부 응답 원문을 로그에 남기지 않는다.
 - Maximum stale age를 넘긴 item은 반환하지 않고 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
+
+구현 결과:
+
+- `DiscoverSourceAdapter` interface로 source metadata, fresh TTL, maximum stale와 정규화 item fetch 책임을 고정했다.
+- 공통 HTTP client는 exact HTTPS host allowlist, credential·비표준 port·redirect 차단, timeout, 최대 3회 시도와 1 MiB 기본 JSON body 상한을 적용한다.
+- HTML·제어문자를 제거한 bounded plain text, HTTPS display URL, category·kind·reward·compensation 조합을 cache write 전에 검증한다.
+- `discover_source_cache`에는 normalized item과 마지막 성공 갱신 시각만 저장하며 5 MiB DB 제약과 최대 7일 정리를 적용한다.
+- 같은 process의 single-flight와 source별 PostgreSQL advisory lock으로 동시 miss를 합치고, lock을 얻지 못한 instance는 stale 또는 unavailable로 안전하게 응답한다.
+- Source별 fresh·stale·miss와 fetch 결과는 fixed low-cardinality metric만 남긴다. Raw body, HTML, URL과 item·user 식별자는 로그와 metric label에 남기지 않는다.
+- 실제 Hacker News와 Remotive 호출은 각각 Task 24와 Task 25에 남겨 두어 현재 source catalog는 계속 disabled·`UNAVAILABLE`이다.
 
 #### 24. Hacker News 커뮤니티 연동
 

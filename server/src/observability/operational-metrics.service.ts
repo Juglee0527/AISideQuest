@@ -1,11 +1,23 @@
 import { Injectable } from '@nestjs/common'
 
 import { DatabaseService } from '../database/database.service'
+import type { DiscoverFetchFailure } from '../discover/discover-http-client'
+import type { DiscoverSource } from '../discover/discover.types'
 
 interface HttpCounter {
   method: string
   route: string
   status: number
+  count: number
+}
+
+type DiscoverCacheResult = 'FRESH' | 'STALE' | 'MISS'
+type DiscoverFetchResult = 'ATTEMPT' | 'SUCCESS' | 'FAILURE' | 'SKIPPED_LOCKED'
+
+interface DiscoverCounter {
+  source: DiscoverSource
+  result: string
+  reason?: DiscoverFetchFailure
   count: number
 }
 
@@ -19,6 +31,8 @@ export class OperationalMetricsService {
   private authFailures = 0
   private rateLimited = 0
   private serverErrors = 0
+  private readonly discoverCacheCounters = new Map<string, DiscoverCounter>()
+  private readonly discoverFetchCounters = new Map<string, DiscoverCounter>()
 
   constructor(private readonly databaseService: DatabaseService) {}
 
@@ -35,6 +49,18 @@ export class OperationalMetricsService {
     if (status === 401 || status === 403) this.authFailures += 1
     if (status === 429) this.rateLimited += 1
     if (status >= 500) this.serverErrors += 1
+  }
+
+  recordDiscoverCache(source: DiscoverSource, result: DiscoverCacheResult) {
+    this.incrementDiscoverCounter(this.discoverCacheCounters, source, result)
+  }
+
+  recordDiscoverFetch(
+    source: DiscoverSource,
+    result: DiscoverFetchResult,
+    reason?: DiscoverFetchFailure,
+  ) {
+    this.incrementDiscoverCounter(this.discoverFetchCounters, source, result, reason)
   }
 
   async renderPrometheus() {
@@ -64,9 +90,28 @@ export class OperationalMetricsService {
       `aisidequest_db_pool_total ${snapshot.databasePool.total}`,
       `aisidequest_db_pool_idle ${snapshot.databasePool.idle}`,
       `aisidequest_db_pool_waiting ${snapshot.databasePool.waiting}`,
+      '# HELP aisidequest_discover_cache_total Discover cache resolution results.',
+      '# TYPE aisidequest_discover_cache_total counter',
+      ...[...this.discoverCacheCounters.values()].map((counter) =>
+        `aisidequest_discover_cache_total{source="${counter.source}",result="${counter.result}"} ${counter.count}`),
+      '# HELP aisidequest_discover_source_fetch_total Discover source fetch outcomes.',
+      '# TYPE aisidequest_discover_source_fetch_total counter',
+      ...[...this.discoverFetchCounters.values()].map((counter) =>
+        `aisidequest_discover_source_fetch_total{source="${counter.source}",result="${counter.result}",reason="${counter.reason ?? 'NONE'}"} ${counter.count}`),
       '',
     ]
 
     return lines.join('\n')
+  }
+
+  private incrementDiscoverCounter(
+    counters: Map<string, DiscoverCounter>,
+    source: DiscoverSource,
+    result: string,
+    reason?: DiscoverFetchFailure,
+  ) {
+    const key = `${source}:${result}:${reason ?? 'NONE'}`
+    const existing = counters.get(key)
+    counters.set(key, { source, result, reason, count: (existing?.count ?? 0) + 1 })
   }
 }

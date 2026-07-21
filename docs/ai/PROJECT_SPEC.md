@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~22 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~23 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-20
 
@@ -107,7 +107,7 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - Strict client response parser와 HTTPS original URL 검증
 - Adapter 구현 전 명시적 empty item과 disabled·`UNAVAILABLE` source 상태
 
-현재 endpoint는 외부 network를 호출하거나 cache를 읽지 않는다. Source adapter와 shared PostgreSQL cache는 Task 23 범위다.
+현재 endpoint는 등록된 concrete source adapter가 없어 외부 network를 호출하지 않는다. Task 23의 adapter interface, bounded HTTP client, 정규화 shared PostgreSQL cache와 stale fallback은 준비되어 있으며 Task 24~25에서 source를 등록할 때 활성화된다.
 
 ## 4.6 현재 제외 범위
 
@@ -242,17 +242,17 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-20 기준 자동 test 166개가 통과했다.
+2026-07-20 기준 자동 test 177개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
 | React | 54 |
 | Codex plugin | 20 |
 | 운영·local startup script | 17 |
-| Server non-database | 24 |
-| PostgreSQL integration | 51 |
+| Server non-database | 34 |
+| PostgreSQL integration | 52 |
 
-Lint, client·server typecheck와 production build, migration 14개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
+Lint, client·server typecheck와 production build, migration 15개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
 
 ---
 
@@ -270,7 +270,7 @@ Lint, client·server typecheck와 production build, migration 14개 revert·reap
 
 # 11. Discover 제품 계약과 다음 단계
 
-Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를 구현했다. 외부 source item과 화면은 아직 제공하지 않는다.
+Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. 외부 source item과 화면은 아직 제공하지 않는다.
 
 - `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
 - AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
@@ -284,7 +284,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 23의 safe source Adapter, bounded HTTP client, shared normalized cache와 stale fallback 구현이다.
+다음 작업은 Task 24의 Hacker News Top·Ask·Show·Jobs adapter 구현이다.
 
 ---
 
@@ -299,7 +299,8 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 
 - Task 21: 제품·개인정보·분류·release 계약 완료
 - Task 22: common model, authenticated read API, source catalog와 strict client parser 완료
-- Task 23~26: adapter, Hacker News, Remotive와 screen 미구현
+- Task 23: safe adapter interface, bounded HTTP client, normalized PostgreSQL cache, single-flight와 stale fallback 완료
+- Task 24~26: Hacker News, Remotive와 screen 미구현
 - Task 27~28: saved item과 explicit interest 미구현
 - Task 29~31: additional source 미구현
 - Task 32~33: Discover observability와 product pilot 미구현

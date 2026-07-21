@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784264400000-add-sanitized-session-context`까지 14개
+- 기준 migration: `1784160000000`부터 `1784268000000-add-discover-source-cache`까지 15개
 
 ---
 
@@ -40,6 +40,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 | `quest_attempts` | 사용자별 퀘스트 응시와 판정 결과 |
 | `quest_attempt_answers` | 제출한 선택지와 판정 snapshot |
 | `point_ledger` | 변경하지 않는 퀘스트 보상 원장 |
+| `discover_source_cache` | source별 정규화 Discover item과 마지막 성공 갱신 시각 |
 
 원래 계획의 5개 핵심 테이블만으로는 GitHub 계정 연결, 기기 인증, event 멱등성, 객관식 답안 저장을 보장할 수 없어 필요한 보조 테이블을 최초 migration에 포함했다.
 
@@ -88,6 +89,14 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - 응시는 AI 세션 종료 후 5분이 지나면 점수 없는 `EXPIRED` 상태로 전이한다.
 - `point_ledger`는 사용자와 퀘스트 버전 조합당 보상 1건만 허용한다.
 - 포인트 잔액 컬럼은 두지 않고 원장의 합으로 계산한다.
+
+## 3.4 Discover source cache
+
+- `source`는 계획된 6개 source allowlist 중 하나이며 source당 row는 하나다.
+- `items`는 JSON array만 허용하고 5 MiB를 넘지 않는다. Raw upstream body와 HTML은 저장하지 않는다.
+- `refreshed_at`은 마지막 성공 갱신 시각이며 stale 판정과 최대 7일 보존의 기준이다.
+- 애플리케이션은 source별 PostgreSQL transaction advisory lock으로 동시 refresh를 직렬화한다.
+- 실행 시작과 30분 간격 정리에서 7일을 넘기기 전에 오래된 row를 삭제한다.
 
 # 4. 개발용 퀘스트 seed
 

@@ -13,7 +13,7 @@ AISideQuest의 PR 검사는 [`.github/workflows/ci.yml`](../../.github/workflows
 | `Tests / Chromium core flow` | 로그인 → 연결 기기 → 자동 session 반영 → 퀴즈 → 답안 새로고침 복구 → 제출 → 100P/dashboard 핵심 흐름 |
 | `Required checks` | 위 job의 실패·취소·skip 중 하나라도 merge 가능한 상태가 되는 문제 |
 
-PostgreSQL job은 이름에 `test`가 포함된 격리 DB와 `ALLOW_DATABASE_RESET=true`가 동시에 있어야만 실행된다. migration job은 실제 migration을 단계적으로 되돌려 대표 데이터를 넣은 뒤 최신 4개 migration을 다시 적용하므로 직전 기능 schema의 point backfill과 최신 운영 진단 column까지 함께 검증한다.
+PostgreSQL job은 이름에 `test`가 포함된 격리 DB와 `ALLOW_DATABASE_RESET=true`가 동시에 있어야만 실행된다. migration job은 실제 migration을 단계적으로 되돌려 대표 데이터를 넣은 뒤 최신 migration을 다시 적용하므로 point backfill, 운영 진단 column과 Discover cache 제약까지 함께 검증한다.
 
 OAuth는 실제 GitHub credential 대신 서버 프로세스 안의 mock provider를 사용해 state/PKCE 성공, 사용자 거절, state replay, callback 입력 오류, logout, session 만료·폐기를 검증한다. 실제 GitHub OAuth는 아래 staging smoke에서만 확인한다.
 

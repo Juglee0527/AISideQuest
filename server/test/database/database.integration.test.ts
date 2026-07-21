@@ -64,6 +64,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'device_link_codes',
       'device_link_requests',
       'devices',
+      'discover_source_cache',
       'integration_events',
       'oauth_login_states',
       'point_ledger',
@@ -91,6 +92,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [discoverCacheReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.discover_source_cache') AS cache_table
+    `)) as Array<{ cache_table: string | null }>
+    assert.equal(discoverCacheReverted.cache_table, null)
 
     await dataSource.undoLastMigration()
     const [sanitizedContextReverted] = (await dataSource.query(`
@@ -195,7 +202,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 7)
+    assert.equal(pointMigrations.length, 8)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -210,6 +217,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -298,7 +306,36 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 14)
+    assert.equal(reappliedMigrations.length, 15)
+  })
+
+  test('discover cache stores only allowlisted normalized item arrays', async () => {
+    await dataSource.query(`
+      INSERT INTO discover_source_cache (source, items, refreshed_at)
+      VALUES ('HACKER_NEWS', '[]'::jsonb, now())
+    `)
+    const [row] = (await dataSource.query(`
+      SELECT source, items
+      FROM discover_source_cache
+      WHERE source = 'HACKER_NEWS'
+    `)) as Array<{ source: string; items: unknown }>
+    assert.deepEqual(row, { source: 'HACKER_NEWS', items: [] })
+
+    await assert.rejects(
+      dataSource.query(`
+        INSERT INTO discover_source_cache (source, items, refreshed_at)
+        VALUES ('UNKNOWN', '[]'::jsonb, now())
+      `),
+      (error) => hasPostgresCode(error, '23514'),
+    )
+    await assert.rejects(
+      dataSource.query(`
+        UPDATE discover_source_cache
+        SET items = '{}'::jsonb
+        WHERE source = 'HACKER_NEWS'
+      `),
+      (error) => hasPostgresCode(error, '23514'),
+    )
   })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {

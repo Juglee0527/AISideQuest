@@ -27,7 +27,7 @@
 | `server/src/quests/` | catalog, attempts, answers, grading, retry, reward transaction |
 | `server/src/points/` | balance and immutable ledger reads |
 | `server/src/statistics/` | time-zone-aware summary and activity |
-| `server/src/discover/` | common Discover types, validated read filters, safe source catalog and future adapter boundary |
+| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, source aggregation and read API |
 | `server/src/security/` | shared PostgreSQL rate limits |
 | `server/src/observability/` | structured logging, metrics, sanitization |
 | `server/src/health/` | liveness, readiness, protected metrics endpoint |
@@ -46,7 +46,7 @@
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
-Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. Source adapters and cache arrive in task 23; Hacker News and Remotive are enabled only by tasks 24-25.
+Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. The shared adapter and cache infrastructure is implemented; Hacker News and Remotive are enabled only by tasks 24-25.
 
 ## Change routing
 

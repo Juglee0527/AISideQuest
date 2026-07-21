@@ -61,7 +61,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Task 22 ships the authenticated read contract and common model, but no source adapter, external call, cache row, or `/discover` screen. Until tasks 23-25 enable sources, list responses contain no items and every catalog entry is `enabled: false`, `status: "UNAVAILABLE"`, and `fetchedAt: null`.
+Tasks 22-23 ship the authenticated read contract, common model, safe adapter boundary, bounded HTTP client, normalized shared cache, and stale fallback. No concrete source adapter or `/discover` screen exists yet. Until tasks 24-25 enable sources, list responses contain no items and every catalog entry is `enabled: false`, `status: "UNAVAILABLE"`, and `fetchedAt: null`.
 
 `GET /discover` query:
 
@@ -96,6 +96,8 @@ Successful `GET /discover` data:
 `GET /discover/sources` returns `{ "sources": [...] }` for `HACKER_NEWS`, `REMOTIVE`, `DEV`, `STACK_EXCHANGE`, `GITHUB`, and `ALGORA`. `enabled` means an adapter is active. `status` is `FRESH`, `STALE`, or `UNAVAILABLE`; `FRESH` and `STALE` require a successful ISO8601 `fetchedAt`. No raw upstream error is exposed.
 
 Every future `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`.
+
+Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
 
 - `EARNING`: `PAID_JOB` or `CASH_BOUNTY`.
 - `NEWS`: `ARTICLE`.

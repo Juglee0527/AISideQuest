@@ -86,6 +86,10 @@ heartbeat 만료율, deferred 최고 age, late Stop 복구, queue depth/oldest a
 
 OAuth 설정 변경, proxy hop 설정과 공격성 traffic을 확인한다. Rate Limit bucket을 임의 삭제하지 않는다. GitHub 장애가 원인이면 신규 로그인만 중단하고 기존 세션 상태를 확인한다.
 
+### Discover source 장애
+
+`aisidequest_discover_source_fetch_total`의 source·result·고정 failure reason과 `aisidequest_discover_cache_total`의 `FRESH`·`STALE`·`MISS`만 확인한다. URL, item ID, 응답 body, HTML 또는 사용자 식별자를 로그나 metric label에 추가하지 않는다. 한 source 실패는 core readiness 장애가 아니며, maximum stale 이내 cache는 `STALE`, 그 이후는 `UNAVAILABLE`로 처리한다. Task 32 전에는 이 기본 counter에 운영 경보나 제품 분석을 연결하지 않는다.
+
 ## Secret 회전
 
 - GitHub OAuth secret: 새 secret을 secret manager에 등록 → staging callback → production rolling restart → 이전 secret 폐기.

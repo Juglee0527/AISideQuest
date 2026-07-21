@@ -1,12 +1,13 @@
 # Discover Product Contract
 
-Status: tasks 21-22 complete; tasks 23-33 are not implemented.
+Status: tasks 21-23 complete; tasks 24-33 are not implemented.
 Contract date: 2026-07-20
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
-pilot work must preserve. Task 22 has shipped the common types and authenticated
-read endpoints; no external source, cache, item, or screen is enabled yet.
+pilot work must preserve. Task 23 has shipped the adapter boundary, bounded HTTP
+client, normalized PostgreSQL cache, stale fallback, and source health counters.
+No concrete external source, item, or screen is enabled until tasks 24-26.
 
 ## Common model and API baseline
 
@@ -28,6 +29,26 @@ read endpoints; no external source, cache, item, or screen is enabled yet.
   The versioned cursor binds this tuple and remains opaque to clients.
 - Before adapters exist, all six planned sources are `enabled: false` and
   `UNAVAILABLE`; both endpoints return successfully without external calls.
+
+## Adapter infrastructure baseline
+
+- A source is enabled only when a server-side `DiscoverSourceAdapter` is
+  registered. Each adapter owns its source identity, categories, display name,
+  fresh TTL, maximum stale age, and normalized item fetch.
+- The shared HTTP client accepts only HTTPS URLs whose exact hostname is in the
+  adapter-provided allowlist. Credentials, non-default ports, and redirects are
+  rejected before response parsing.
+- Requests time out, perform at most three configured attempts, accept bounded
+  JSON response bodies only, and retry only transient network, timeout, rate
+  limit, or upstream failures.
+- Normalization enforces namespaced identity, category/kind/reward/compensation
+  consistency, bounded plain text, HTTPS display URLs, and canonical dates
+  before a cache write.
+- PostgreSQL cache refreshes use a per-source transaction advisory lock and an
+  in-process single-flight. A losing instance serves bounded stale data or an
+  unavailable status instead of multiplying upstream calls.
+- Basic cache and fetch counters use only fixed source, result, and failure
+  reason labels. Task 32 still owns dashboards, alerts, and pilot analytics.
 
 ## Product boundary
 
