@@ -73,6 +73,7 @@ export function normalizeDiscoverItem(
     reward: normalizeReward(value.reward),
     compensation: normalizeCompensation(value.compensation),
     engagement: normalizeEngagement(value.engagement),
+    readingTimeMinutes: normalizeReadingTime(value.readingTimeMinutes),
     originalUrl,
     attribution,
     publishedAt,
@@ -217,6 +218,14 @@ function normalizeEngagement(engagement: DiscoverItem['engagement'] | undefined)
     throw new Error('Invalid Discover engagement')
   }
   return engagement
+}
+
+function normalizeReadingTime(value: DiscoverItem['readingTimeMinutes'] | undefined) {
+  if (value === undefined || value === null) return null
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 1_440) {
+    throw new Error('Invalid Discover reading time')
+  }
+  return value
 }
 
 function decodeEntity(entity: string) {

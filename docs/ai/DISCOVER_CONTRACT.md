@@ -1,6 +1,6 @@
 # Discover Product Contract
 
-Status: tasks 21-28 complete; tasks 29-33 are not implemented.
+Status: tasks 21-29 complete; tasks 30-33 are not implemented.
 Contract date: 2026-07-21
 
 This document is the canonical product, privacy, and release contract for the
@@ -33,8 +33,9 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   then the chronological tuple. The versioned cursor binds the current interest
   hash and ranking tuple and remains opaque to clients.
 - A source without a registered adapter remains `enabled: false` and
-  `UNAVAILABLE`. Hacker News and Remotive are registered; the other four planned
-  sources stay disabled until their tasks are implemented.
+  `UNAVAILABLE`. Hacker News, Remotive, DEV, and Stack Exchange are registered;
+  GitHub and Algora stay disabled until their own tasks are
+  implemented or, for Algora, a documented GO decision is reached.
 
 ## Adapter infrastructure baseline
 
@@ -55,6 +56,45 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   unavailable status instead of multiplying upstream calls.
 - Basic cache and fetch counters use only fixed source, result, and failure
   reason labels. Task 32 still owns dashboards, alerts, and pilot analytics.
+
+## Source expansion contract
+
+- Task 29 is delivered as independently verified `29A DEV` and `29B Stack
+  Overflow`. A user interest never causes an upstream request. Every source
+  refresh populates the shared cache, and task 28 interests only rank the
+  already-normalized result.
+- DEV uses one public `GET https://dev.to/api/articles?per_page=30` request per
+  shared refresh. It sends `Accept: application/vnd.forem.api-v1+json`, never
+  sends an API key, has a 30-minute fresh TTL and 24-hour maximum stale age,
+  and performs no source-level retry. DEV articles are attributed to `DEV
+  Community`; title, description, tags, reading time, positive reactions,
+  publication time, and a direct `https://dev.to/` article URL are the only
+  parsed fields.
+- DEV reading time is a nullable positive integer in minutes. Positive reaction
+  count is nullable `REACTIONS` engagement. Raw article HTML, Markdown, author
+  profile data, and response bodies are neither cached nor logged.
+- Stack Overflow uses fixed Stack Exchange API v2.3 methods, at most one
+  30-question page for featured
+  and unanswered questions per refresh, a 15-minute fresh TTL, a 24-hour
+  maximum stale age, and no user-interest query. It must parse the common
+  wrapper even on HTTP success, honor method-level `backoff` in a shared request
+  gate, and never repeat a semantically identical request more often than once
+  per minute. `quota_remaining: 0` fails the current refresh so the shared cache
+  falls back to bounded stale data, then blocks new requests until the next UTC
+  day. `has_more` never expands the one-page boundary. A Stack Overflow bounty
+  is reputation only; unanswered questions without a bounty are discussions.
+  The adapter caches no owner, body, HTML, Markdown, or raw wrapper data and
+  accepts only matching `https://stackoverflow.com/questions/...` links.
+- Task 30 must settle the server credential and discovery scope before a GitHub
+  adapter is registered. Search results use both an `is:issue` query and a
+  defensive absence-of-`pull_request` check. Search rate limits are separate
+  from core REST limits; `Retry-After`, remaining/reset headers, and 403/429
+  responses are part of the source contract.
+- Task 31 is `Algora research and conditional integration`. The public API
+  lists bounties by a known organization, while authenticated `/api/bounties`
+  lists the caller's organization. Without an approved organization allowlist
+  or another documented public global-discovery route, a written NO-GO result
+  completes the task and no adapter is registered.
 
 ## Hacker News adapter
 

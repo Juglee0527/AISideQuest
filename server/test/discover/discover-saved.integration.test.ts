@@ -44,6 +44,7 @@ function discoverItem(id: string, publishedAt: string): DiscoverItem {
     reward: null,
     compensation: null,
     engagement: null,
+    readingTimeMinutes: null,
     originalUrl: `https://news.ycombinator.com/item?id=${id}`,
     attribution: 'Hacker News',
     publishedAt,

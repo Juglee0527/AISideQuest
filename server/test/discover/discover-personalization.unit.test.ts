@@ -25,6 +25,7 @@ function item(
     engagement: engagementValue > 0
       ? { type: 'SCORE', value: engagementValue }
       : null,
+    readingTimeMinutes: null,
     originalUrl: `https://example.com/${id}`,
     attribution: 'Example',
     publishedAt,

@@ -121,12 +121,12 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 6.1 Discover Adapter 보안 경계
 
-Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Task 25의 Remotive adapter는 `remotive.com`의 Software Development API만 fetch하고 source가 제공한 Remotive HTTPS detail URL만 표시한다. Task 26 화면은 검증된 HTTPS 원문만 새 browsing context로 열고 `noopener noreferrer`를 적용한다. Task 27은 server cache에서 다시 검증한 normalized snapshot만 사용자별로 저장한다. Task 28은 사용자가 고정 allowlist에서 직접 고른 기술만 저장·정렬에 사용하고 export·삭제에 포함한다. 방문·click 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
+Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Task 25의 Remotive adapter는 `remotive.com`의 Software Development API만 fetch하고 source가 제공한 Remotive HTTPS detail URL만 표시한다. Task 29A의 DEV adapter는 API key 없이 `dev.to` public article 목록만 Forem V1 Accept header로 fetch하고 direct DEV HTTPS URL만 표시한다. Task 29B의 Stack Overflow adapter는 `api.stackexchange.com`의 고정 v2.3 featured·unanswered request만 보내며 owner·body·raw wrapper를 저장하지 않고 question ID와 일치하는 Stack Overflow HTTPS link만 표시한다. Task 26 화면은 검증된 HTTPS 원문만 새 browsing context로 열고 `noopener noreferrer`를 적용한다. Task 27은 server cache에서 다시 검증한 normalized snapshot만 사용자별로 저장한다. Task 28은 사용자가 고정 allowlist에서 직접 고른 기술만 저장·정렬에 사용하고 export·삭제에 포함한다. 방문·click 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
 
 - `/discover`와 browser API는 웹 session 인증을 요구하지만 활성 AI session은 요구하지 않는다.
 - 서버는 source별 고정 HTTPS host만 호출하고 사용자가 제공한 URL을 가져오지 않는다. 화면의 외부 원문 link는 서버 fetch 대상이 아니다.
 - 외부 응답 원문과 HTML은 메모리에서 정규화한 뒤 폐기한다. DB cache에는 길이가 제한된 일반 텍스트, 검증된 link, 분류와 freshness metadata만 저장한다.
-- 초기 fresh·stale 기준은 Hacker News 10분·24시간, Remotive 6시간·72시간이다. 정규화 cache는 마지막 성공 갱신 후 최대 7일 안에 교체하거나 삭제한다.
+- Fresh·maximum stale 기준은 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간, Stack Overflow 15분·24시간이다. 정규화 cache는 마지막 성공 갱신 후 최대 7일 안에 교체하거나 삭제한다.
 - 운영 로그와 metric label에는 외부 응답, 전체 원문 URL, item ID·제목·tag, 사용자 관심 기술을 남기지 않는다.
 - Task 32에서 제품 분석을 구현하기 전에는 Discover 방문·클릭을 수집하지 않는다. 이후에도 고정 event 이름과 source·category만 허용하며 item 정보는 수집하지 않는다.
 - 반복 방문 계산용 사용자 ID는 소유권이 있는 분석 row에만 저장할 수 있고 로그·metric label에는 금지한다. 이 row는 90일 후 만료하고 계정 내보내기와 primary 삭제에 포함한다.

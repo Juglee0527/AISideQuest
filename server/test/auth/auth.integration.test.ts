@@ -396,6 +396,8 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       tags: ['typescript'],
       reward: null,
       compensation: null,
+      engagement: null,
+      readingTimeMinutes: null,
       originalUrl: 'https://news.ycombinator.com/item?id=export-1',
       attribution: 'Hacker News',
       publishedAt: '2026-07-21T00:00:00.000Z',

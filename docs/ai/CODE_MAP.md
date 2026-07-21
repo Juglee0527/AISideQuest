@@ -47,7 +47,7 @@
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
-Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, `src/pages/DiscoverPage.tsx`, and `src/components/DiscoverInterestSettings.tsx`. The page owns explore/saved views, save and interest mutations, recommendation reasons, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/discover-saved.service.ts` owns snapshot persistence and saved-list ownership; `discover-interest.service.ts` owns fixed-allowlist preferences and idempotent replacement; `discover-personalization.ts` owns the pure ranking tuple and reasons. `hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs.
+Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, `src/pages/DiscoverPage.tsx`, and `src/components/DiscoverInterestSettings.tsx`. The page owns explore/saved views, save and interest mutations, recommendation reasons, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/discover-saved.service.ts` owns snapshot persistence and saved-list ownership; `discover-interest.service.ts` owns fixed-allowlist preferences and idempotent replacement; `discover-personalization.ts` owns the pure ranking tuple and reasons. `hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs, `remotive.adapter.ts` owns Software Development remote jobs, `dev.adapter.ts` owns the public Forem V1 DEV article feed, and `stack-overflow.adapter.ts` plus `stack-exchange-request-gate.ts` own fixed Stack Exchange question fetches and shared throttle state.
 
 ## Change routing
 

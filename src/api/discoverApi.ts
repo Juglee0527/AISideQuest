@@ -199,6 +199,14 @@ function parseItem(value: unknown): DiscoverItem {
     || !(value.summary === null || typeof value.summary === 'string')
     || !Array.isArray(value.tags)
     || !value.tags.every(isNonEmptyString)
+    || !(
+      value.readingTimeMinutes === null
+      || (
+        Number.isSafeInteger(value.readingTimeMinutes)
+        && (value.readingTimeMinutes as number) > 0
+        && (value.readingTimeMinutes as number) <= 1_440
+      )
+    )
     || !isHttpsUrl(value.originalUrl)
     || !isNonEmptyString(value.attribution)
     || !(value.publishedAt === null || isDate(value.publishedAt))
@@ -218,6 +226,7 @@ function parseItem(value: unknown): DiscoverItem {
     reward: parseReward(value.reward),
     compensation: parseCompensation(value.compensation),
     engagement: parseEngagement(value.engagement),
+    readingTimeMinutes: value.readingTimeMinutes as number | null,
     originalUrl: value.originalUrl,
     attribution: value.attribution,
     publishedAt: value.publishedAt,

@@ -145,6 +145,7 @@ function parseItem(
       ? { provided: false, text: null }
       : null,
     engagement: toEngagement(value.score),
+    readingTimeMinutes: null,
     originalUrl: toDisplayUrl(value.url, candidate.id),
     attribution: HACKER_NEWS_ATTRIBUTION,
     publishedAt,

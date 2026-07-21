@@ -121,6 +121,7 @@ function parseJob(value: unknown, fetchedAt: string): DiscoverItem | null {
       ? { provided: true, text: salary }
       : { provided: false, text: null },
     engagement: null,
+    readingTimeMinutes: null,
     originalUrl,
     attribution: REMOTIVE_ATTRIBUTION,
     publishedAt,

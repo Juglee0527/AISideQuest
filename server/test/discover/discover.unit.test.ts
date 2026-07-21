@@ -85,6 +85,7 @@ function item(
     reward: null,
     compensation: null,
     engagement: null,
+    readingTimeMinutes: null,
     originalUrl: 'https://example.com/item',
     attribution: 'Example',
     publishedAt,

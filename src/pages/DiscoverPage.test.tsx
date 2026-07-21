@@ -50,6 +50,7 @@ function item(overrides: Partial<DiscoverItem> = {}): DiscoverItem {
     reward: null,
     compensation: { provided: true, text: '$100k-$120k yearly' },
     engagement: null,
+    readingTimeMinutes: null,
     originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
     attribution: 'Remotive',
     publishedAt: '2026-07-20T08:00:00.000Z',
@@ -95,6 +96,7 @@ describe('Discover page', () => {
             kind: 'ARTICLE',
             title: 'A new TypeScript release',
             compensation: null,
+            readingTimeMinutes: 5,
             originalUrl: 'https://news.ycombinator.com/item?id=202',
             attribution: 'Hacker News',
           })],
@@ -131,10 +133,54 @@ describe('Discover page', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: '개발 소식' }))
     expect(await screen.findByText('A new TypeScript release')).toBeInTheDocument()
+    expect(screen.getByText('· 5분 읽기')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: '개발 소식' })).toHaveAttribute('aria-selected', 'true')
     expect(fetchMock.mock.calls.some(([input]) => (
       new URL(String(input)).searchParams.get('category') === 'NEWS'
     ))).toBe(true)
+  })
+
+  it('labels Stack Overflow bounties as reputation instead of cash or points', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      const session = sessionResponse(url)
+      if (session) return session
+
+      if (url.searchParams.get('category') === 'COMMUNITY') {
+        return response({
+          items: [item({
+            id: 'STACK_EXCHANGE:404',
+            source: 'STACK_EXCHANGE',
+            category: 'COMMUNITY',
+            kind: 'REPUTATION_BOUNTY',
+            title: 'How should this TypeScript type be modeled?',
+            compensation: null,
+            reward: { type: 'REPUTATION_BOUNTY', amount: 100 },
+            originalUrl: 'https://stackoverflow.com/questions/404/example',
+            attribution: 'Stack Overflow',
+          })],
+          nextCursor: null,
+          savedItems: [],
+          recommendations: [],
+          sources: [source('STACK_EXCHANGE', 'Stack Overflow', ['COMMUNITY'])],
+        })
+      }
+
+      return response({
+        items: [],
+        nextCursor: null,
+        savedItems: [],
+        recommendations: [],
+        sources: [source('STACK_EXCHANGE', 'Stack Overflow', ['COMMUNITY'])],
+      })
+    })
+
+    renderDiscover(fetchMock)
+    fireEvent.click(screen.getByRole('tab', { name: '커뮤니티' }))
+
+    expect(await screen.findByText('How should this TypeScript type be modeled?')).toBeInTheDocument()
+    expect(screen.getByText('평판 보상 100')).toBeInTheDocument()
+    expect(screen.queryByText(/검증된 바운티/)).not.toBeInTheDocument()
   })
 
   it('keeps available items visible when one enabled source is unavailable', async () => {

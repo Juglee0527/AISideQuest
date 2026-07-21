@@ -55,6 +55,7 @@ export interface DiscoverItem {
   reward: DiscoverReward | null
   compensation: DiscoverCompensation | null
   engagement: DiscoverEngagement | null
+  readingTimeMinutes: number | null
   originalUrl: string
   attribution: string
   publishedAt: string | null

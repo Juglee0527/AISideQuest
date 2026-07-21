@@ -76,6 +76,7 @@ describe('Discover API', () => {
           reward: null,
           compensation: { provided: true, text: '$100k-$120k yearly' },
           engagement: null,
+          readingTimeMinutes: 7,
           originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
           attribution: 'Remotive',
           publishedAt: '2026-07-19T08:00:00.000Z',
@@ -92,6 +93,7 @@ describe('Discover API', () => {
           reward: { type: 'CASH_BOUNTY', amountMinor: 10_000, currency: 'USD' },
           compensation: null,
           engagement: null,
+          readingTimeMinutes: null,
           originalUrl: 'https://console.algora.io/bounties/example',
           attribution: 'Algora',
           publishedAt: null,
@@ -114,6 +116,7 @@ describe('Discover API', () => {
       provided: true,
       text: '$100k-$120k yearly',
     })
+    expect(result.data.items[0]?.readingTimeMinutes).toBe(7)
     expect(result.data.items[1]?.reward).toEqual({
       type: 'CASH_BOUNTY',
       amountMinor: 10_000,
@@ -134,6 +137,7 @@ describe('Discover API', () => {
         reward: { type: 'CASH_BOUNTY', amountMinor: 100, currency: 'USD' },
         compensation: { provided: false, text: null },
         engagement: null,
+        readingTimeMinutes: null,
         originalUrl: 'http://example.com/job',
         attribution: 'Example',
         publishedAt: null,
@@ -181,6 +185,7 @@ describe('Discover API', () => {
         reward: null,
         compensation: { provided: false, text: null },
         engagement: null,
+        readingTimeMinutes: null,
         originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
         attribution: 'Remotive',
         publishedAt: '2026-07-19T08:00:00.000Z',

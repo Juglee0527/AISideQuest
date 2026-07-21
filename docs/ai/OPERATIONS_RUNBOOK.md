@@ -90,6 +90,8 @@ OAuth 설정 변경, proxy hop 설정과 공격성 traffic을 확인한다. Rate
 
 `aisidequest_discover_source_fetch_total`의 source·result·고정 failure reason과 `aisidequest_discover_cache_total`의 `FRESH`·`STALE`·`MISS`만 확인한다. URL, item ID, 응답 body, HTML 또는 사용자 식별자를 로그나 metric label에 추가하지 않는다. 한 source 실패는 core readiness 장애가 아니며, maximum stale 이내 cache는 `STALE`, 그 이후는 `UNAVAILABLE`로 처리한다. Task 32 전에는 이 기본 counter에 운영 경보나 제품 분석을 연결하지 않는다.
 
+현재 활성 source의 정상 fresh·maximum stale는 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간, Stack Overflow 15분·24시간이다. DEV `429`나 schema 변경은 source-level retry 없이 기존 stale cache로 격리한다. Stack Overflow는 동일 method 요청 1분 간격과 wrapper `backoff`를 우선하며 `quota_remaining`이 0이면 UTC 다음 날까지 새 요청을 차단한다. 장애 진단 중에도 Forem·Stack Exchange response body, article·question URL, item ID·title·tag를 로그에 추가하거나 사용자에게 요청하지 않는다.
+
 ## Secret 회전
 
 - GitHub OAuth secret: 새 secret을 secret manager에 등록 → staging callback → production rolling restart → 이전 secret 폐기.

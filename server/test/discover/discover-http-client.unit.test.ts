@@ -34,6 +34,32 @@ test('permits only HTTPS URLs on the adapter allowlist', async () => {
   assert.equal(calls, 0)
 })
 
+test('sends an explicitly validated versioned Accept header', async () => {
+  let receivedAccept: string | null = null
+  const client = new DiscoverHttpClient({
+    fetch: (async (_url: URL, init?: RequestInit) => {
+      receivedAccept = new Headers(init?.headers).get('accept')
+      return jsonResponse({ ok: true })
+    }) as typeof fetch,
+  })
+
+  await client.getJson({
+    url: 'https://api.example.com/items',
+    allowedHosts: ['api.example.com'],
+    accept: 'application/vnd.forem.api-v1+json',
+  })
+  assert.equal(receivedAccept, 'application/vnd.forem.api-v1+json')
+
+  await assert.rejects(
+    client.getJson({
+      url: 'https://api.example.com/items',
+      allowedHosts: ['api.example.com'],
+      accept: 'application/json\r\nx-secret: value',
+    }),
+    (error) => error instanceof DiscoverFetchError && error.reason === 'INVALID_REQUEST',
+  )
+})
+
 test('rejects redirects, non-JSON and oversized response bodies', async () => {
   const responses = [
     new Response(null, { status: 302, headers: { location: 'https://api.example.com/next' } }),

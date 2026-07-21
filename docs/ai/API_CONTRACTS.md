@@ -63,7 +63,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Both sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. The other planned sources remain disabled.
+Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Task 29 adds DEV Community and Stack Overflow. These four sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. GitHub and Algora remain disabled.
 
 `GET /discover` query:
 
@@ -99,7 +99,7 @@ Successful `GET /discover` data:
 
 `GET /discover/sources` returns `{ "sources": [...] }` for `HACKER_NEWS`, `REMOTIVE`, `DEV`, `STACK_EXCHANGE`, `GITHUB`, and `ALGORA`. `enabled` means an adapter is active. `status` is `FRESH`, `STALE`, or `UNAVAILABLE`; `FRESH` and `STALE` require a successful ISO8601 `fetchedAt`. No raw upstream error is exposed.
 
-Every `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, nullable source-provided `engagement`, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`. A recommendation is a separate `{ itemId, reasons, matchedInterests }` record and is returned only for items in the current page.
+Every `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, nullable source-provided `engagement`, nullable positive `readingTimeMinutes`, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`. A recommendation is a separate `{ itemId, reasons, matchedInterests }` record and is returned only for items in the current page.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
 
@@ -133,6 +133,8 @@ Without interests, ordering remains exact chronological order. With interests, t
 Hacker News maps Top and Show to `NEWS/ARTICLE`, Ask to `COMMUNITY/DISCUSSION`, and Jobs to `EARNING/PAID_JOB`. Deleted or incomplete items are omitted. Missing or non-HTTPS story URLs use the canonical HTTPS Hacker News discussion URL. Hacker News compensation and rewards are never inferred.
 
 Remotive maps validated Software Development jobs to `EARNING/PAID_JOB`. `originalUrl` is the direct source-provided Remotive HTTPS detail URL and attribution is always `Remotive`. Salary is source-provided compensation text, never a parsed cash reward; missing salary is represented by `{ provided: false, text: null }`. Employment type is a fixed tag and location remains bounded plain-text context.
+
+DEV maps the first 30 public Forem V1 articles from `dev.to` to `NEWS/ARTICLE`. The server sends the required versioned Accept header and no API key. `originalUrl` must remain an exact `https://dev.to/` article URL and attribution is always `DEV Community`. Positive reaction count becomes `REACTIONS` engagement; a positive reading-time value becomes `readingTimeMinutes`. Description and tags are bounded plain text, while article HTML, Markdown, and author profile data are discarded.
 
 - `EARNING`: `PAID_JOB` or `CASH_BOUNTY`.
 - `NEWS`: `ARTICLE`.

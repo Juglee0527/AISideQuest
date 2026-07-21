@@ -96,6 +96,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 
 - `source`는 계획된 6개 source allowlist 중 하나이며 source당 row는 하나다.
 - `items`는 JSON array만 허용하고 5 MiB를 넘지 않는다. Raw upstream body와 HTML은 저장하지 않는다.
+- 정규화 item의 nullable 읽기 시간·source engagement 같은 필드는 같은 bounded JSON contract에 포함된다. 이미 저장된 snapshot에 새 nullable 필드가 없으면 service 정규화 경계에서 `null`로 보정한다.
 - `refreshed_at`은 마지막 성공 갱신 시각이며 stale 판정과 최대 7일 보존의 기준이다.
 - 애플리케이션은 source별 PostgreSQL transaction advisory lock으로 동시 refresh를 직렬화한다.
 - 실행 시작과 30분 간격 정리에서 7일을 넘기기 전에 오래된 row를 삭제한다.
@@ -206,4 +207,6 @@ npm.cmd run test:database
 - 18번 구현 완료: queue 진단 컬럼, advisory-lock migration runner와 readiness 검증
 - Discover Task 27 완료: 사용자별 저장 snapshot과 소유권·cursor 제약
 - Discover Task 28 완료: 고정 allowlist 관심 기술과 idempotent 전체 교체
+- Discover Task 29A 완료: schema 변경 없이 DEV normalized item의 nullable 읽기 시간·반응 수 JSON contract 확장
+- Discover Task 29B 완료: schema 변경 없이 Stack Overflow 평판 bounty·discussion normalized item을 기존 source cache JSON contract에 저장
 - 연결 UX 개선 완료: 브라우저 승인 요청과 OAuth 승인 화면 복귀 경로

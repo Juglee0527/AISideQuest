@@ -16,6 +16,7 @@ export class DiscoverFetchError extends Error {
 export interface DiscoverJsonRequest {
   url: string
   allowedHosts: readonly string[]
+  accept?: string
   timeoutMs?: number
   maxAttempts?: number
   maxResponseBytes?: number
@@ -43,6 +44,7 @@ export class DiscoverHttpClient {
 
   async getJson(request: DiscoverJsonRequest): Promise<unknown> {
     const url = this.validateUrl(request.url, request.allowedHosts)
+    const accept = this.validateHeaderValue(request.accept ?? 'application/json')
     const timeoutMs = this.validatePositiveInteger(request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     const maxAttempts = this.validatePositiveInteger(request.maxAttempts ?? DEFAULT_MAX_ATTEMPTS)
     const maxResponseBytes = this.validatePositiveInteger(
@@ -56,7 +58,7 @@ export class DiscoverHttpClient {
     let lastFailure: DiscoverFetchError | undefined
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        return await this.fetchOnce(url, timeoutMs, maxResponseBytes)
+        return await this.fetchOnce(url, accept, timeoutMs, maxResponseBytes)
       } catch (error) {
         const failure = this.toFetchError(error)
         lastFailure = failure
@@ -70,7 +72,12 @@ export class DiscoverHttpClient {
     throw lastFailure ?? new DiscoverFetchError('NETWORK')
   }
 
-  private async fetchOnce(url: URL, timeoutMs: number, maxResponseBytes: number) {
+  private async fetchOnce(
+    url: URL,
+    accept: string,
+    timeoutMs: number,
+    maxResponseBytes: number,
+  ) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     try {
@@ -79,7 +86,7 @@ export class DiscoverHttpClient {
         redirect: 'manual',
         signal: controller.signal,
         headers: {
-          accept: 'application/json',
+          accept,
           'user-agent': 'AISideQuest-Discover/1.0',
         },
       })
@@ -177,6 +184,19 @@ export class DiscoverHttpClient {
 
   private validatePositiveInteger(value: number) {
     if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new DiscoverFetchError('INVALID_REQUEST')
+    }
+    return value
+  }
+
+  private validateHeaderValue(value: string) {
+    if (
+      typeof value !== 'string'
+      || value.length === 0
+      || value.length > 200
+      || value.trim() !== value
+      || !/^[\x20-\x7E]+$/.test(value)
+    ) {
       throw new DiscoverFetchError('INVALID_REQUEST')
     }
     return value

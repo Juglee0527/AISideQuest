@@ -5,7 +5,7 @@
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
 - Task 20: 배포 패키지 구현 완료, 외부 운영 배포·파일럿 증거 대기
-- Discover 확장: Task 21~28 완료, Task 29~33 대기
+- Discover 확장: Task 21~29 완료, Task 30~33 대기
 
 ---
 
@@ -29,7 +29,7 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP를 서버 소유 데이터�
 12. 30초 heartbeat, durable FIFO queue, 재시도·dead-letter와 서버 세션 만료·late Stop 복구를 구현했다.
 13. 게시 퀘스트 목록·상세 API, 사용자별 최근 응시 상태와 cursor pagination을 구현하고 프런트엔드의 `mockQuests`를 제거했다.
 14. 활성 AI 세션 기반 실제 퀴즈, 답안 저장·복구, 서버 채점, 제출 멱등성과 만료·재응시 정책을 구현했다.
-15. Hacker News·Remotive source, 안전한 adapter/cache/stale fallback과 `/discover` 화면을 구현했다.
+15. Hacker News·Remotive·DEV Community source, 안전한 adapter/cache/stale fallback과 `/discover` 화면을 구현했다.
 16. 사용자별 저장 snapshot과 고정 allowlist 관심 기술, 결정적 정렬과 추천 이유를 구현했다.
 
 현재 React 프런트엔드는 GitHub 로그인, PostgreSQL 기반 세션·퀘스트·채점·포인트·기간 통계·Discover API를 사용한다. 기간 통계는 저장된 IANA time zone과 응답의 동일한 서버 기준 시각으로만 표시하며, Discover는 저장 snapshot과 명시적 관심 기술을 사용자 소유 데이터로 처리한다.
@@ -655,7 +655,7 @@ Task 21~28에서 다음 범위를 구현했다.
 
 1. Discover 제품·보상 분류·개인정보·release 계약과 공통 `DiscoverItem` API model
 2. HTTPS host allowlist, timeout, 제한된 retry, plain-text 정제, PostgreSQL cache, source별 single-flight와 stale fallback
-3. Hacker News Top·Ask·Show·Jobs와 Remotive Software Development adapter
+3. Hacker News Top·Ask·Show·Jobs, Remotive Software Development, public Forem V1 DEV article adapter
 4. GitHub login은 요구하지만 active AI session과 독립적인 `/discover` 화면, 세 category tab과 loading·empty·부분/전체 장애·pagination 상태
 5. Server cache의 normalized item을 다시 검증하는 사용자별 저장 snapshot, CSRF·UUID idempotency·ownership·cursor 목록
 6. 20개 고정 allowlist에서 최대 10개를 직접 선택하는 관심 기술 전체 교체 API와 DB 중복·허용값 제약
@@ -664,6 +664,6 @@ Task 21~28에서 다음 범위를 구현했다.
 9. 저장 snapshot과 관심 기술을 포함하는 사용자 export schema version 3과 account delete transaction
 10. Prompt, AI response, code, diff, transcript, raw command, tool input/output와 local path를 개인화·분석·운영 log에서 제외하는 경계
 
-2026-07-21 현재 React 64개, Codex plugin 20개, 운영·local startup 17개, server non-database 47개, PostgreSQL integration 58개로 자동 테스트 총 206개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다.
+2026-07-21 현재 React 65개, Codex plugin 20개, 운영·local startup 17개, server non-database 58개, PostgreSQL integration 58개로 자동 테스트 총 218개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다.
 
-다음 구현 작업은 Task 29의 DEV 개발 글과 Stack Overflow 미답변·reputation bounty 연동이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.
+Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. 다음 구현 작업은 Task 30의 GitHub credential·탐색 범위 확정이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.

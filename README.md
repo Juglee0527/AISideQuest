@@ -22,7 +22,7 @@ AISideQuest는 Codex를 사용하는 개발자가 저장소를 내려받아 자�
 - 게시된 개발 퀴즈, 답안 저장·복구와 서버 채점
 - 사용자·퀘스트 버전별 최초 통과 100P 원장
 - IANA time zone 기반 오늘·주·월·사용자 지정 통계
-- Hacker News·Remotive 기반 Discover, 사용자별 저장과 명시적 관심 기술 정렬
+- Hacker News·Remotive·DEV Community 기반 Discover, 사용자별 저장과 명시적 관심 기술 정렬
 - GitHub OAuth, CSRF, 소유권, Rate Limit, 데이터 내보내기·삭제
 - 연결 코드 복사 없이 Codex 요청과 브라우저 승인만으로 끝나는 기기 연결
 - 한 명령으로 PostgreSQL·API·웹을 준비하는 로컬 통합 실행
@@ -55,11 +55,11 @@ npm.cmd test
 npm.cmd run build
 ```
 
-2026-07-21 마지막 전체 검증에서는 React 64개, Codex plugin 20개, 운영·로컬 실행 도구 17개, 서버 비DB 47개, PostgreSQL 통합 58개 등 총 206개 테스트를 통과했습니다. PostgreSQL 통합 테스트는 초기화 가능한 전용 test DB가 필요하므로 [개발 및 실행 가이드](./docs/개발_실행_가이드.md)의 `test:database` 절차를 따릅니다.
+2026-07-21 마지막 전체 검증에서는 React 65개, Codex plugin 20개, 운영·로컬 실행 도구 17개, 서버 비DB 58개, PostgreSQL 통합 58개 등 총 218개 테스트를 통과했습니다. PostgreSQL 통합 테스트는 초기화 가능한 전용 test DB가 필요하므로 [개발 및 실행 가이드](./docs/개발_실행_가이드.md)의 `test:database` 절차를 따릅니다.
 
 ## 현재 상태
 
-핵심 기능과 Discover Task 21~28은 개발자 개인 PC에서 무료로 사용하는 로컬 실행 흐름을 기본으로 제공합니다. 다음 제품 작업은 DEV·Stack Overflow를 추가하는 Task 29입니다. 운영 배포 패키지는 선택 사항으로 보존하지만, 공개 서버 운영은 현재 제품 사용의 필수 조건이나 기본 목표가 아닙니다.
+핵심 기능과 Discover Task 21~29는 개발자 개인 PC에서 무료로 사용하는 로컬 실행 흐름을 기본으로 제공합니다. DEV 개발 글과 Stack Overflow 미답변·평판 bounty를 shared cache로 제공합니다. 다음 제품 작업은 credential과 탐색 범위를 먼저 확정하는 Task 30 GitHub Issues입니다. 운영 배포 패키지는 선택 사항으로 보존하지만, 공개 서버 운영은 현재 제품 사용의 필수 조건이나 기본 목표가 아닙니다.
 
 자세한 내용은 [개발 현황](./docs/개발_현황.md)과 [운영 배포 가이드](./docs/운영_배포_가이드.md)를 확인하세요.
 

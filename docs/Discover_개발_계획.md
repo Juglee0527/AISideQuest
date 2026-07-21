@@ -2,10 +2,10 @@
 
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
-- 작성일: 2026-07-20
-- 상태: Task 21~28 완료, Discover MVP·저장·명시적 개인화 구현 완료
+- 작성일: 2026-07-21
+- 상태: Task 21~29 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow 연동 완료
 - 작업 번호: 21~33
-- 다음 작업: 29. DEV와 Stack Overflow 연동
+- 다음 작업: 30. GitHub credential·탐색 범위 확정과 Issues 연동
 - 1차 구현 범위: 21~26
 
 ---
@@ -325,34 +325,84 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 
 #### 29. DEV와 Stack Overflow 연동
 
+Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Stack Overflow`로 나눈다. 두 source는 공통 shared cache를 갱신할 때만 외부 API를 호출하며, 사용자 관심 기술별 요청을 만들지 않는다. 관심 기술은 정규화된 item의 태그를 기존 Task 28 정렬에 사용하는 입력일 뿐이다.
+
+##### 29A. DEV
+
+상태: 완료(2026-07-21)
+
 작업:
 
-- DEV tag별 개발 글, 예상 읽기 시간, 반응 수를 연동한다.
-- Stack Overflow 활성 bounty, 미답변, 관심 tag 질문을 연동한다.
-- 각 source의 attribution과 rate limit을 적용한다.
+- API host는 `dev.to`로 고정하고 public `GET /api/articles?per_page=30`의 첫 page만 호출한다.
+- Forem V1을 선택하는 `Accept: application/vnd.forem.api-v1+json`과 고정 User-Agent를 보낸다. Public article 목록에는 API key를 요구하지 않고 브라우저에 credential을 노출하지 않는다.
+- Refresh당 최대 1 page·1 request·30 article, timeout 5초·source retry 0회·JSON body 1 MiB 상한을 적용한다.
+- Fresh TTL은 30분, maximum stale age는 24시간으로 하고, shared lock으로 정상 경로를 최대 하루 48회의 공유 refresh로 제한한다.
+- 양의 정수 ID, 일반 text 제목, DEV HTTPS article URL, RFC 3339 게시 시각이 있는 article만 `NEWS/ARTICLE`로 정규화한다.
+- Description과 tag는 bounded plain text로 정제하고, `reading_time_minutes`는 nullable 양의 정수, `positive_reactions_count`는 nullable `REACTIONS` engagement로 보존한다. HTML·Markdown body와 raw response는 저장하지 않는다.
+- Attribution은 `DEV Community`, 표시 link는 source가 반환한 `https://dev.to/...` URL로 고정한다.
 
 완료 조건:
 
-- Stack Overflow bounty는 `평판 보상`으로 표시한다.
-- 외부 HTML과 Markdown을 그대로 렌더링하지 않는다.
-- source별 장애가 격리된다.
+- 정상 빈 배열은 healthy empty로 cache한다.
+- 중복 ID는 첫 article만 남기고 고립된 invalid article은 건너뛴다.
+- 빈 배열이 아닌데 유효 item이 0개이거나 invalid article이 3개 이상이면서 25%를 넘으면 refresh를 실패시켜 기존 stale cache를 보존한다.
+- V1 Accept header, 호출 상한, cache/stale, 읽기 시간·반응 수, URL·text 정제와 전체 장애 격리를 단위 테스트로 검증한다.
+
+구현 결과:
+
+- `DevAdapter`를 등록해 public Forem V1 article 30개를 하나의 bounded request로 읽고 `DEV Community` source를 `NEWS`에서 활성화했다.
+- 공통 HTTP client에 제어문자·과대 길이를 거부하는 명시적 `Accept` 경계를 추가했고 DEV adapter만 Forem V1 media type을 사용한다.
+- 공통 item에 nullable `readingTimeMinutes`를 추가해 서버 cache·saved snapshot·client parser와 화면을 일치시켰다. 기존 source와 기존 snapshot은 `null`로 정규화된다.
+- DEV tag와 정제한 제목·설명에서 고정 관심 기술만 추출하며, 사용자 관심 기술은 외부 요청에 포함하지 않는다.
+- DEV adapter 4개와 Accept header 보안 1개 테스트를 추가하고 기존 Discover 회귀 테스트와 client 읽기 시간 파싱·표시 검증을 갱신했다.
+- 2026-07-21 [live smoke](./ai/operations/2026-07-21-dev-smoke.md)에서 정규화 article 30개, DEV HTTPS link·읽기 시간·반응 수 30개와 attribution 전체 통과를 raw item 정보 출력 없이 확인했다.
+
+##### 29B. Stack Overflow
+
+상태: 완료(2026-07-21)
+
+작업:
+
+- API host는 `api.stackexchange.com`으로 고정하고 Stack Exchange API v2.3의 Stack Overflow `questions/featured`와 `questions/unanswered`를 source-wide 고정 요청으로 조회한다.
+- Refresh당 최대 2 method·각 1 page·page size 30으로 제한하고, `has_more`를 파싱하되 초기 범위에서 추가 page를 자동 호출하지 않는다.
+- Fresh TTL은 15분, maximum stale age는 24시간으로 하고, 의미상 동일한 method 요청을 1분보다 자주 보내지 않는다.
+- 정상 HTTP 응답에서도 wrapper의 `backoff`, `quota_remaining`, `has_more`를 파싱한다. `backoff`가 있으면 동일 method의 다음 호출 가능 시각을 shared source state로 준수하고, quota가 소진되면 stale 또는 unavailable로 전환한다.
+- Active bounty는 `REPUTATION_BOUNTY`, 미답변 질문은 `DISCUSSION`으로만 표시하고 현금·급여·AISideQuest point로 설명하지 않는다.
+- 사용자 관심 태그를 Stack Exchange 요청 query로 보내지 않고 source가 제공한 tag를 정규화한 뒤 기존 정렬에서만 사용한다.
+
+완료 조건:
+
+- `backoff`와 1분 동일-request 제한이 다중 API instance에서도 깨지지 않는다.
+- Bounty는 `평판 보상`으로 표시하고 외부 HTML·Markdown을 그대로 렌더링하지 않는다.
+- 정상 empty, 부분 invalid, wrapper error, timeout·quota·backoff와 source 장애 격리를 검증한다.
+
+구현 결과:
+
+- `StackOverflowAdapter`를 등록해 Stack Exchange API v2.3의 featured·unanswered 고정 요청을 각각 최대 1 page·30개로 읽고 `Stack Overflow` source를 `COMMUNITY`에서 활성화했다.
+- `StackExchangeRequestGate`가 두 method의 의미상 동일한 요청을 최소 1분 간격으로 예약하고 wrapper `backoff`를 method별로 연장한다. `quota_remaining`이 0이면 현재 refresh를 `RATE_LIMITED`로 실패시키고 UTC 다음 날까지 새 source 요청을 차단하며, cache service가 기존 24시간 이내 stale snapshot으로 전환한다.
+- `has_more`는 boolean으로 검증하지만 추가 page는 호출하지 않는다. HTTP client retry도 0회로 고정해 내부 재시도가 1분 계약을 우회하지 못한다.
+- Featured question의 양의 `bounty_amount`만 `REPUTATION_BOUNTY`로 저장한다. 미답변 질문은 `DISCUSSION`이며 compensation·현금·AISideQuest point를 만들지 않는다.
+- Title은 bounded plain text로 정제하고 owner·body·HTML·Markdown·raw wrapper는 저장하거나 로그로 남기지 않는다. 원문은 question ID와 일치하는 `https://stackoverflow.com/questions/...`만 허용한다.
+- Request gate 2개와 adapter 4개 단위 테스트에서 정상·empty·부분 invalid·전체 invalid·중복·`has_more` 상한·quota·backoff·1분 간격을 검증했다.
+- 2026-07-21 [live smoke](./ai/operations/2026-07-21-stack-overflow-smoke.md)는 raw question 정보를 출력하지 않고 반환 수, 평판 bounty·discussion 분류, attribution과 HTTPS link만 집계한다.
 
 #### 30. GitHub 오픈소스 기회 연동
 
 작업:
 
-- `good first issue`, `help wanted`, `documentation` issue를 탐색한다.
+- API host는 `api.github.com`으로 고정하고 Search Issues endpoint의 고정 query로 `good first issue`, `help wanted`, `documentation` issue를 탐색한다.
 - 기존 로그인 과정에서 폐기하는 GitHub OAuth access token을 재사용하지 않는다.
 - 별도 GitHub App 또는 서버 전용 credential 정책을 먼저 확정한다.
-- 닫힘, 할당 여부, Pull Request 혼입을 필터링한다.
+- Refresh당 최대 1 page·30 item을 기본으로 하고 fresh TTL 30분·maximum stale 24시간을 credential·rate-limit 조사 결과와 함께 확정한 뒤 adapter를 등록한다.
+- Query에 `is:issue is:open no:assignee`를 포함하고 응답에 `pull_request` 필드가 있는 item을 다시 제외하여 닫힘, 할당, Pull Request 혼입을 방어한다.
 
 완료 조건:
 
-- GitHub rate limit과 `Retry-After`를 처리한다.
+- Search API의 별도 rate-limit bucket을 인식하고 `Retry-After`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `403`, `429`를 처리한다.
 - label만 보고 현금 보상을 추정하지 않는다.
 - credential이 브라우저, 응답, 로그에 노출되지 않는다.
 
-#### 31. Algora 현금 바운티 연동
+#### 31. Algora 조사 및 조건부 연동
 
 선행 조사:
 
@@ -360,12 +410,15 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - 조직 목록 확보 방법
 - API 이용 조건과 attribution
 - 지급 국가와 통화 제한
+- Public `GET /api/orgs/{org}/bounties`에 넣을 수 있는 신뢰 가능한 조직 allowlist와 갱신 주기를 제품 범위로 승인할 수 있는지
+- Authenticated `GET /api/bounties`는 자기 조직용이며 전역 공개 탐색 경로로 사용하지 않는다는 경계
 
 완료 조건:
 
 - 제공자가 반환한 금액, 통화, 활성 상태만 표시한다.
 - AISideQuest가 지급을 중개하지 않는다.
 - 전역 탐색 조건을 확보하지 못하면 구현을 강행하지 않고 조사 결과를 문서화한다.
+- 조사 결과에 API host, 인증, 조직 선정, attribution, fresh TTL, maximum stale, page/request 상한과 rate-limit을 포함한 `GO`·`NO-GO` 판정을 남긴다. `GO`가 아니면 adapter·schema·UI를 변경하지 않는 것이 Task 31의 정상 완료다.
 
 ### 3.4 4차 마일스톤: 안정화와 파일럿
 
@@ -373,12 +426,15 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 
 작업:
 
-- source 요청, 실패, cache hit, stale 응답, 반환 item 수 지표를 추가한다.
+- Task 23부터 존재하는 source fetch/cache counter를 신규 adapter에서 계속 사용하고 중복 구현하지 않는다.
+- Source 요청 latency와 반환 item 수를 fixed source·result 차원의 aggregate histogram 또는 동등한 저카디널리티 지표로 추가한다.
 - source별 timeout, rate limit, parsing 실패를 구분한다.
 - 외부 응답 원문과 전체 원문 URL을 운영 로그에서 제외한다.
+- Source freshness·failure·latency·item count dashboard와 warning·critical alert를 코드로 관리하고, pilot 운영 metric·log 보존을 30일로 고정한다.
 - Pilot에 필요한 `DISCOVER_VIEW`, `TAB_VIEW`, `OUTBOUND_CLICK`, `SAVE`만 owned 분석 event로 추가한다.
 - 분석 dimension은 fixed source·category만 허용하고 item ID·제목·URL·tag·검색어·관심 기술은 수집하지 않는다.
 - Owned 분석 row에 90일 expiry, account export와 primary delete를 적용한다.
+- `DISCOVER_VIEW`는 route 진입 후 초기 category를 표시했을 때, `TAB_VIEW`는 명시적 tab 전환, `OUTBOUND_CLICK`은 사용자가 원문 link를 활성화했을 때, `SAVE`는 idempotent 재전송이 아닌 최초 `created: true` 성공 시점에만 기록한다.
 
 완료 조건:
 
@@ -389,14 +445,16 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 
 #### 33. Discover 파일럿과 다음 범위 결정
 
-확인 항목:
+집계 계약:
 
-- Discover 진입률
-- 탭별 사용량
-- 원문 이동률
-- 저장률
-- 반복 방문률
-- source별 빈 결과와 장애율
+- 파일럿 기간은 연속 7일이며 시각 경계는 저장된 UTC를 기준으로 계산하되 보고서에는 파일럿 timezone을 명시한다. 표본 사용자 수와 event 수를 함께 보고하고 표본 부족을 성공으로 간주하지 않는다.
+- Discover 진입률은 기간 내 AI session을 1회 이상 시작한 고유 사용자를 분모, `DISCOVER_VIEW`를 1회 이상 만든 고유 사용자를 분자로 한다.
+- 탭별 사용량은 category별 `TAB_VIEW` 총합과 고유 사용자 수를 함께 보고한다.
+- 원문 이동률은 `DISCOVER_VIEW` 고유 사용자 중 `OUTBOUND_CLICK`을 1회 이상 만든 고유 사용자 비율이다. Click 횟수 집계는 보조 지표로만 분리한다.
+- 저장률은 `DISCOVER_VIEW` 고유 사용자 중 최초 `SAVE` 성공을 1회 이상 만든 고유 사용자 비율이다. Item impression을 수집하지 않으므로 item 기준 저장률을 계산하지 않는다.
+- 반복 방문률은 `DISCOVER_VIEW` 사용자 중 7일 안에 서로 다른 UTC 날짜 2일 이상 방문한 고유 사용자 비율이다.
+- Source 빈 결과율은 정상 refresh 중 item 0개인 횟수, 장애율은 refresh attempt 중 failure 횟수를 각각 분자로 삼는다. 사용자 행동과의 비교는 1시간 source·category time bucket에서 aggregate로만 결합하고 분석 row에 장애 상세를 복제하지 않는다.
+- Task 32에서 위 지표의 분자·분모·중복 제거·경계 시각을 구현한 SQL과 test fixture를 확정한 후에만 파일럿을 시작한다.
 
 판정 원칙:
 
@@ -436,6 +494,10 @@ export interface DiscoverItem {
     provided: boolean
     text: string | null
   } | null
+  engagement:
+    | { type: 'SCORE' | 'REACTIONS'; value: number }
+    | null
+  readingTimeMinutes: number | null
   originalUrl: string
   attribution: string
   publishedAt: string | null

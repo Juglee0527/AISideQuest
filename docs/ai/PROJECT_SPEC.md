@@ -114,7 +114,7 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - Loading·empty·stale·부분 장애·전체 source 장애·pagination error 구분
 - Desktop·mobile navigation, keyboard tab 이동과 `noopener noreferrer` 외부 원문 link
 
-Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 item을 가져온다. Remotive adapter는 `category=software-dev&limit=30`을 6시간에 최대 한 번 공유 호출하고 source-provided salary text만 compensation으로 표시한다. 삭제·누락·중복 item은 개별 격리하며 나머지 source는 아직 외부 network를 호출하지 않는다.
+Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 item을 가져온다. Remotive adapter는 `category=software-dev&limit=30`을 6시간에 최대 한 번 공유 호출하고 source-provided salary text만 compensation으로 표시한다. DEV adapter는 Forem V1 Accept header로 `dev.to` public article 30개를 30분에 최대 한 번 공유 호출하고 읽기 시간과 반응 수를 별도 필드로 정규화한다. 삭제·누락·중복 item은 개별 격리하며 Stack Exchange·GitHub·Algora는 아직 외부 network를 호출하지 않는다.
 
 ## 4.6 현재 제외 범위
 
@@ -251,14 +251,14 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-21 기준 자동 test 206개가 통과했다.
+2026-07-21 기준 자동 test 218개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
-| React | 64 |
+| React | 65 |
 | Codex plugin | 20 |
 | 운영·local startup script | 17 |
-| Server non-database | 47 |
+| Server non-database | 58 |
 | PostgreSQL integration | 58 |
 
 Lint, client·server typecheck와 production build, migration 17개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
@@ -279,14 +279,14 @@ Lint, client·server typecheck와 production build, migration 17개 revert·reap
 
 # 11. Discover 제품 계약과 다음 단계
 
-Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을, Task 28에서 명시적 관심 기술과 결정적 정렬을 제공한다.
+Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을, Task 28에서 명시적 관심 기술과 결정적 정렬을, Task 29에서 DEV Community 개발 글과 Stack Overflow 미답변·평판 bounty를 제공한다.
 
 - `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
 - AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
 - AISideQuest point, job compensation, verified cash bounty와 reputation bounty를 별도 개념으로 표시한다.
 - 외부 item 조회·click·save에는 AISideQuest point를 지급하지 않는다.
 - Server만 고정 source API host를 fetch하고 raw response·HTML은 저장하거나 log하지 않는다.
-- Shared PostgreSQL cache에는 normalized item만 저장한다. 초기 fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간이며 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
+- Shared PostgreSQL cache에는 normalized item만 저장한다. Fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간이며 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
 - 관심 기술은 20개 고정 allowlist에서 최대 10개만 직접 선택한다. 관심사가 없으면 기존 최신순이며, 있으면 tag 일치 수·newest item 기준 최신성 구간·source 반응도·명확한 reward/compensation·기존 시간순으로 결정적으로 정렬한다.
 - 개인화에는 prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path를 사용하지 않는다. 관심 기술은 export schema version 3과 account delete에 포함하고 log·metric·analytics에서 제외한다.
 - Task 32 전에는 visit·click analytics를 암묵적으로 수집하지 않는다. Pilot용 owned analytics를 구현하면 item detail 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
@@ -295,7 +295,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 29의 DEV 개발 글과 Stack Overflow 미답변·reputation bounty 연동이다.
+다음 작업은 Task 30의 GitHub server credential·탐색 범위 확정과 Issues 연동이다.
 
 ---
 
@@ -316,7 +316,9 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Task 26: authenticated Discover screen, desktop·mobile navigation, 세 category tab과 장애·empty·pagination UI 완료
 - Task 27: user-owned saved snapshot, CSRF·idempotency·ownership, cursor 목록, export·delete 완료
 - Task 28: explicit interest allowlist, CSRF·idempotency, deterministic ranking, reason UI, export·delete 완료
-- Task 29~31: additional source 미구현
+- Task 29A: public Forem V1 DEV article, reading time·reaction, bounded cache/stale 완료
+- Task 29B: Stack Exchange API v2.3 featured·unanswered, reputation bounty, backoff·quota·1분 request gate 완료
+- Task 30~31: GitHub·조건부 Algora source 미구현
 - Task 32~33: Discover observability와 product pilot 미구현
 
 최종 목표는 AI가 일하는 동안 개발자가 안전하게 학습하거나 외부 기회를 발견하도록 돕는 것이다. AISideQuest는 사용자의 작업 content를 수집하거나 외부 보상을 보장하는 방식으로 이 목표를 달성하지 않는다.
