@@ -129,6 +129,7 @@ test('uses a fresh cache without calling the adapter', async () => {
   const result = await service.listDiscover(userId, { limit: 20 })
   assert.equal(calls, 0)
   assert.deepEqual(result.items.map((value) => value.id), ['HACKER_NEWS:cached'])
+  assert.equal(result.sources[0]?.enabled, true)
   assert.equal(result.sources[0]?.status, 'FRESH')
   assert.ok(metricEvents.includes('cache:HACKER_NEWS:FRESH'))
 })

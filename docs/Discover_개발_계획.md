@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~23 완료, Task 24 구현 전
+- 상태: Task 21~24 완료, Task 25 구현 전
 - 작업 번호: 21~33
-- 다음 작업: 24. Hacker News 커뮤니티 연동
+- 다음 작업: 25. Remotive 수익 기회 연동
 - 1차 구현 범위: 21~26
 
 ---
@@ -189,7 +189,7 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - `discover_source_cache`에는 normalized item과 마지막 성공 갱신 시각만 저장하며 5 MiB DB 제약과 최대 7일 정리를 적용한다.
 - 같은 process의 single-flight와 source별 PostgreSQL advisory lock으로 동시 miss를 합치고, lock을 얻지 못한 instance는 stale 또는 unavailable로 안전하게 응답한다.
 - Source별 fresh·stale·miss와 fetch 결과는 fixed low-cardinality metric만 남긴다. Raw body, HTML, URL과 item·user 식별자는 로그와 metric label에 남기지 않는다.
-- 실제 Hacker News와 Remotive 호출은 각각 Task 24와 Task 25에 남겨 두어 현재 source catalog는 계속 disabled·`UNAVAILABLE`이다.
+- Task 23 완료 시점에는 concrete source를 등록하지 않았다. Hacker News는 Task 24에서 활성화했고 Remotive는 Task 25에 남겨 둔다.
 
 #### 24. Hacker News 커뮤니티 연동
 
@@ -204,6 +204,16 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - 게시 시각과 원문 링크가 정상 표시된다.
 - 삭제되거나 불완전한 item 때문에 전체 목록이 실패하지 않는다.
 - source 장애 시 stale cache 또는 명확한 부분 장애 상태를 반환한다.
+
+구현 결과:
+
+- 공식 `hacker-news.firebaseio.com/v0`의 Top·Ask·Show·Jobs 목록과 item 상세를 exact HTTPS host allowlist로 연동했다.
+- Feed별 최대 12개, item 동시 요청 최대 8개, 갱신당 logical request 최대 52개로 호출량을 제한했다. Fresh TTL은 10분, maximum stale은 24시간이다.
+- 중복 ID는 `Jobs > Ask > Show > Top` 순으로 한 번만 분류하고 Jobs는 `EARNING/PAID_JOB`, Ask는 `COMMUNITY/DISCUSSION`, Top·Show는 `NEWS/ARTICLE`로 변환한다.
+- Null·삭제·dead·type/ID 불일치·title/time 누락 item은 개별 제외한다. HTML title·text는 bounded plain text로 정제한다.
+- 외부 URL이 없거나 HTTPS 검증에 실패하면 `news.ycombinator.com/item?id=...` 원문 토론 link로 대체하며 salary·reward는 추정하지 않는다.
+- Item 상세 실패가 25%를 넘으면 refresh 전체를 실패시켜 기존 stale cache를 보존하고, 그 이하는 정상 item만 부분 반영한다.
+- 2026-07-21 [live smoke](./ai/operations/2026-07-21-hacker-news-smoke.md)에서 47개를 정규화했고 `EARNING 12`, `NEWS 23`, `COMMUNITY 12`, attribution·HTTPS link 검증을 통과했다.
 
 #### 25. Remotive 수익 기회 연동
 

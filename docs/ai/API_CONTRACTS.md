@@ -61,7 +61,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-23 ship the authenticated read contract, common model, safe adapter boundary, bounded HTTP client, normalized shared cache, and stale fallback. No concrete source adapter or `/discover` screen exists yet. Until tasks 24-25 enable sources, list responses contain no items and every catalog entry is `enabled: false`, `status: "UNAVAILABLE"`, and `fetchedAt: null`.
+Tasks 22-24 ship the authenticated read contract, common model, safe adapter/cache boundary, and Hacker News source. Hacker News is `enabled: true`; its first uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. Remotive and the other planned sources remain disabled. The `/discover` screen does not exist until task 26.
 
 `GET /discover` query:
 
@@ -98,6 +98,8 @@ Successful `GET /discover` data:
 Every future `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
+
+Hacker News maps Top and Show to `NEWS/ARTICLE`, Ask to `COMMUNITY/DISCUSSION`, and Jobs to `EARNING/PAID_JOB`. Deleted or incomplete items are omitted. Missing or non-HTTPS story URLs use the canonical HTTPS Hacker News discussion URL. Hacker News compensation and rewards are never inferred.
 
 - `EARNING`: `PAID_JOB` or `CASH_BOUNTY`.
 - `NEWS`: `ARTICLE`.

@@ -1,13 +1,13 @@
 # Discover Product Contract
 
-Status: tasks 21-23 complete; tasks 24-33 are not implemented.
+Status: tasks 21-24 complete; tasks 25-33 are not implemented.
 Contract date: 2026-07-20
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
-pilot work must preserve. Task 23 has shipped the adapter boundary, bounded HTTP
-client, normalized PostgreSQL cache, stale fallback, and source health counters.
-No concrete external source, item, or screen is enabled until tasks 24-26.
+pilot work must preserve. Task 24 has enabled Hacker News through the adapter,
+cache, stale fallback, and source health boundaries. Remotive and the Discover
+screen remain disabled until tasks 25-26.
 
 ## Common model and API baseline
 
@@ -27,8 +27,9 @@ No concrete external source, item, or screen is enabled until tasks 24-26.
   normalized text, nullable publication time, and required fetch time.
 - The future item order is `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`.
   The versioned cursor binds this tuple and remains opaque to clients.
-- Before adapters exist, all six planned sources are `enabled: false` and
-  `UNAVAILABLE`; both endpoints return successfully without external calls.
+- A source without a registered adapter remains `enabled: false` and
+  `UNAVAILABLE`. Hacker News is registered; the other five planned sources stay
+  disabled until their tasks are implemented.
 
 ## Adapter infrastructure baseline
 
@@ -49,6 +50,27 @@ No concrete external source, item, or screen is enabled until tasks 24-26.
   unavailable status instead of multiplying upstream calls.
 - Basic cache and fetch counters use only fixed source, result, and failure
   reason labels. Task 32 still owns dashboards, alerts, and pilot analytics.
+
+## Hacker News adapter
+
+- The server fetches only `https://hacker-news.firebaseio.com/v0/` feed and
+  item endpoints. It never follows an upstream redirect.
+- One refresh reads Top, Show, Ask, and Jobs, taking at most 12 IDs per feed.
+  Duplicate IDs are fetched once; classification precedence is Jobs, Ask, Show,
+  then Top. Logical calls are capped at 4 feed plus 48 item requests, item
+  concurrency is capped at 8, and only feed requests may retry once.
+- Top and Show become `NEWS/ARTICLE`, Ask becomes `COMMUNITY/DISCUSSION`, and
+  Jobs become `EARNING/PAID_JOB`. Jobs never infer salary and use explicit
+  unavailable compensation.
+- Deleted, dead, null, wrong-type, mismatched-ID, missing-title, or invalid-time
+  items are skipped independently. HTML title/text is converted to bounded
+  plain text.
+- A valid HTTPS story URL is preserved. Missing, empty, malformed, non-HTTPS,
+  or credential-bearing URLs fall back to the canonical HTTPS Hacker News
+  discussion link.
+- A small number of item-detail failures may produce a partial fresh result.
+  When more than 25 percent of requested details fail, the refresh fails so the
+  previous cache is served as `STALE` instead of being replaced broadly.
 
 ## Product boundary
 
