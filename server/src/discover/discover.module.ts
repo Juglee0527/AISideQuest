@@ -7,6 +7,7 @@ import { DiscoverController } from './discover.controller'
 import { DiscoverHttpClient } from './discover-http-client'
 import { DiscoverService } from './discover.service'
 import { HackerNewsAdapter } from './hacker-news.adapter'
+import { RemotiveAdapter } from './remotive.adapter'
 
 @Module({
   imports: [AuthModule],
@@ -15,11 +16,15 @@ import { HackerNewsAdapter } from './hacker-news.adapter'
     { provide: DiscoverHttpClient, useFactory: () => new DiscoverHttpClient() },
     DiscoverCacheService,
     HackerNewsAdapter,
+    RemotiveAdapter,
     DiscoverService,
     {
       provide: DISCOVER_SOURCE_ADAPTERS,
-      inject: [HackerNewsAdapter],
-      useFactory: (hackerNewsAdapter: HackerNewsAdapter) => [hackerNewsAdapter],
+      inject: [HackerNewsAdapter, RemotiveAdapter],
+      useFactory: (
+        hackerNewsAdapter: HackerNewsAdapter,
+        remotiveAdapter: RemotiveAdapter,
+      ) => [hackerNewsAdapter, remotiveAdapter],
     },
   ],
 })

@@ -1,13 +1,13 @@
 # Discover Product Contract
 
-Status: tasks 21-24 complete; tasks 25-33 are not implemented.
+Status: tasks 21-25 complete; tasks 26-33 are not implemented.
 Contract date: 2026-07-20
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
-pilot work must preserve. Task 24 has enabled Hacker News through the adapter,
-cache, stale fallback, and source health boundaries. Remotive and the Discover
-screen remain disabled until tasks 25-26.
+pilot work must preserve. Tasks 24-25 have enabled Hacker News and Remotive
+through the adapter, cache, stale fallback, and source health boundaries. The
+Discover screen remains task 26 work.
 
 ## Common model and API baseline
 
@@ -28,8 +28,8 @@ screen remain disabled until tasks 25-26.
 - The future item order is `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`.
   The versioned cursor binds this tuple and remains opaque to clients.
 - A source without a registered adapter remains `enabled: false` and
-  `UNAVAILABLE`. Hacker News is registered; the other five planned sources stay
-  disabled until their tasks are implemented.
+  `UNAVAILABLE`. Hacker News and Remotive are registered; the other four planned
+  sources stay disabled until their tasks are implemented.
 
 ## Adapter infrastructure baseline
 
@@ -71,6 +71,28 @@ screen remain disabled until tasks 25-26.
 - A small number of item-detail failures may produce a partial fresh result.
   When more than 25 percent of requested details fail, the refresh fails so the
   previous cache is served as `STALE` instead of being replaced broadly.
+
+## Remotive adapter
+
+- The server calls only `https://remotive.com/api/remote-jobs` with
+  `category=software-dev` and `limit=30`. One shared refresh is one logical API
+  call; a transient failure may retry once.
+- The fresh TTL is 6 hours and maximum stale age is 72 hours, keeping normal
+  traffic at no more than four shared refreshes per day as requested by the
+  public API policy.
+- Only positive numeric IDs, Software Development category, bounded title,
+  valid publication time, and direct HTTPS `remotive.com` detail URLs become
+  items. Duplicate IDs keep their first feed occurrence.
+- All items are `EARNING/PAID_JOB`, attributed to `Remotive`, and preserve the
+  source URL. Full-time, contract, freelance, part-time, and internship are
+  fixed tags; unknown job types are not inferred.
+- Company, candidate location, and HTML description are converted to bounded
+  plain-text summary. Salary is preserved only as sanitized source-provided
+  compensation text. Missing salary remains explicitly unavailable even when
+  the description contains currency-like text.
+- Isolated invalid jobs are skipped. An entirely invalid result or at least
+  three invalid jobs exceeding 25 percent fails the refresh so stale cache is
+  not broadly replaced after an upstream schema change.
 
 ## Product boundary
 
@@ -142,8 +164,8 @@ not a verified cash bounty.
 - Initial Hacker News defaults: fresh for 10 minutes, stale fallback for at most
   24 hours.
 - Initial Remotive defaults: fresh for 6 hours, stale fallback for at most
-  72 hours. This bounds normal requests to no more than four refreshes per day
-  per shared deployment.
+  72 hours. Each refresh performs one HTTP attempt with no source-level retry,
+  keeping the normal shared-deployment path within four requests per day.
 - A future source must define its fresh TTL and maximum stale age before it is
   enabled. `STALE` data is labeled as such; data older than the source's maximum
   stale age is never returned as available.

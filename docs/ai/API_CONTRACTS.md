@@ -61,7 +61,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-24 ship the authenticated read contract, common model, safe adapter/cache boundary, and Hacker News source. Hacker News is `enabled: true`; its first uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. Remotive and the other planned sources remain disabled. The `/discover` screen does not exist until task 26.
+Tasks 22-25 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, and Remotive. Both sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. The other planned sources remain disabled. The `/discover` screen does not exist until task 26.
 
 `GET /discover` query:
 
@@ -85,7 +85,7 @@ Successful `GET /discover` data:
       "source": "REMOTIVE",
       "displayName": "Remotive",
       "categories": ["EARNING"],
-      "enabled": false,
+      "enabled": true,
       "status": "UNAVAILABLE",
       "fetchedAt": null
     }
@@ -100,6 +100,8 @@ Every future `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-e
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
 
 Hacker News maps Top and Show to `NEWS/ARTICLE`, Ask to `COMMUNITY/DISCUSSION`, and Jobs to `EARNING/PAID_JOB`. Deleted or incomplete items are omitted. Missing or non-HTTPS story URLs use the canonical HTTPS Hacker News discussion URL. Hacker News compensation and rewards are never inferred.
+
+Remotive maps validated Software Development jobs to `EARNING/PAID_JOB`. `originalUrl` is the direct source-provided Remotive HTTPS detail URL and attribution is always `Remotive`. Salary is source-provided compensation text, never a parsed cash reward; missing salary is represented by `{ provided: false, text: null }`. Employment type is a fixed tag and location remains bounded plain-text context.
 
 - `EARNING`: `PAID_JOB` or `CASH_BOUNTY`.
 - `NEWS`: `ARTICLE`.

@@ -46,7 +46,7 @@
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
-Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. `server/src/discover/hacker-news.adapter.ts` owns the enabled HN Top·Ask·Show·Jobs source. Remotive is enabled only by task 25.
+Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. `server/src/discover/hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs. Both sources are enabled; task 26 owns the screen.
 
 ## Change routing
 

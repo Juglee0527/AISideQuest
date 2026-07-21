@@ -113,7 +113,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 6.1 Discover Adapter 보안 경계
 
-Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Remotive, 저장, 관심사, 분석 event와 화면은 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
+Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Task 25의 Remotive adapter는 `remotive.com`의 Software Development API만 fetch하고 source가 제공한 Remotive HTTPS detail URL만 표시한다. 저장, 관심사, 분석 event와 화면은 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
 
 - `/discover`와 browser API는 웹 session 인증을 요구하지만 활성 AI session은 요구하지 않는다.
 - 서버는 source별 고정 HTTPS host만 호출하고 사용자가 제공한 URL을 가져오지 않는다. 화면의 외부 원문 link는 서버 fetch 대상이 아니다.

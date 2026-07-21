@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~24 완료, Task 25 구현 전
+- 상태: Task 21~25 완료, Task 26 구현 전
 - 작업 번호: 21~33
-- 다음 작업: 25. Remotive 수익 기회 연동
+- 다음 작업: 26. Discover 화면 구현
 - 1차 구현 범위: 21~26
 
 ---
@@ -189,7 +189,7 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - `discover_source_cache`에는 normalized item과 마지막 성공 갱신 시각만 저장하며 5 MiB DB 제약과 최대 7일 정리를 적용한다.
 - 같은 process의 single-flight와 source별 PostgreSQL advisory lock으로 동시 miss를 합치고, lock을 얻지 못한 instance는 stale 또는 unavailable로 안전하게 응답한다.
 - Source별 fresh·stale·miss와 fetch 결과는 fixed low-cardinality metric만 남긴다. Raw body, HTML, URL과 item·user 식별자는 로그와 metric label에 남기지 않는다.
-- Task 23 완료 시점에는 concrete source를 등록하지 않았다. Hacker News는 Task 24에서 활성화했고 Remotive는 Task 25에 남겨 둔다.
+- Task 23 완료 시점에는 concrete source를 등록하지 않았다. 이후 Hacker News는 Task 24에서, Remotive는 Task 25에서 활성화했다.
 
 #### 24. Hacker News 커뮤니티 연동
 
@@ -230,6 +230,16 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - 급여가 없는 공고의 금액을 추정하지 않는다.
 - 채용 기회를 확정 수익으로 표현하지 않는다.
 - attribution과 호출량 조건을 지킨다.
+
+구현 결과:
+
+- `https://remotive.com/api/remote-jobs?category=software-dev&limit=30`만 호출하며 shared fresh TTL 6시간과 maximum stale 72시간을 적용했다.
+- Shared cache의 fresh 기간마다 실제 HTTP 요청을 한 번만 보내고 재시도하지 않아 Remotive 권고인 하루 최대 4회를 지킨다. 실패 시에는 maximum stale 안의 마지막 성공 cache를 사용한다.
+- Positive ID, Software Development category, title, publication time과 직접 Remotive HTTPS URL을 검증하고 중복 ID는 첫 공고만 유지한다.
+- 모든 공고는 `EARNING/PAID_JOB`, attribution `Remotive`, reward `null`로 분류한다. 고용 형태는 full-time·contract·freelance·part-time·internship 고정 tag로만 구분한다.
+- Company·지원 가능 지역·HTML description은 bounded plain-text summary로 정제하고, salary가 실제 제공된 경우에만 compensation text로 보존한다. Description 속 금액은 salary로 추정하지 않는다.
+- 전체가 invalid이거나 invalid 공고가 3개 이상이면서 25%를 넘으면 refresh를 실패시켜 stale cache를 보존한다.
+- 2026-07-21 [live smoke](./ai/operations/2026-07-21-remotive-smoke.md)에서 공고 10개, 급여 제공 9개, full-time 8개, contract 2개와 attribution·Remotive HTTPS URL을 확인했다.
 
 #### 26. Discover 화면 구현
 

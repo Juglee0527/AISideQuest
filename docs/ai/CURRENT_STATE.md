@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-24 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, and Hacker News source complete; tasks 25-33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-25 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, and Remotive complete; tasks 26-33 are not implemented.
 
 Implemented:
 
@@ -23,6 +23,7 @@ Implemented:
 - Staging/production deployment templates, validation, migration-first deploy, smoke, rollback, kill switches, and pilot evaluator.
 - Discover common server/client types, authenticated read API, bounded HTTP and plain-text normalization boundaries, shared PostgreSQL cache, per-source single-flight/stale fallback and low-cardinality counters.
 - Enabled Hacker News Top·Ask·Show·Jobs adapter with bounded request volume, duplicate/deleted/incomplete item handling, HTTPS fallback links, 10-minute fresh TTL, and 24-hour maximum stale fallback. Other sources remain disabled.
+- Enabled Remotive Software Development adapter with one shared bounded request, direct source URL and attribution, explicit compensation availability, employment-type tags, 6-hour fresh TTL, and 72-hour maximum stale fallback.
 
 Optional external deployment remains unverified:
 
@@ -39,9 +40,9 @@ Optional external deployment remains unverified:
 | React | 54 |
 | Codex plugin | 20 |
 | operations and local startup scripts | 17 |
-| server non-database | 39 |
+| server non-database | 43 |
 | PostgreSQL integration | 52 |
-| total | 182 |
+| total | 186 |
 
 Also passed: lint, client/server typecheck, client/server production build, 15 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
@@ -74,4 +75,4 @@ Also passed: lint, client/server typecheck, client/server production build, 15 m
 
 ## Immediate next action
 
-Begin task 25 in the ordered [`Discover development plan`](../Discover_개발_계획.md): implement the Remotive software-development opportunity adapter with attribution, compensation, 6-hour fresh TTL, and 72-hour maximum stale fallback. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 26 in the ordered [`Discover development plan`](../Discover_개발_계획.md): implement the authenticated `/discover` screen with earning, news, and community tabs plus loading, empty, partial-failure, total-failure, mobile, and accessibility states. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
