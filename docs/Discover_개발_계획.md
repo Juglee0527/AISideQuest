@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~25 완료, Task 26 구현 전
+- 상태: Task 21~26 완료, Discover MVP 구현 완료
 - 작업 번호: 21~33
-- 다음 작업: 26. Discover 화면 구현
+- 다음 작업: 27. 관심 항목 저장
 - 1차 구현 범위: 21~26
 
 ---
@@ -257,6 +257,17 @@ Canonical contract는 [`ai/DISCOVER_CONTRACT.md`](./ai/DISCOVER_CONTRACT.md)를 
 - 외부 이동임을 사용자에게 명확히 알린다.
 - GitHub login을 요구하고 login을 email·marketing 가입 유도에 사용하지 않는다.
 - 활성 AI session 유무와 관계없이 조회할 수 있다.
+
+구현 결과:
+
+- `/discover` route를 desktop·mobile 주요 navigation에 추가하고 수익 기회·개발 소식·커뮤니티 탭을 category API와 연결했다.
+- Card는 source·유형·tag·게시일, source-provided compensation 또는 검증된 reward와 외부 원문 동작을 표시한다. 원문은 새 browsing context에서 `noopener noreferrer`로 연다.
+- 초기 loading, login 대기, 정상 empty, request error, enabled source 전체 unavailable, 부분 unavailable, stale, 더 보기 loading·error를 구분한다. 더 보기 실패 시 기존 항목을 유지한다.
+- Disabled future source는 장애로 표시하지 않고 enabled source의 safe status만 사용자에게 설명한다. 원문 오류, host와 내부 retry 정보는 표시하지 않는다.
+- Tab은 tablist·tab·tabpanel 관계와 좌우·Home·End keyboard 이동을 지원한다. Card grid와 5개 항목 mobile navigation은 320px 이상에서 한 열 기반으로 동작하고 큰 화면에서는 두 열로 확장한다.
+- 화면은 visit·tab·outbound click analytics를 추가하지 않으며 active AI session 없이도 authenticated browser session만으로 조회한다.
+- React 화면·route test 6개로 category 전환, 외부 link 속성, healthy empty, request error, stale·부분·전체 장애, total retry와 pagination 실패 복구를 검증했다.
+- 2026-07-21 [local UI smoke](./ai/operations/2026-07-21-discover-ui-smoke.md)에서 1280×720·375×812 navigation 전환, 가로 overflow 없음과 keyboard tab 이동을 확인했다. Authenticated 실제 card browser smoke와 전체 접근성 audit은 release gate로 남긴다.
 
 Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release candidate가 된다. 실제 release 판정에는 real Hacker News·Remotive smoke, source attribution·호출량, desktop·mobile·접근성, 부분·전체 장애와 개인정보 gate 증거가 추가로 필요하다.
 

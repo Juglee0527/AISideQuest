@@ -61,7 +61,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-25 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, and Remotive. Both sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. The other planned sources remain disabled. The `/discover` screen does not exist until task 26.
+Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Both sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. The other planned sources remain disabled.
 
 `GET /discover` query:
 

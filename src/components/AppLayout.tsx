@@ -1,4 +1,4 @@
-import { AlertCircle, BarChart3, Compass, House, LoaderCircle, LogIn, Plug, RefreshCw, Sparkles } from 'lucide-react'
+import { AlertCircle, BarChart3, Compass, Globe2, House, LoaderCircle, LogIn, Plug, RefreshCw, Sparkles } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { useSession } from '../contexts/SessionContext'
@@ -7,6 +7,7 @@ import { getGithubLoginUrl } from '../api/apiClient'
 const navigationItems = [
   { to: '/', label: 'Home', icon: House },
   { to: '/quests', label: 'Side Quest', icon: Compass },
+  { to: '/discover', label: 'Discover', icon: Globe2 },
   { to: '/dashboard', label: 'Dashboard', icon: BarChart3 },
   { to: '/devices', label: 'Devices', icon: Plug },
 ]
@@ -132,7 +133,7 @@ function AppLayout() {
       </main>
 
       <nav
-        className="fixed inset-x-4 bottom-4 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-slate-700/70 bg-slate-900/95 p-2 shadow-2xl shadow-black/40 backdrop-blur-xl md:hidden"
+        className="fixed inset-x-4 bottom-4 z-40 grid grid-cols-5 gap-1 rounded-2xl border border-slate-700/70 bg-slate-900/95 p-2 shadow-2xl shadow-black/40 backdrop-blur-xl md:hidden"
         aria-label="모바일 주요 메뉴"
       >
         {navigationItems.map(({ to, label, icon: Icon }) => (

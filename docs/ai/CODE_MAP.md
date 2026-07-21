@@ -42,11 +42,12 @@
 - `/quests` → published quest catalog;
 - `/quests/:code` and `/quest-attempts/:attemptId` → quiz start/resume;
 - `/dashboard` → server statistics and point history;
+- `/discover` → earning, news, and community source cards;
 - `/devices` → device link, rotation, and revocation.
 
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
-Discover currently has `src/types/discover.ts` and `src/api/discoverApi.ts`, but no route or page. `server/src/discover/hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs. Both sources are enabled; task 26 owns the screen.
+Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, and `src/pages/DiscoverPage.tsx`. The page owns tab, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs and `remotive.adapter.ts` owns Software Development remote jobs.
 
 ## Change routing
 

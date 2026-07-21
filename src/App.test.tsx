@@ -549,4 +549,44 @@ describe('AISideQuest API session flow', () => {
     expect(screen.getByText('퀘스트를 통과했습니다!')).toBeInTheDocument()
     expect(screen.getByText('점수 100점 · 통과 기준 100점')).toBeInTheDocument()
   })
+
+  it('opens Discover without requiring an active AI session', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      if (url.pathname.endsWith('/sessions/active')) return jsonResponse([])
+      if (url.pathname.endsWith('/sessions')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/quests')) {
+        return jsonResponse({ items: [], nextCursor: null })
+      }
+      if (url.pathname.endsWith('/discover')) {
+        return jsonResponse({
+          items: [],
+          nextCursor: null,
+          sources: [{
+            source: 'REMOTIVE',
+            displayName: 'Remotive',
+            categories: ['EARNING'],
+            enabled: true,
+            status: 'FRESH',
+            fetchedAt: '2026-07-21T00:00:00.000Z',
+          }],
+        })
+      }
+      return jsonResponse({ code: 'NOT_FOUND', message: 'not found' }, 404)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    renderApp('/discover')
+    await flushRequests()
+
+    expect(screen.getByRole('heading', { name: '다음 개발 기회를 발견하세요.' })).toBeInTheDocument()
+    expect(screen.getByText('현재 표시할 항목이 없습니다.')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => {
+      const url = new URL(typeof input === 'string' ? input : input.toString())
+      return url.pathname.endsWith('/discover')
+        && url.searchParams.get('category') === 'EARNING'
+    })).toBe(true)
+  })
 })

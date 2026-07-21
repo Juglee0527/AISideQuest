@@ -124,10 +124,11 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Final pilot gate: at least 10 full-flow users, 7 days, 100 eligible automatic sessions, detection ≥95%, reflection p95 ≤5s, zero unrecoverable loss, zero duplicate sessions/points, API 5xx <1%.
 - Retaining optional deployment tooling does not satisfy the pilot gate; task 20 remains incomplete without real external evidence.
 
-## Discover expansion (Hacker News and Remotive enabled; no screen)
+## Discover expansion (Hacker News, Remotive, and screen enabled)
 
 - Discover requires the existing GitHub-authenticated browser session but never an active AI session.
-- `GET /discover` and `GET /discover/sources` are implemented with validated filters, an opaque versioned cursor contract, safe source status, and strict client parsing. Hacker News Top·Ask·Show·Jobs and Remotive Software Development jobs are enabled through bounded HTTP, normalized cache, single-flight and stale fallback. The screen remains task 26 work.
+- `GET /discover` and `GET /discover/sources` are implemented with validated filters, an opaque versioned cursor contract, safe source status, and strict client parsing. Hacker News Top·Ask·Show·Jobs and Remotive Software Development jobs are enabled through bounded HTTP, normalized cache, single-flight and stale fallback.
+- `/discover` provides accessible earning, news, and community tabs, cursor-based load-more, safe external links, and distinct loading, empty, stale, partial-failure, and total-failure states. Disabled future sources are not presented as failures, and a paging failure preserves loaded items.
 - AISideQuest only indexes and links to external items. It does not guarantee employment, income, bounty payment, eligibility, or availability.
 - AISideQuest points, source-provided job compensation, verified cash bounties, and reputation bounties are separate classifications. An external click or save never awards points.
 - Only the server fetches fixed source API hosts. Display links are never used as server fetch targets, and raw upstream payloads or HTML are never persisted or logged.

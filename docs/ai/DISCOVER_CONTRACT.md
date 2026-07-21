@@ -1,13 +1,13 @@
 # Discover Product Contract
 
-Status: tasks 21-25 complete; tasks 26-33 are not implemented.
+Status: tasks 21-26 complete; tasks 27-33 are not implemented.
 Contract date: 2026-07-20
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
 pilot work must preserve. Tasks 24-25 have enabled Hacker News and Remotive
 through the adapter, cache, stale fallback, and source health boundaries. The
-Discover screen remains task 26 work.
+Task 26 adds the authenticated Discover screen without adding behavioral analytics.
 
 ## Common model and API baseline
 
@@ -75,8 +75,8 @@ Discover screen remains task 26 work.
 ## Remotive adapter
 
 - The server calls only `https://remotive.com/api/remote-jobs` with
-  `category=software-dev` and `limit=30`. One shared refresh is one logical API
-  call; a transient failure may retry once.
+  `category=software-dev` and `limit=30`. One shared refresh performs one HTTP
+  attempt with no source-level retry.
 - The fresh TTL is 6 hours and maximum stale age is 72 hours, keeping normal
   traffic at no more than four shared refreshes per day as requested by the
   public API policy.
@@ -187,6 +187,27 @@ not a verified cash bounty.
   readiness. It is a degraded feature state, not a reason to mark the whole
   application unhealthy.
 
+## Screen contract
+
+- `/discover` appears in desktop and mobile navigation and requires the existing
+  authenticated browser session, not an active AI session.
+- The three accessible tabs request `EARNING`, `NEWS`, and `COMMUNITY`
+  independently. Tab changes replace the current page; opaque-cursor pagination
+  appends de-duplicated items without constructing or editing a cursor.
+- Cards show kind, attribution, normalized title and summary, tags, publication
+  time, explicit compensation or verified reward information, and a clear
+  external original-link action. External links use a new context with
+  `noopener noreferrer`.
+- Initial loading, authenticated-session waiting, healthy empty, request error,
+  total source unavailability, partial source failure, stale data, pagination
+  loading, and pagination error are distinct states. A later-page error preserves
+  the already loaded items.
+- Disabled future sources are not reported as failures. `STALE` and enabled
+  `UNAVAILABLE` sources are explained without exposing upstream error details.
+- The screen does not collect view, tab, or outbound-click analytics. It does not
+  infer compensation or claim that an opportunity, reward, or availability is
+  guaranteed.
+
 ## Product analytics and privacy
 
 Discover remains functional without behavioral analytics. Tasks 22-26 do not
@@ -219,6 +240,9 @@ specific record remains.
   Hacker News and Remotive smoke evidence, source attribution and request-rate
   checks, desktop/mobile and accessibility checks, partial/total failure checks,
   and a forbidden-data review.
+- Task 26 local UI evidence covers unauthenticated desktop/mobile layout and
+  keyboard tab semantics. An authenticated real-card browser check and a full
+  accessibility review remain release evidence, not implementation blockers.
 - A local-first release does not complete task 20. Task 20 still requires its
   separately documented real staging/production and 10-user, 7-day evidence.
 - Task 33 is the Discover product pilot and cannot be declared complete until
