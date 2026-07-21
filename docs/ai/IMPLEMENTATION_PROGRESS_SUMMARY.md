@@ -1,16 +1,17 @@
 # AISideQuest 개발 진행 요약
 
-- 작성일: 2026-07-18
+- 최종 현행화: 2026-07-21
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
-- 현재 작업: 20. 배포 패키지 구현 완료, 외부 운영 배포·파일럿 대기
+- Task 20: 배포 패키지 구현 완료, 외부 운영 배포·파일럿 증거 대기
+- Discover 확장: Task 21~28 완료, Task 29~33 대기
 
 ---
 
 # 1. 현재 상태 요약
 
-AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능한 폐쇄형 베타로 전환 중이다.
+AISideQuest는 브라우저 LocalStorage 기반 MVP를 서버 소유 데이터와 로컬 우선 실행 구조로 전환했고, Discover MVP·저장·명시적 개인화까지 구현했다.
 
 현재까지 다음 기반을 확보했다.
 
@@ -28,8 +29,10 @@ AISideQuest는 브라우저 LocalStorage 기반 MVP에서 실제 사용 가능�
 12. 30초 heartbeat, durable FIFO queue, 재시도·dead-letter와 서버 세션 만료·late Stop 복구를 구현했다.
 13. 게시 퀘스트 목록·상세 API, 사용자별 최근 응시 상태와 cursor pagination을 구현하고 프런트엔드의 `mockQuests`를 제거했다.
 14. 활성 AI 세션 기반 실제 퀴즈, 답안 저장·복구, 서버 채점, 제출 멱등성과 만료·재응시 정책을 구현했다.
+15. Hacker News·Remotive source, 안전한 adapter/cache/stale fallback과 `/discover` 화면을 구현했다.
+16. 사용자별 저장 snapshot과 고정 allowlist 관심 기술, 결정적 정렬과 추천 이유를 구현했다.
 
-현재 React 프런트엔드는 GitHub 로그인, PostgreSQL 기반 세션·퀘스트·채점·포인트·기간 통계 API를 사용한다. 기간 통계는 저장된 IANA time zone과 응답의 동일한 서버 기준 시각으로만 표시한다.
+현재 React 프런트엔드는 GitHub 로그인, PostgreSQL 기반 세션·퀘스트·채점·포인트·기간 통계·Discover API를 사용한다. 기간 통계는 저장된 IANA time zone과 응답의 동일한 서버 기준 시각으로만 표시하며, Discover는 저장 snapshot과 명시적 관심 기술을 사용자 소유 데이터로 처리한다.
 
 # 2. 출발점: 기존 MVP
 
@@ -603,10 +606,12 @@ React 47개, 플러그인 9개, NestJS 비DB 8개, PostgreSQL 통합 테스트 4
 | [SECURITY_AND_PRIVACY.md](./SECURITY_AND_PRIVACY.md) | Endpoint 보안 matrix, Rate Limit, 개인정보 보존·내보내기·삭제 기준 |
 | [OPERATIONS_RUNBOOK.md](./OPERATIONS_RUNBOOK.md) | Request ID 로그, probe, 지표·경보, migration, backup·복원과 secret 회전 절차 |
 | [CI_AND_RELEASE_GATES.md](./CI_AND_RELEASE_GATES.md) | CI job, branch protection, artifact 정책과 staging·Codex 릴리스 체크리스트 |
+| [DISCOVER_CONTRACT.md](./DISCOVER_CONTRACT.md) | Discover source·저장·개인화·개인정보·release 계약 |
+| [../Discover_개발_계획.md](../Discover_개발_계획.md) | Discover Task 21~33 순서와 완료 결과 |
 
 ---
 
-현재 결론: **분리된 GitHub Actions, PostgreSQL 16 migration·통합 gate와 Chromium 핵심 흐름을 구현했다. 다음 작업은 20번 운영 배포와 파일럿 진행이다.**
+당시 19번 완료 시점 결론: **분리된 GitHub Actions, PostgreSQL 16 migration·통합 gate와 Chromium 핵심 흐름을 구현했다.** 이후 20번 배포 패키지와 Discover Task 21~28 구현 결과는 아래에 이어서 기록한다.
 
 # 13. 17번 구현 결과
 
@@ -643,3 +648,22 @@ React 47개, 플러그인 10개, 운영 3개, NestJS 비DB 17개, PostgreSQL 통
 event 수신과 퀘스트 제출·보상을 독립적으로 멈추는 kill switch를 추가했다. event 중단은 `503`과 `Retry-After`로 plugin queue를 보존하고, 보상 중단은 채점 transaction 전에 제출을 막는다. plugin bundle·설치 안내·개인정보 안내, 7일·10명·50건 checkpoint·100건 최종 표본과 품질 기준을 평가하는 파일럿 판정기도 추가했다.
 
 Docker 리허설에서 11개 migration 적용과 재실행 `applied: []`, API·PostgreSQL health, Caddy 경유 health·CORS·OAuth state/PKCE·cookie·SPA smoke 10개를 통과했다. 세부 실행서는 [DEPLOYMENT_AND_PILOT.md](./DEPLOYMENT_AND_PILOT.md)에 기록했다. 실제 domain·DB·OAuth 자격증명, production 복원·rollback 증거, 초대 사용자 10명과 최소 7일 관찰이 완료되기 전까지 20번 전체는 미완료다.
+
+# 17. Discover Task 21~28 구현 결과
+
+Task 21~28에서 다음 범위를 구현했다.
+
+1. Discover 제품·보상 분류·개인정보·release 계약과 공통 `DiscoverItem` API model
+2. HTTPS host allowlist, timeout, 제한된 retry, plain-text 정제, PostgreSQL cache, source별 single-flight와 stale fallback
+3. Hacker News Top·Ask·Show·Jobs와 Remotive Software Development adapter
+4. GitHub login은 요구하지만 active AI session과 독립적인 `/discover` 화면, 세 category tab과 loading·empty·부분/전체 장애·pagination 상태
+5. Server cache의 normalized item을 다시 검증하는 사용자별 저장 snapshot, CSRF·UUID idempotency·ownership·cursor 목록
+6. 20개 고정 allowlist에서 최대 10개를 직접 선택하는 관심 기술 전체 교체 API와 DB 중복·허용값 제약
+7. 관심 tag 일치 수, newest item 기준 상대 최신성 band, source 제공 engagement, 명확한 reward·compensation, 기존 시간순의 결정적 정렬
+8. 관심 기술 일치·최신 항목·외부 반응·보상 정보 명확성으로 제한한 화면 추천 이유와 관심 변경 시 기존 cursor 거부
+9. 저장 snapshot과 관심 기술을 포함하는 사용자 export schema version 3과 account delete transaction
+10. Prompt, AI response, code, diff, transcript, raw command, tool input/output와 local path를 개인화·분석·운영 log에서 제외하는 경계
+
+2026-07-21 현재 React 64개, Codex plugin 20개, 운영·local startup 17개, server non-database 47개, PostgreSQL integration 58개로 자동 테스트 총 206개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다.
+
+다음 구현 작업은 Task 29의 DEV 개발 글과 Stack Overflow 미답변·reputation bounty 연동이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.
