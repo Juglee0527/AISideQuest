@@ -10,6 +10,7 @@ import type {
 } from '../../src/discover/discover-cache.service'
 import { DiscoverFetchError } from '../../src/discover/discover-http-client'
 import type { DiscoverSavedService } from '../../src/discover/discover-saved.service'
+import type { DiscoverInterestService } from '../../src/discover/discover-interest.service'
 import { DiscoverService } from '../../src/discover/discover.service'
 import type { DiscoverItem, DiscoverSource } from '../../src/discover/discover.types'
 import type { OperationalLoggerService } from '../../src/observability/operational-logger.service'
@@ -40,6 +41,7 @@ class FakeCacheService {
 function createService(
   adapters: DiscoverSourceAdapter[] = [],
   cache = new FakeCacheService(),
+  interestTags: Array<'typescript' | 'python'> = [],
 ) {
   const metricEvents: string[] = []
   const metrics = {
@@ -50,11 +52,15 @@ function createService(
   const savedService = {
     findSavedItemReferences: async () => [],
   } as unknown as DiscoverSavedService
+  const interestService = {
+    getInterests: async () => ({ tags: interestTags, updatedAt: null }),
+  } as unknown as DiscoverInterestService
   return {
     service: new DiscoverService(
       adapters,
       cache as unknown as DiscoverCacheService,
       savedService,
+      interestService,
       metrics,
       logger,
     ),
@@ -78,6 +84,7 @@ function item(
     tags: [],
     reward: null,
     compensation: null,
+    engagement: null,
     originalUrl: 'https://example.com/item',
     attribution: 'Example',
     publishedAt,
@@ -104,6 +111,7 @@ test('returns the explicit unavailable baseline before source adapters exist', a
 
   assert.deepEqual(result.items, [])
   assert.equal(result.nextCursor, null)
+  assert.deepEqual(result.recommendations, [])
   assert.equal(result.sources.length, 6)
   assert.ok(result.sources.every((source) => !source.enabled && source.status === 'UNAVAILABLE'))
 })
@@ -176,6 +184,39 @@ test('deduplicates, sorts and paginates with a stable cursor', async () => {
   const second = await service.listDiscover(userId, { limit: 1, cursor: first.nextCursor as string })
   assert.deepEqual(second.items.map((value) => value.id), ['HACKER_NEWS:older'])
   assert.equal(second.nextCursor, null)
+})
+
+test('personalizes from explicit tags and rejects a cursor after interests change', async () => {
+  const cache = new FakeCacheService()
+  const newer = item('newer', 'HACKER_NEWS', '2026-07-20T08:00:00.000Z')
+  const matched = {
+    ...item('matched', 'HACKER_NEWS', '2026-07-19T08:00:00.000Z'),
+    tags: ['typescript'],
+    engagement: { type: 'SCORE' as const, value: 10 },
+  }
+  const personalized = createService([
+    adapter('HACKER_NEWS', async () => [newer, matched]),
+  ], cache, ['typescript'])
+
+  const first = await personalized.service.listDiscover(userId, { limit: 1 })
+  assert.deepEqual(first.items.map((value) => value.id), [matched.id])
+  assert.deepEqual(first.recommendations, [{
+    itemId: matched.id,
+    reasons: ['INTEREST_MATCH', 'RECENT', 'EXTERNAL_ENGAGEMENT'],
+    matchedInterests: ['typescript'],
+  }])
+  assert.ok(first.nextCursor)
+
+  const defaultService = createService([
+    adapter('HACKER_NEWS', async () => []),
+  ], cache)
+  await assert.rejects(
+    defaultService.service.listDiscover(userId, {
+      limit: 1,
+      cursor: first.nextCursor as string,
+    }),
+    (error) => error instanceof BadRequestException,
+  )
 })
 
 test('returns defensive source category copies', async () => {

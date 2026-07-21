@@ -10,6 +10,7 @@ import { DiscoverService } from './discover.service'
 import { HackerNewsAdapter } from './hacker-news.adapter'
 import { RemotiveAdapter } from './remotive.adapter'
 import { DiscoverSavedService } from './discover-saved.service'
+import { DiscoverInterestService } from './discover-interest.service'
 
 @Module({
   imports: [AuthModule, ApiIdempotencyModule],
@@ -21,6 +22,7 @@ import { DiscoverSavedService } from './discover-saved.service'
     RemotiveAdapter,
     DiscoverService,
     DiscoverSavedService,
+    DiscoverInterestService,
     {
       provide: DISCOVER_SOURCE_ADAPTERS,
       inject: [HackerNewsAdapter, RemotiveAdapter],

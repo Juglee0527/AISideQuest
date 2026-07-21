@@ -50,6 +50,8 @@
 | `GET /discover/saved-items` | 웹 세션 | 아니오 | 본인 snapshot만 | cursor 1,000자, 최대 50건 | 없음 |
 | `POST /discover/saved-items` | 웹 세션 | 예 | cache item을 본인에게 저장 | namespaced item ID, Idem | 없음 |
 | `DELETE /discover/saved-items/:id` | 웹 세션 | 예 | 본인 저장 row만 | UUID, 빈 body, Idem | 없음 |
+| `GET /discover/interests` | 웹 세션 | 아니오 | 본인 관심 기술만 | 없음 | 없음 |
+| `PUT /discover/interests` | 웹 세션 | 예 | 본인 관심 기술 전체 교체 | 고정 tag 최대 10개, Idem | 없음 |
 
 Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도 공유된다. state·연결 code·기기 token을 바꾸는 우회를 막기 위해 복합 식별자 bucket과 별도의 IP ceiling을 함께 소비한다. 초과 응답은 `429 RATE_LIMITED`와 `Retry-After`를 포함한다.
 
@@ -82,7 +84,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 5. 데이터 내보내기와 계정 삭제
 
-`POST /auth/me/export`는 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, 정제된 workspace·operation label을 포함한 AI 세션과 allowlist 이벤트 metadata, 응시·답안, point 원장을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
+`POST /auth/me/export`는 schema version 3으로 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, 정제된 workspace·operation label을 포함한 AI 세션과 allowlist 이벤트 metadata, 응시·답안, point 원장, Discover 저장 snapshot과 명시적 관심 기술을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
 
 `DELETE /auth/me`는 확인 문자열, CSRF, 15분 이내 인증을 요구하며 다음 순서로 한 transaction에서 삭제한다.
 
@@ -91,9 +93,10 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 3. integration event
 4. AI 세션
 5. 승인된 브라우저 연결 요청, 기기 연결 code와 기기
-6. idempotency record
-7. 웹 인증 세션과 OAuth 연결
-8. 사용자
+6. Discover 저장 snapshot과 관심 기술
+7. idempotency record
+8. 웹 인증 세션과 OAuth 연결
+9. 사용자
 
 성공 응답은 사용자의 기기에 남은 플러그인 연결 정보와 durable queue도 삭제하도록 안내한다. 서버는 사용자 기기의 로컬 파일을 원격 삭제할 수 없다.
 
@@ -108,6 +111,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 | AI 세션, allowlist integration event | 계정 유지 중 90일을 beta 운영 기준으로 사용 | 즉시 삭제 |
 | 응시·답안·point 원장 | 계정 유지 기간 | 즉시 삭제 |
 | Discover 저장 snapshot | 사용자가 삭제하거나 계정 유지 기간 | 즉시 삭제 |
+| Discover 관심 기술 | 사용자가 비우거나 계정 유지 기간 | 즉시 삭제 |
 | 로컬 queue 성공 record | 전송 완료 즉시 제거 | 사용자가 로컬 삭제 |
 | 로컬 dead-letter 진단 | 최대 7일 | 사용자가 로컬 삭제 |
 | 운영 로그 | 최대 30일 | 직접 식별자 금지, 정기 만료 |
@@ -117,7 +121,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 6.1 Discover Adapter 보안 경계
 
-Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Task 25의 Remotive adapter는 `remotive.com`의 Software Development API만 fetch하고 source가 제공한 Remotive HTTPS detail URL만 표시한다. Task 26 화면은 검증된 HTTPS 원문만 새 browsing context로 열고 `noopener noreferrer`를 적용한다. Task 27은 server cache에서 다시 검증한 normalized snapshot만 사용자별로 저장하고 내보내기·삭제에 포함한다. 관심사와 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
+Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서 source adapter interface, bounded HTTP client, DB cache와 stale fallback을 구현했다. Task 24의 Hacker News adapter는 `hacker-news.firebaseio.com`만 fetch하며 item URL은 server fetch에 재사용하지 않는다. Task 25의 Remotive adapter는 `remotive.com`의 Software Development API만 fetch하고 source가 제공한 Remotive HTTPS detail URL만 표시한다. Task 26 화면은 검증된 HTTPS 원문만 새 browsing context로 열고 `noopener noreferrer`를 적용한다. Task 27은 server cache에서 다시 검증한 normalized snapshot만 사용자별로 저장한다. Task 28은 사용자가 고정 allowlist에서 직접 고른 기술만 저장·정렬에 사용하고 export·삭제에 포함한다. 방문·click 분석 event는 아직 구현하지 않았다. 이후 구현은 다음 경계를 지킨다.
 
 - `/discover`와 browser API는 웹 session 인증을 요구하지만 활성 AI session은 요구하지 않는다.
 - 서버는 source별 고정 HTTPS host만 호출하고 사용자가 제공한 URL을 가져오지 않는다. 화면의 외부 원문 link는 서버 fetch 대상이 아니다.
@@ -126,7 +130,8 @@ Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서
 - 운영 로그와 metric label에는 외부 응답, 전체 원문 URL, item ID·제목·tag, 사용자 관심 기술을 남기지 않는다.
 - Task 32에서 제품 분석을 구현하기 전에는 Discover 방문·클릭을 수집하지 않는다. 이후에도 고정 event 이름과 source·category만 허용하며 item 정보는 수집하지 않는다.
 - 반복 방문 계산용 사용자 ID는 소유권이 있는 분석 row에만 저장할 수 있고 로그·metric label에는 금지한다. 이 row는 90일 후 만료하고 계정 내보내기와 primary 삭제에 포함한다.
-- Task 27 저장 snapshot은 계정 소유 데이터로 내보내기 schema version 2와 account delete transaction에 포함하며, 사용자가 삭제하거나 계정을 유지하는 동안만 보존한다. Task 28 관심 기술도 같은 경계를 적용한다.
+- Task 27 저장 snapshot과 Task 28 관심 기술은 계정 소유 데이터로 내보내기 schema version 3과 account delete transaction에 포함한다. 관심 기술은 사용자가 비우면 row를 삭제한다.
+- 개인화는 명시적 관심 tag와 normalized external item만 사용한다. Prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path는 요청 schema에도 정렬 입력에도 없다.
 
 보상·출시·source 이용 조건까지 포함한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md)를 따른다.
 

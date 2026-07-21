@@ -49,6 +49,7 @@ function item(overrides: Partial<DiscoverItem> = {}): DiscoverItem {
     tags: ['remote', 'full-time'],
     reward: null,
     compensation: { provided: true, text: '$100k-$120k yearly' },
+    engagement: null,
     originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
     attribution: 'Remotive',
     publishedAt: '2026-07-20T08:00:00.000Z',
@@ -70,6 +71,9 @@ function sessionResponse(url: URL) {
   if (url.pathname.endsWith('/sessions/active')) return response([])
   if (url.pathname.endsWith('/sessions')) {
     return response({ items: [], nextCursor: null })
+  }
+  if (url.pathname.endsWith('/discover/interests')) {
+    return response({ tags: [], updatedAt: null })
   }
   return null
 }
@@ -96,6 +100,7 @@ describe('Discover page', () => {
           })],
           nextCursor: null,
           savedItems: [],
+          recommendations: [],
           sources: [source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY'])],
         })
       }
@@ -104,6 +109,7 @@ describe('Discover page', () => {
         items: [item()],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [
           source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY']),
           source('REMOTIVE', 'Remotive', ['EARNING']),
@@ -147,6 +153,7 @@ describe('Discover page', () => {
         })],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [
           source('HACKER_NEWS', 'Hacker News', ['EARNING', 'NEWS', 'COMMUNITY'], 'STALE'),
           source('REMOTIVE', 'Remotive', ['EARNING'], 'UNAVAILABLE'),
@@ -173,6 +180,7 @@ describe('Discover page', () => {
         items: [],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [
           source(
             'HACKER_NEWS',
@@ -212,6 +220,7 @@ describe('Discover page', () => {
         items: [],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
       })
     })
@@ -237,6 +246,7 @@ describe('Discover page', () => {
           items: [],
           nextCursor: null,
           savedItems: [],
+          recommendations: [],
           sources: [source('REMOTIVE', 'Remotive', ['EARNING'], 'UNAVAILABLE')],
         })
       }
@@ -245,6 +255,7 @@ describe('Discover page', () => {
           items: [item()],
           nextCursor: 'next-page',
           savedItems: [],
+          recommendations: [],
           sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
         })
       }
@@ -253,6 +264,7 @@ describe('Discover page', () => {
         items: [item({ id: 'REMOTIVE:102', title: 'Backend Contract Engineer' })],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
       })
     })
@@ -301,6 +313,7 @@ describe('Discover page', () => {
         items: [item()],
         nextCursor: null,
         savedItems: [],
+        recommendations: [],
         sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
       })
     })
@@ -329,5 +342,51 @@ describe('Discover page', () => {
       name: 'Remote TypeScript Engineer 저장 취소',
     }))
     expect(await screen.findByText('저장한 항목이 없습니다.')).toBeInTheDocument()
+  })
+
+  it('uses only explicitly saved interests and shows deterministic recommendation reasons', async () => {
+    document.cookie = 'aisidequest_csrf=interest-csrf; path=/'
+    let personalized = false
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input))
+      if (url.pathname.endsWith('/discover/interests') && init?.method === 'PUT') {
+        personalized = true
+        return response({ tags: ['typescript'], updatedAt: SERVER_TIME })
+      }
+      const session = sessionResponse(url)
+      if (session) return session
+
+      return response({
+        items: [item({ tags: ['typescript', 'remote'] })],
+        nextCursor: null,
+        savedItems: [],
+        recommendations: personalized ? [{
+          itemId: 'REMOTIVE:101',
+          reasons: ['INTEREST_MATCH', 'RECENT', 'CLEAR_VALUE'],
+          matchedInterests: ['typescript'],
+        }] : [],
+        sources: [source('REMOTIVE', 'Remotive', ['EARNING'])],
+      })
+    })
+
+    renderDiscover(fetchMock)
+    expect(await screen.findByText('Remote TypeScript Engineer')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('관심 기술 설정'))
+    expect(screen.getByText(/프롬프트, 코드, 경로와 작업 내용은 사용하지 않습니다/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'TypeScript' }))
+    fireEvent.click(screen.getByRole('button', { name: '관심 기술 저장' }))
+
+    expect(await screen.findByText('추천 이유')).toBeInTheDocument()
+    expect(screen.getByText('관심 기술 일치 · TypeScript')).toBeInTheDocument()
+    expect(screen.getByText('최신 항목')).toBeInTheDocument()
+    expect(screen.getByText('보상·급여 정보 명확')).toBeInTheDocument()
+
+    const updateCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    expect(updateCall?.[1]).toMatchObject({ body: JSON.stringify({ tags: ['typescript'] }) })
+    expect(updateCall?.[1]?.headers).toMatchObject({
+      'x-csrf-token': 'interest-csrf',
+      'Content-Type': 'application/json',
+    })
+    expect(updateCall?.[1]?.headers).toHaveProperty('Idempotency-Key')
   })
 })

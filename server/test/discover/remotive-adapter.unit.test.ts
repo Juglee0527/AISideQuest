@@ -48,7 +48,7 @@ test('normalizes salary, location and supported employment types without inferen
   const { adapter, client } = createAdapter()
   client.response = {
     jobs: [
-      job(1, { salary: '<b>$100k &amp; equity</b>' }),
+      job(1, { title: 'TypeScript Developer', salary: '<b>$100k &amp; equity</b>' }),
       job(2, {
         job_type: 'freelance',
         salary: '',
@@ -68,11 +68,13 @@ test('normalizes salary, location and supported employment types without inferen
   assert.deepEqual(items[1]?.compensation, { provided: false, text: null })
   assert.ok(items[1]?.summary?.includes('Potential budget $200k'))
   assert.ok(items[0]?.tags.includes('full-time'))
+  assert.ok(items[0]?.tags.includes('typescript'))
   assert.ok(items[1]?.tags.includes('freelance'))
   assert.ok(items[2]?.tags.includes('contract'))
   assert.equal(items[0]?.publishedAt, '2026-07-21T01:02:03.000Z')
   assert.equal(items[0]?.attribution, 'Remotive')
   assert.equal(items[0]?.originalUrl, 'https://remotive.com/remote-jobs/software-dev/job-1')
+  assert.equal(items[0]?.engagement, null)
   assert.doesNotMatch(JSON.stringify(items), /<\/?(?:p|b|strong)>/i)
 })
 

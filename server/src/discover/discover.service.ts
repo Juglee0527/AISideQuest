@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { hashToken } from '../auth/auth-crypto'
 import { OperationalLoggerService } from '../observability/operational-logger.service'
 import { OperationalMetricsService } from '../observability/operational-metrics.service'
 import { validationError } from '../sessions/session-input'
@@ -10,6 +11,12 @@ import {
 import { DiscoverCacheService, type DiscoverCacheEntry } from './discover-cache.service'
 import type { DiscoverListQueryDto } from './discover.dto'
 import { DiscoverFetchError, type DiscoverFetchFailure } from './discover-http-client'
+import { DiscoverInterestService } from './discover-interest.service'
+import {
+  compareRankedItems,
+  rankDiscoverItems,
+  type RankedDiscoverItem,
+} from './discover-personalization'
 import { DiscoverSavedService } from './discover-saved.service'
 import {
   DISCOVER_ITEM_ID_PATTERN,
@@ -47,6 +54,7 @@ export class DiscoverService {
     adapters: readonly DiscoverSourceAdapter[],
     private readonly cacheService: DiscoverCacheService,
     private readonly savedService: DiscoverSavedService,
+    private readonly interestService: DiscoverInterestService,
     private readonly metrics: OperationalMetricsService,
     private readonly logger: OperationalLoggerService,
   ) {
@@ -62,7 +70,19 @@ export class DiscoverService {
     userId: string,
     query: DiscoverListQueryDto,
   ): Promise<DiscoverListResult> {
+    const interests = await this.interestService.getInterests(userId)
+    const personalized = interests.tags.length > 0
+    const interestHash = hashToken(JSON.stringify(interests.tags))
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : null
+    if (
+      cursor
+      && (
+        cursor.interestHash !== interestHash
+        || cursor.personalized !== personalized
+      )
+    ) {
+      validationError('cursor does not match current interests')
+    }
     const selectedSources = this.filterCatalog(query.source, query.category)
     const loaded = await Promise.all(selectedSources.map((source) => this.loadSource(source)))
     const snapshots = loaded.map((result) => result.snapshot)
@@ -74,17 +94,29 @@ export class DiscoverService {
       if (!uniqueItems.has(item.id)) uniqueItems.set(item.id, item)
     }
 
-    const sorted = [...uniqueItems.values()].sort(compareItems)
+    const sorted = rankDiscoverItems([...uniqueItems.values()], interests.tags)
     const afterCursor = cursor
-      ? sorted.filter((item) => compareItemToCursor(item, cursor) > 0)
+      ? sorted.filter((item) => compareRankedItems(item, cursor, personalized) > 0)
       : sorted
-    const items = afterCursor.slice(0, query.limit)
-    const nextCursor = afterCursor.length > query.limit && items.length > 0
-      ? this.encodeCursor(items.at(-1) as DiscoverItem)
+    const rankedItems = afterCursor.slice(0, query.limit)
+    const items = rankedItems.map((ranked) => ranked.item)
+    const nextCursor = afterCursor.length > query.limit && rankedItems.length > 0
+      ? this.encodeCursor(
+        rankedItems.at(-1) as RankedDiscoverItem,
+        interestHash,
+        personalized,
+      )
       : null
     const savedItems = await this.savedService.findSavedItemReferences(userId, items)
+    const recommendations = personalized
+      ? rankedItems.map((ranked) => ({
+        itemId: ranked.item.id,
+        reasons: ranked.reasons,
+        matchedInterests: ranked.matchedInterests,
+      }))
+      : []
 
-    return { items, nextCursor, sources: snapshots, savedItems }
+    return { items, nextCursor, sources: snapshots, savedItems, recommendations }
   }
 
   async listSources(): Promise<DiscoverSourceListResult> {
@@ -215,12 +247,22 @@ export class DiscoverService {
     return error instanceof DiscoverFetchError ? error.reason : 'INVALID_RESPONSE'
   }
 
-  private encodeCursor(item: DiscoverItem) {
+  private encodeCursor(
+    ranked: RankedDiscoverItem,
+    interestHash: string,
+    personalized: boolean,
+  ) {
     const cursor: DiscoverCursor = {
-      version: 1,
-      sortAt: item.publishedAt ?? item.fetchedAt,
-      source: item.source,
-      id: item.id,
+      version: 2,
+      interestHash,
+      personalized,
+      interestMatches: ranked.interestMatches,
+      recencyBand: ranked.recencyBand,
+      engagementValue: ranked.engagementValue,
+      clearValue: ranked.clearValue,
+      sortAt: ranked.sortAt,
+      source: ranked.item.source,
+      id: ranked.item.id,
     }
     return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url')
   }
@@ -237,7 +279,13 @@ export class DiscoverService {
 
     if (
       typeof value !== 'object' || value === null || Array.isArray(value)
-      || !('version' in value) || value.version !== 1
+      || !('version' in value) || value.version !== 2
+      || !('interestHash' in value) || typeof value.interestHash !== 'string' || !/^[0-9a-f]{64}$/.test(value.interestHash)
+      || !('personalized' in value) || typeof value.personalized !== 'boolean'
+      || !('interestMatches' in value) || !isIntegerBetween(value.interestMatches, 0, 10)
+      || !('recencyBand' in value) || !isIntegerBetween(value.recencyBand, 0, 3)
+      || !('engagementValue' in value) || !isIntegerBetween(value.engagementValue, 0, 1_000_000_000)
+      || !('clearValue' in value) || typeof value.clearValue !== 'boolean'
       || !('sortAt' in value) || typeof value.sortAt !== 'string' || !Number.isFinite(Date.parse(value.sortAt))
       || !('source' in value) || typeof value.source !== 'string' || !DISCOVER_SOURCES.includes(value.source as DiscoverSource)
       || !('id' in value) || typeof value.id !== 'string' || !DISCOVER_ITEM_ID_PATTERN.test(value.id)
@@ -247,7 +295,13 @@ export class DiscoverService {
     }
 
     return {
-      version: 1,
+      version: 2,
+      interestHash: value.interestHash,
+      personalized: value.personalized,
+      interestMatches: value.interestMatches,
+      recencyBand: value.recencyBand,
+      engagementValue: value.engagementValue,
+      clearValue: value.clearValue,
       sortAt: new Date(value.sortAt).toISOString(),
       source: value.source as DiscoverSource,
       id: value.id,
@@ -255,30 +309,6 @@ export class DiscoverService {
   }
 }
 
-function itemSortAt(item: DiscoverItem) {
-  return item.publishedAt ?? item.fetchedAt
-}
-
-function compareKeys(
-  left: { sortAt: string; source: DiscoverSource; id: string },
-  right: { sortAt: string; source: DiscoverSource; id: string },
-) {
-  const byDate = Date.parse(right.sortAt) - Date.parse(left.sortAt)
-  if (byDate !== 0) return byDate
-  const bySource = left.source.localeCompare(right.source)
-  return bySource !== 0 ? bySource : left.id.localeCompare(right.id)
-}
-
-function compareItems(left: DiscoverItem, right: DiscoverItem) {
-  return compareKeys(
-    { sortAt: itemSortAt(left), source: left.source, id: left.id },
-    { sortAt: itemSortAt(right), source: right.source, id: right.id },
-  )
-}
-
-function compareItemToCursor(item: DiscoverItem, cursor: DiscoverCursor) {
-  return compareKeys(
-    { sortAt: itemSortAt(item), source: item.source, id: item.id },
-    cursor,
-  )
+function isIntegerBetween(value: unknown, minimum: number, maximum: number): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= minimum && (value as number) <= maximum
 }

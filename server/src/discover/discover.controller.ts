@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -21,7 +22,9 @@ import {
   DiscoverListQueryDto,
   DiscoverSavedItemListQueryDto,
   SaveDiscoverItemDto,
+  UpdateDiscoverInterestsDto,
 } from './discover.dto'
+import { DiscoverInterestService } from './discover-interest.service'
 import { DiscoverSavedService } from './discover-saved.service'
 import { DiscoverService } from './discover.service'
 
@@ -31,6 +34,7 @@ export class DiscoverController {
   constructor(
     private readonly discoverService: DiscoverService,
     private readonly savedService: DiscoverSavedService,
+    private readonly interestService: DiscoverInterestService,
   ) {}
 
   @Get()
@@ -55,6 +59,26 @@ export class DiscoverController {
       request.auth.user.id,
       query.limit,
       query.cursor,
+    )
+  }
+
+  @Get('interests')
+  getInterests(@Req() request: AuthenticatedRequest) {
+    return this.interestService.getInterests(request.auth.user.id)
+  }
+
+  @Put('interests')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(CsrfGuard)
+  updateInterests(
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() body: UpdateDiscoverInterestsDto,
+  ) {
+    return this.interestService.updateInterests(
+      request.auth.user.id,
+      body.tags,
+      parseIdempotencyKey(idempotencyKey),
     )
   }
 

@@ -54,6 +54,8 @@ Base path: `/api/v1`
 | `GET /stats/activity` | browser session | cursor-paginated mixed activity |
 | `GET /discover` | browser session; no active AI session required | validated category/source filter, empty item baseline, cursor contract, and safe per-source status |
 | `GET /discover/sources` | browser session; no active AI session required | safe source catalog and availability metadata |
+| `GET /discover/interests` | browser session; no active AI session required | own explicit fixed-allowlist interest tags |
+| `PUT /discover/interests` | session + CSRF + idempotency | replace own explicit interest tags |
 
 For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVACY.md`](./SECURITY_AND_PRIVACY.md). For session event semantics, use [`SESSION_STATE_AND_DATA_FLOW.md`](./SESSION_STATE_AND_DATA_FLOW.md).
 
@@ -72,7 +74,7 @@ Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cac
 | `limit` | integer 1-50, default 20 |
 | `cursor` | optional opaque base64url cursor, maximum 1,000 characters |
 
-Unknown fields and invalid enum, limit, or cursor values return the common `400 VALIDATION_ERROR`. A cursor is versioned and binds the future stable order tuple `(sortAt DESC, source ASC, id ASC)`, where `sortAt` is `publishedAt ?? fetchedAt`. Clients must not construct or edit it.
+Unknown fields and invalid enum, limit, or cursor values return the common `400 VALIDATION_ERROR`. A version 2 cursor binds the current interest hash, personalization flag, ranking values, and chronological tie-break tuple. Changing interests makes an older cursor invalid. Clients must not construct or edit it.
 
 Successful `GET /discover` data:
 
@@ -81,6 +83,7 @@ Successful `GET /discover` data:
   "items": [],
   "nextCursor": null,
   "savedItems": [],
+  "recommendations": [],
   "sources": [
     {
       "source": "REMOTIVE",
@@ -96,7 +99,7 @@ Successful `GET /discover` data:
 
 `GET /discover/sources` returns `{ "sources": [...] }` for `HACKER_NEWS`, `REMOTIVE`, `DEV`, `STACK_EXCHANGE`, `GITHUB`, and `ALGORA`. `enabled` means an adapter is active. `status` is `FRESH`, `STALE`, or `UNAVAILABLE`; `FRESH` and `STALE` require a successful ISO8601 `fetchedAt`. No raw upstream error is exposed.
 
-Every future `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`.
+Every `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, nullable source-provided `engagement`, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`. A recommendation is a separate `{ itemId, reasons, matchedInterests }` record and is returned only for items in the current page.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
 
@@ -113,6 +116,19 @@ All endpoints require the authenticated browser session and never require an act
 Save returns `{ "created": boolean, "savedItem": { "id", "item", "savedAt" } }`. The server resolves the ID from its normalized source cache and never accepts a browser-supplied title, URL, reward, or other snapshot field. Duplicate saves reuse the unique `(user, item)` row and return `created: false`.
 
 Delete returns `{ "deleted": boolean, "savedItemId": "uuid" }`. Missing, already deleted, and another user's IDs return `deleted: false`. Saved list responses are `{ "items": [...], "nextCursor": string | null }` and remain available without the source cache.
+
+## Discover explicit-interest contract
+
+All endpoints require the authenticated browser session and never require an active AI session.
+
+| Endpoint | Contract |
+|---|---|
+| `GET /discover/interests` | Returns `{ "tags": [], "updatedAt": null }` when no preferences exist |
+| `PUT /discover/interests` | Body `{ "tags": [...] }`; full replacement; CSRF + UUID `Idempotency-Key` |
+
+Tags are unique, limited to 10, and must come from the fixed server allowlist: JavaScript, TypeScript, React, Node.js, Python, Java, Go, Rust, C#, C++, mobile, DevOps, cloud, data, AI/ML, security, databases, web, testing, and open source. The wire values are the lowercase canonical tags defined in the common type. Empty replacement deletes the preference row. Canonical ordering makes semantically equal updates stable, and exact idempotent replays return the stored response.
+
+Without interests, ordering remains exact chronological order. With interests, the server sorts by interest match count, relative recency band, source-provided engagement, clear reward or salary, then chronological tie-breakers. Recency is relative to the newest resolved item, not request time. The browser receives fixed recommendation reason codes only. Prompt, AI response, code, diff, transcript, raw command, tool input/output, workspace label, and local path are not accepted inputs.
 
 Hacker News maps Top and Show to `NEWS/ARTICLE`, Ask to `COMMUNITY/DISCUSSION`, and Jobs to `EARNING/PAID_JOB`. Deleted or incomplete items are omitted. Missing or non-HTTPS story URLs use the canonical HTTPS Hacker News discussion URL. Hacker News compensation and rewards are never inferred.
 

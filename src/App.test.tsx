@@ -557,6 +557,9 @@ describe('AISideQuest API session flow', () => {
       if (url.pathname.endsWith('/sessions')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
+      if (url.pathname.endsWith('/discover/interests')) {
+        return jsonResponse({ tags: [], updatedAt: null })
+      }
       if (url.pathname.endsWith('/quests')) {
         return jsonResponse({ items: [], nextCursor: null })
       }
@@ -565,6 +568,7 @@ describe('AISideQuest API session flow', () => {
           items: [],
           nextCursor: null,
           savedItems: [],
+          recommendations: [],
           sources: [{
             source: 'REMOTIVE',
             displayName: 'Remotive',

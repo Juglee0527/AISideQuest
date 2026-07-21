@@ -1,12 +1,26 @@
 import { Type } from 'class-transformer'
-import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator'
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator'
 
 import {
   DISCOVER_CATEGORIES,
   DISCOVER_ITEM_ID_PATTERN,
+  DISCOVER_INTEREST_TAGS,
   DISCOVER_SOURCES,
   type DiscoverCategory,
   type DiscoverSource,
+  type DiscoverInterestTag,
 } from './discover.types'
 
 export class DiscoverListQueryDto {
@@ -49,4 +63,12 @@ export class DiscoverSavedItemListQueryDto {
   @IsString()
   @MaxLength(1_000)
   cursor?: string
+}
+
+export class UpdateDiscoverInterestsDto {
+  @IsArray()
+  @ArrayMaxSize(10)
+  @ArrayUnique()
+  @IsEnum(DISCOVER_INTEREST_TAGS, { each: true })
+  tags!: DiscoverInterestTag[]
 }

@@ -13,6 +13,7 @@ export type ApiIdempotencyOperation =
   | 'QUEST_ATTEMPT_SUBMIT'
   | 'DISCOVER_ITEM_SAVE'
   | 'DISCOVER_ITEM_DELETE'
+  | 'DISCOVER_INTERESTS_UPDATE'
 
 interface StoredIdempotencyRow {
   request_hash: string

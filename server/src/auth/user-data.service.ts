@@ -3,7 +3,7 @@ import type { EntityManager } from 'typeorm'
 
 import { DatabaseService } from '../database/database.service'
 
-type SafeRow = Record<string, string | number | boolean | Date | null>
+type SafeRow = Record<string, unknown>
 
 @Injectable()
 export class UserDataService {
@@ -84,9 +84,14 @@ export class UserDataService {
             WHERE user_id = $1
             ORDER BY saved_at, id
           `, userId)
+      const discoverInterests = await this.first(manager, `
+            SELECT tags, updated_at
+            FROM discover_user_interests
+            WHERE user_id = $1
+          `, userId)
 
       return {
-        schemaVersion: 2,
+        schemaVersion: 3,
         exportedAt: new Date().toISOString(),
         profile: this.camelize(profile),
         connectedAccounts: accounts.map((row) => this.camelize(row)),
@@ -97,6 +102,9 @@ export class UserDataService {
         questAnswers: answers.map((row) => this.camelize(row)),
         pointLedger: points.map((row) => this.camelize(row)),
         discoverSavedItems: discoverSavedItems.map((row) => this.camelize(row)),
+        discoverInterests: discoverInterests
+          ? this.camelize(discoverInterests)
+          : { tags: [], updatedAt: null },
       }
     })
   }
@@ -120,6 +128,7 @@ export class UserDataService {
       await manager.query('DELETE FROM device_link_codes WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM devices WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM discover_saved_items WHERE user_id = $1', [userId])
+      await manager.query('DELETE FROM discover_user_interests WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM api_idempotency_keys WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM user_auth_accounts WHERE user_id = $1', [userId])

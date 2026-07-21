@@ -405,6 +405,10 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       INSERT INTO discover_saved_items (user_id, source, source_item_id, item)
       VALUES ($1, 'HACKER_NEWS', $2, $3::jsonb)
     `, [userId, savedDiscoverItem.id, JSON.stringify(savedDiscoverItem)])
+    await databaseService.query(`
+      INSERT INTO discover_user_interests (user_id, tags)
+      VALUES ($1, ARRAY['typescript', 'react']::text[])
+    `, [userId])
 
     await agent.post('/api/v1/auth/me/export').send({}).expect(403)
     const exportResponse = await agent
@@ -414,10 +418,11 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .expect(200)
     const exported = JSON.stringify(exportResponse.body.data)
 
-    assert.equal(exportResponse.body.data.schemaVersion, 2)
+    assert.equal(exportResponse.body.data.schemaVersion, 3)
     assert.equal(exportResponse.body.data.profile.id, userId)
     assert.equal(exportResponse.body.data.discoverSavedItems.length, 1)
     assert.equal(exportResponse.body.data.discoverSavedItems[0].item.id, savedDiscoverItem.id)
+    assert.deepEqual(exportResponse.body.data.discoverInterests.tags, ['typescript', 'react'])
     assert.doesNotMatch(exported, /tokenHash|csrfToken|requestHash|responseBody|externalSessionKey|externalTurnKey/i)
 
     await databaseService.query(`
@@ -454,13 +459,20 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       deleted_user: number
       other_user: number
       saved_items: number
+      interests: number
     }>>(`
       SELECT
         (SELECT count(*)::integer FROM users WHERE id = $1) AS deleted_user,
         (SELECT count(*)::integer FROM users WHERE id = $2) AS other_user,
-        (SELECT count(*)::integer FROM discover_saved_items WHERE user_id = $1) AS saved_items
+        (SELECT count(*)::integer FROM discover_saved_items WHERE user_id = $1) AS saved_items,
+        (SELECT count(*)::integer FROM discover_user_interests WHERE user_id = $1) AS interests
     `, [userId, otherUser.id])
-    assert.deepEqual(counts, { deleted_user: 0, other_user: 1, saved_items: 0 })
+    assert.deepEqual(counts, {
+      deleted_user: 0,
+      other_user: 1,
+      saved_items: 0,
+      interests: 0,
+    })
   })
 
   test('OAuth start rate limit is shared in PostgreSQL and returns Retry-After', async () => {

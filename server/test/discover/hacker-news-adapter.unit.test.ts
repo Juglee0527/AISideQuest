@@ -82,6 +82,7 @@ test('normalizes Top, Ask, Show and Jobs with specific-feed precedence', async (
     type: 'job',
     title: '<b>Job one</b>',
     text: '<p>Build &amp; ship</p>',
+    score: 42,
     url: '',
   })
   client.responses.set('/v0/item/2.json', story(2, { url: undefined }))
@@ -107,6 +108,7 @@ test('normalizes Top, Ask, Show and Jobs with specific-feed precedence', async (
       title: job.title,
       summary: job.summary,
       compensation: job.compensation,
+      engagement: job.engagement,
       originalUrl: job.originalUrl,
     },
     {
@@ -115,6 +117,7 @@ test('normalizes Top, Ask, Show and Jobs with specific-feed precedence', async (
       title: 'Job one',
       summary: 'Build & ship',
       compensation: { provided: false, text: null },
+      engagement: { type: 'SCORE', value: 42 },
       originalUrl: 'https://news.ycombinator.com/item?id=1',
     },
   )

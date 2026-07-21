@@ -66,6 +66,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'devices',
       'discover_saved_items',
       'discover_source_cache',
+      'discover_user_interests',
       'integration_events',
       'oauth_login_states',
       'point_ledger',
@@ -93,6 +94,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [discoverInterestsReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.discover_user_interests') AS interests_table
+    `)) as Array<{ interests_table: string | null }>
+    assert.equal(discoverInterestsReverted.interests_table, null)
 
     await dataSource.undoLastMigration()
     const [discoverSavedItemsReverted] = (await dataSource.query(`
@@ -209,7 +216,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 9)
+    assert.equal(pointMigrations.length, 10)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -224,6 +231,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -314,7 +322,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 16)
+    assert.equal(reappliedMigrations.length, 17)
   })
 
   test('discover cache stores only allowlisted normalized item arrays', async () => {
@@ -345,6 +353,46 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       (error) => hasPostgresCode(error, '23514'),
     )
   })
+
+  test('discover interests enforce the fixed tag allowlist and maximum count', async () => {
+    const [user] = (await dataSource.query(`
+      INSERT INTO users (display_name)
+      VALUES ('Discover interest constraint user')
+      RETURNING id
+    `)) as Array<{ id: string }>
+    await dataSource.query(`
+      INSERT INTO discover_user_interests (user_id, tags)
+      VALUES ($1, ARRAY['typescript', 'react']::text[])
+    `, [user.id])
+
+      await assert.rejects(
+        dataSource.query(`
+          UPDATE discover_user_interests
+        SET tags = ARRAY['not-allowed']::text[]
+        WHERE user_id = $1
+      `, [user.id]),
+      (error) => hasPostgresCode(error, '23514'),
+    )
+    await assert.rejects(
+      dataSource.query(`
+        UPDATE discover_user_interests
+        SET tags = ARRAY[
+          'javascript', 'typescript', 'react', 'node.js', 'python', 'java',
+          'go', 'rust', 'csharp', 'cpp', 'mobile'
+        ]::text[]
+        WHERE user_id = $1
+      `, [user.id]),
+        (error) => hasPostgresCode(error, '23514'),
+      )
+      await assert.rejects(
+        dataSource.query(`
+          UPDATE discover_user_interests
+          SET tags = ARRAY['typescript', 'typescript']::text[]
+          WHERE user_id = $1
+        `, [user.id]),
+        (error) => hasPostgresCode(error, '23514'),
+      )
+    })
 
   test('development seed is idempotent and creates five complete quizzes', async () => {
     await seedDevelopmentQuests(dataSource)

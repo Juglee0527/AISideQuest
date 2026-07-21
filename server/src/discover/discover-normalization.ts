@@ -2,9 +2,11 @@ import {
   DISCOVER_CATEGORIES,
   DISCOVER_ITEM_ID_PATTERN,
   DISCOVER_KINDS,
+  DISCOVER_INTEREST_TAGS,
   DISCOVER_SOURCES,
   type DiscoverItem,
   type DiscoverSource,
+  type DiscoverInterestTag,
 } from './discover.types'
 
 const TAGS = /<[^>]*>/g
@@ -70,11 +72,45 @@ export function normalizeDiscoverItem(
       .filter(Boolean))].slice(0, 20),
     reward: normalizeReward(value.reward),
     compensation: normalizeCompensation(value.compensation),
+    engagement: normalizeEngagement(value.engagement),
     originalUrl,
     attribution,
     publishedAt,
     fetchedAt,
   }
+}
+
+const INTEREST_PATTERNS: Record<DiscoverInterestTag, readonly RegExp[]> = {
+  javascript: [/\bjavascript\b/i, /\bjs\b/i],
+  typescript: [/\btypescript\b/i, /\bts\b/i],
+  react: [/\breact(?:\.js)?\b/i, /\bnext\.js\b/i],
+  'node.js': [/\bnode(?:\.js|js)?\b/i, /\bnestjs\b/i],
+  python: [/\bpython\b/i, /\bdjango\b/i, /\bfastapi\b/i],
+  java: [/\bjava\b/i, /\bspring(?: boot)?\b/i],
+  go: [/\bgolang\b/i, /\bgo developer\b/i, /\bgo engineer\b/i],
+  rust: [/\brust\b/i],
+  csharp: [/(?:^|[^a-z0-9_])c#(?=$|[^a-z0-9_])/i, /\bcsharp\b/i, /\b\.net\b/i],
+  cpp: [/(?:^|[^a-z0-9_])c\+\+(?=$|[^a-z0-9_])/i, /\bcpp\b/i],
+  mobile: [/\bandroid\b/i, /\bios\b/i, /\bflutter\b/i, /\breact native\b/i],
+  devops: [/\bdevops\b/i, /\bkubernetes\b/i, /\bdocker\b/i, /\bterraform\b/i],
+  cloud: [/\bcloud\b/i, /\baws\b/i, /\bazure\b/i, /\bgcp\b/i],
+  data: [/\bdata engineer/i, /\bdata science/i, /\banalytics\b/i, /\bspark\b/i],
+  'ai-ml': [/\bai\b/i, /\bmachine learning\b/i, /\bml\b/i, /\bllm\b/i],
+  security: [/\bsecurity\b/i, /\bcybersecurity\b/i, /\binfosec\b/i],
+  databases: [/\bdatabase\b/i, /\bpostgres(?:ql)?\b/i, /\bmysql\b/i, /\bmongodb\b/i],
+  web: [/\bweb\b/i, /\bfrontend\b/i, /\bbackend\b/i, /\bfull[ -]?stack\b/i],
+  testing: [/\btesting\b/i, /\btest automation\b/i, /\bqa\b/i],
+  'open-source': [/\bopen[ -]?source\b/i, /\boss\b/i],
+}
+
+export function extractDiscoverInterestTags(...values: unknown[]) {
+  const text = values
+    .map((value) => toDiscoverPlainText(value, 2_000))
+    .filter(Boolean)
+    .join(' ')
+  return DISCOVER_INTEREST_TAGS.filter((tag) => (
+    INTEREST_PATTERNS[tag].some((pattern) => pattern.test(text))
+  ))
 }
 
 function normalizeHttpsUrl(value: string) {
@@ -168,6 +204,19 @@ function normalizeCompensation(compensation: DiscoverItem['compensation']) {
   const text = toDiscoverPlainText(compensation.text, 300)
   if (!text) throw new Error('Invalid Discover compensation')
   return { provided: true as const, text }
+}
+
+function normalizeEngagement(engagement: DiscoverItem['engagement'] | undefined) {
+  if (engagement === undefined || engagement === null) return null
+  if (
+    (engagement.type !== 'SCORE' && engagement.type !== 'REACTIONS')
+    || !Number.isSafeInteger(engagement.value)
+    || engagement.value < 0
+    || engagement.value > 1_000_000_000
+  ) {
+    throw new Error('Invalid Discover engagement')
+  }
+  return engagement
 }
 
 function decodeEntity(entity: string) {

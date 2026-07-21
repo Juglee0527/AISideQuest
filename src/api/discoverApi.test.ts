@@ -4,9 +4,11 @@ import { ApiClientError } from './apiClient'
 import {
   deleteSavedDiscoverItem,
   getDiscoverPage,
+  getDiscoverInterests,
   getDiscoverSources,
   getSavedDiscoverItems,
   saveDiscoverItem,
+  updateDiscoverInterests,
 } from './discoverApi'
 
 const serverTime = '2026-07-20T08:00:00.000Z'
@@ -34,6 +36,7 @@ describe('Discover API', () => {
       items: [],
       nextCursor: null,
       savedItems: [],
+      recommendations: [],
       sources: [unavailableRemotive],
     }))
     vi.stubGlobal('fetch', fetchMock)
@@ -54,6 +57,7 @@ describe('Discover API', () => {
       items: [],
       nextCursor: null,
       savedItems: [],
+      recommendations: [],
       sources: [unavailableRemotive],
     })
   })
@@ -71,6 +75,7 @@ describe('Discover API', () => {
           tags: ['typescript'],
           reward: null,
           compensation: { provided: true, text: '$100k-$120k yearly' },
+          engagement: null,
           originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
           attribution: 'Remotive',
           publishedAt: '2026-07-19T08:00:00.000Z',
@@ -86,6 +91,7 @@ describe('Discover API', () => {
           tags: [],
           reward: { type: 'CASH_BOUNTY', amountMinor: 10_000, currency: 'USD' },
           compensation: null,
+          engagement: null,
           originalUrl: 'https://console.algora.io/bounties/example',
           attribution: 'Algora',
           publishedAt: null,
@@ -94,6 +100,7 @@ describe('Discover API', () => {
       ],
       nextCursor: null,
       savedItems: [],
+      recommendations: [],
       sources: [{
         ...unavailableRemotive,
         enabled: true,
@@ -126,6 +133,7 @@ describe('Discover API', () => {
         tags: [],
         reward: { type: 'CASH_BOUNTY', amountMinor: 100, currency: 'USD' },
         compensation: { provided: false, text: null },
+        engagement: null,
         originalUrl: 'http://example.com/job',
         attribution: 'Example',
         publishedAt: null,
@@ -133,6 +141,7 @@ describe('Discover API', () => {
       }],
       nextCursor: null,
       savedItems: [],
+      recommendations: [],
       sources: [unavailableRemotive],
     })))
 
@@ -171,6 +180,7 @@ describe('Discover API', () => {
         tags: ['typescript'],
         reward: null,
         compensation: { provided: false, text: null },
+        engagement: null,
         originalUrl: 'https://remotive.com/remote-jobs/software-dev/example',
         attribution: 'Remotive',
         publishedAt: '2026-07-19T08:00:00.000Z',
@@ -194,5 +204,33 @@ describe('Discover API', () => {
       expect(init?.headers).toMatchObject({ 'x-csrf-token': 'test-csrf' })
       expect(init?.headers).toHaveProperty('Idempotency-Key')
     }
+  })
+
+  it('reads and replaces only explicit interest tags with protected idempotent mutation', async () => {
+    document.cookie = 'aisidequest_csrf=interest-csrf; path=/'
+    const fetchMock = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => (
+      response({
+        tags: init?.method === 'PUT' ? ['typescript', 'react'] : ['typescript'],
+        updatedAt: serverTime,
+      })
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect((await getDiscoverInterests()).data.tags).toEqual(['typescript'])
+    expect((await updateDiscoverInterests(['typescript', 'react'])).data.tags).toEqual([
+      'typescript',
+      'react',
+    ])
+
+    const updateCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+    expect(updateCall?.[1]).toMatchObject({
+      method: 'PUT',
+      body: JSON.stringify({ tags: ['typescript', 'react'] }),
+    })
+    expect(updateCall?.[1]?.headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'x-csrf-token': 'interest-csrf',
+    })
+    expect(updateCall?.[1]?.headers).toHaveProperty('Idempotency-Key')
   })
 })

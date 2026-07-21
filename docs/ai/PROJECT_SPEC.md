@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~27 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~28 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-21
 
@@ -110,6 +110,7 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - Remotive Software Development 공고의 고용 형태·지역·급여 제공 여부 정규화와 직접 원문 attribution
 - `/discover`의 수익 기회·개발 소식·커뮤니티 탭과 cursor 더 보기
 - 사용자별 Discover 저장·저장 취소, source와 독립된 저장 목록, export·account delete 반영
+- 고정 allowlist 관심 기술 설정, 명시적 관심 tag·상대 최신성·source 반응·가치 명확성 기반 결정적 정렬과 추천 이유
 - Loading·empty·stale·부분 장애·전체 source 장애·pagination error 구분
 - Desktop·mobile navigation, keyboard tab 이동과 `noopener noreferrer` 외부 원문 link
 
@@ -123,7 +124,7 @@ Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 
 - 외부 application 자동 제출
 - 공개 service 운영을 기본 사용 경로로 강제하는 기능
 - 실제 staging·production과 초대 사용자 pilot을 완료했다는 주장
-- Discover interest, additional source와 analytics 구현
+- Discover additional source와 analytics 구현
 
 ---
 
@@ -191,6 +192,7 @@ Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 
 - published quest, question과 option
 - quest attempt, answer와 point ledger
 - shared rate-limit과 idempotency record
+- normalized Discover source cache, 사용자별 저장 snapshot과 명시적 관심 기술
 
 DB의 정확한 table, FK, UK, check와 index는 [`DATABASE_SCHEMA.md`](./DATABASE_SCHEMA.md)를 따른다.
 
@@ -249,17 +251,17 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-21 기준 자동 test 197개가 통과했다.
+2026-07-21 기준 자동 test 206개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
-| React | 62 |
+| React | 64 |
 | Codex plugin | 20 |
 | 운영·local startup script | 17 |
-| Server non-database | 43 |
-| PostgreSQL integration | 55 |
+| Server non-database | 47 |
+| PostgreSQL integration | 58 |
 
-Lint, client·server typecheck와 production build, migration 16개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
+Lint, client·server typecheck와 production build, migration 17개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
 
 ---
 
@@ -277,7 +279,7 @@ Lint, client·server typecheck와 production build, migration 16개 revert·reap
 
 # 11. Discover 제품 계약과 다음 단계
 
-Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을 제공한다.
+Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을, Task 28에서 명시적 관심 기술과 결정적 정렬을 제공한다.
 
 - `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
 - AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
@@ -285,13 +287,15 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - 외부 item 조회·click·save에는 AISideQuest point를 지급하지 않는다.
 - Server만 고정 source API host를 fetch하고 raw response·HTML은 저장하거나 log하지 않는다.
 - Shared PostgreSQL cache에는 normalized item만 저장한다. 초기 fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간이며 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
+- 관심 기술은 20개 고정 allowlist에서 최대 10개만 직접 선택한다. 관심사가 없으면 기존 최신순이며, 있으면 tag 일치 수·newest item 기준 최신성 구간·source 반응도·명확한 reward/compensation·기존 시간순으로 결정적으로 정렬한다.
+- 개인화에는 prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path를 사용하지 않는다. 관심 기술은 export schema version 3과 account delete에 포함하고 log·metric·analytics에서 제외한다.
 - Task 32 전에는 visit·click analytics를 암묵적으로 수집하지 않는다. Pilot용 owned analytics를 구현하면 item detail 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
 - Tasks 22~26 완료는 `Discover MVP implementation complete`인 release candidate다. Real source smoke, attribution, failure, accessibility와 privacy evidence가 있어야 release할 수 있다.
 - Discover 완료는 별도 track인 Task 20 완료 증거가 아니다.
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 28의 사용자가 명시적으로 선택하는 관심 기술과 결정적 정렬이다.
+다음 작업은 Task 29의 DEV 개발 글과 Stack Overflow 미답변·reputation bounty 연동이다.
 
 ---
 
@@ -311,7 +315,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Task 25: Remotive Software Development adapter와 live source smoke 완료
 - Task 26: authenticated Discover screen, desktop·mobile navigation, 세 category tab과 장애·empty·pagination UI 완료
 - Task 27: user-owned saved snapshot, CSRF·idempotency·ownership, cursor 목록, export·delete 완료
-- Task 28: explicit interest 미구현
+- Task 28: explicit interest allowlist, CSRF·idempotency, deterministic ranking, reason UI, export·delete 완료
 - Task 29~31: additional source 미구현
 - Task 32~33: Discover observability와 product pilot 미구현
 

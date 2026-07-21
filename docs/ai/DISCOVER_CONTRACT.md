@@ -1,14 +1,14 @@
 # Discover Product Contract
 
-Status: tasks 21-27 complete; tasks 28-33 are not implemented.
+Status: tasks 21-28 complete; tasks 29-33 are not implemented.
 Contract date: 2026-07-21
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
 pilot work must preserve. Tasks 24-25 have enabled Hacker News and Remotive
 through the adapter, cache, stale fallback, and source health boundaries. The
-Task 26 adds the authenticated Discover screen and task 27 adds user-owned saved
-items without adding behavioral analytics.
+Task 26 adds the authenticated Discover screen, task 27 adds user-owned saved
+items, and task 28 adds explicit-interest ordering without behavioral analytics.
 
 ## Common model and API baseline
 
@@ -17,7 +17,7 @@ items without adding behavioral analytics.
 - `GET /api/v1/discover/sources` returns the safe source catalog.
 - Both endpoints require a browser session and never require an active AI
   session.
-- List data is `{ items, nextCursor, sources, savedItems }`; source-list data is
+- List data is `{ items, nextCursor, sources, savedItems, recommendations }`; source-list data is
   `{ sources }`. The common API envelope remains unchanged.
 - Source snapshots contain source, display name, categories, `enabled`, status,
   and nullable successful fetch time. Status is `FRESH`, `STALE`, or
@@ -25,9 +25,13 @@ items without adding behavioral analytics.
 - The model separates category from kind and uses discriminated cash and
   reputation reward shapes. Compensation is a separate job-only union.
 - Items use a stable namespaced ID, a validated HTTPS original URL, bounded
-  normalized text, nullable publication time, and required fetch time.
-- The future item order is `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`.
-  The versioned cursor binds this tuple and remains opaque to clients.
+  normalized text, nullable publication time, required fetch time, and nullable
+  source-provided engagement metadata.
+- With no selected interests, item order remains `(publishedAt ?? fetchedAt)
+  DESC, source ASC, id ASC`. With interests, the deterministic tuple is interest
+  match count, relative recency band, source engagement, clear reward or salary,
+  then the chronological tuple. The versioned cursor binds the current interest
+  hash and ranking tuple and remains opaque to clients.
 - A source without a registered adapter remains `enabled: false` and
   `UNAVAILABLE`. Hacker News and Remotive are registered; the other four planned
   sources stay disabled until their tasks are implemented.
@@ -224,15 +228,40 @@ not a verified cash bounty.
   row with `created: false`, and an exact idempotent replay returns the original
   response.
 - Saved snapshots remain readable when the external source and shared source
-  cache are unavailable. They are included in user export schema version 2 and
+  cache are unavailable. They are included in current user export schema version 3 and
   deleted in the account-deletion transaction.
 - The `/discover` screen provides separate explore and saved views. Save and
   remove failures remain local to the action and do not hide already loaded
   cards.
 
+## Explicit-interest personalization contract
+
+- `GET /api/v1/discover/interests` returns the authenticated user's selected
+  tags. `PUT /api/v1/discover/interests` replaces the full set and requires CSRF
+  plus a UUID idempotency key.
+- The server accepts at most 10 unique tags from the fixed 20-tag allowlist. An
+  empty set removes the preference row and restores the exact chronological
+  default.
+- Ranking uses only normalized external item tags and the explicitly selected
+  tags. Hacker News exposes its non-negative source score; Remotive currently
+  has no engagement value. Title and summary keyword matching only adds fixed
+  canonical tags and does not use an LLM.
+- Relative recency bands are measured from the newest item in the resolved set:
+  at most 1 day, 7 days, 30 days, or older. This avoids request-time-dependent
+  ordering, so equal items and interests always produce the same order.
+- Recommendation reasons are limited to interest match, recent item,
+  source-provided engagement, and clear reward or salary information. They do
+  not claim relevance beyond these observable factors.
+- Updating interests invalidates an older Discover cursor rather than mixing two
+  ranking configurations. Interest rows are included in user export schema
+  version 3 and deleted with the account.
+- Prompts, AI responses, source code, diffs, transcripts, raw commands, tool
+  input/output, workspace labels, and local paths are never personalization
+  inputs.
+
 ## Product analytics and privacy
 
-Discover remains functional without behavioral analytics. Tasks 22-27 do not
+Discover remains functional without behavioral analytics. Tasks 22-28 do not
 implicitly authorize collecting visits or clicks. Before the task 33 pilot,
 task 32 may add the following minimal events under the rules below:
 
@@ -247,9 +276,9 @@ task 32 may add the following minimal events under the rules below:
   export and primary account deletion;
 - Prometheus metrics expose aggregates only and never a user or item identifier.
 
-Task 27 saved-item snapshots are owned user data. Task 28 explicitly selected
-interests will follow the same boundary. They must be included in export and deletion, excluded from
-operational logs and metric labels, and retained only while the account or the
+Task 27 saved-item snapshots and task 28 explicitly selected interests are owned
+user data. They are included in export and deletion, excluded from operational
+logs, metric labels, and analytics, and retained only while the account or the
 specific record remains.
 
 ## Release terminology and gates

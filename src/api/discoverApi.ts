@@ -1,10 +1,15 @@
 import type {
   DiscoverCategory,
   DiscoverCompensation,
+  DiscoverEngagement,
+  DiscoverInterests,
+  DiscoverInterestTag,
   DiscoverItem,
   DiscoverKind,
   DiscoverPage,
   DiscoverReward,
+  DiscoverRecommendation,
+  DiscoverRecommendationReason,
   DiscoverSavedItem,
   DiscoverSavedItemPage,
   DiscoverSavedItemReference,
@@ -13,6 +18,7 @@ import type {
   DiscoverSourceSnapshot,
   DiscoverSourceStatus,
 } from '../types/discover'
+import { DISCOVER_INTEREST_TAGS } from '../types/discover'
 import { ApiClientError, createMutationHeaders, requestApi } from './apiClient'
 
 const SOURCES = new Set<DiscoverSource>([
@@ -39,6 +45,13 @@ const SOURCE_STATUSES = new Set<DiscoverSourceStatus>([
 ])
 const ITEM_ID_PATTERN = /^(HACKER_NEWS|REMOTIVE|DEV|STACK_EXCHANGE|GITHUB|ALGORA):[A-Za-z0-9_-]{1,200}$/
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const INTEREST_TAGS = new Set<DiscoverInterestTag>(DISCOVER_INTEREST_TAGS)
+const RECOMMENDATION_REASONS = new Set<DiscoverRecommendationReason>([
+  'INTEREST_MATCH',
+  'RECENT',
+  'EXTERNAL_ENGAGEMENT',
+  'CLEAR_VALUE',
+])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -123,6 +136,20 @@ function parseCompensation(value: unknown): DiscoverCompensation | null {
   return invalidDiscoverResponse()
 }
 
+function parseEngagement(value: unknown): DiscoverEngagement | null {
+  if (value === null) return null
+  if (
+    !isRecord(value)
+    || (value.type !== 'SCORE' && value.type !== 'REACTIONS')
+    || !Number.isSafeInteger(value.value)
+    || (value.value as number) < 0
+    || (value.value as number) > 1_000_000_000
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return { type: value.type, value: value.value as number }
+}
+
 function assertKindContract(item: DiscoverItem) {
   const categoryMatches =
     (item.category === 'EARNING'
@@ -190,6 +217,7 @@ function parseItem(value: unknown): DiscoverItem {
     tags: value.tags,
     reward: parseReward(value.reward),
     compensation: parseCompensation(value.compensation),
+    engagement: parseEngagement(value.engagement),
     originalUrl: value.originalUrl,
     attribution: value.attribution,
     publishedAt: value.publishedAt,
@@ -250,6 +278,7 @@ function parsePage(value: unknown): DiscoverPage {
     || !(value.nextCursor === null || typeof value.nextCursor === 'string')
     || !Array.isArray(value.sources)
     || !Array.isArray(value.savedItems)
+    || !Array.isArray(value.recommendations)
   ) {
     return invalidDiscoverResponse()
   }
@@ -258,10 +287,13 @@ function parsePage(value: unknown): DiscoverPage {
     invalidDiscoverResponse()
   }
   const savedItems = value.savedItems.map(parseSavedItemReference)
+  const recommendations = value.recommendations.map(parseRecommendation)
   const itemIds = new Set(items.map((item) => item.id))
   if (
     new Set(savedItems.map((item) => item.itemId)).size !== savedItems.length
     || savedItems.some((item) => !itemIds.has(item.itemId))
+    || new Set(recommendations.map((item) => item.itemId)).size !== recommendations.length
+    || recommendations.some((item) => !itemIds.has(item.itemId))
   ) {
     invalidDiscoverResponse()
   }
@@ -270,6 +302,33 @@ function parsePage(value: unknown): DiscoverPage {
     nextCursor: value.nextCursor,
     sources: parseSources(value.sources),
     savedItems,
+    recommendations,
+  }
+}
+
+function parseRecommendation(value: unknown): DiscoverRecommendation {
+  if (
+    !isRecord(value)
+    || typeof value.itemId !== 'string'
+    || !ITEM_ID_PATTERN.test(value.itemId)
+    || !Array.isArray(value.reasons)
+    || !value.reasons.every((reason) => (
+      typeof reason === 'string'
+      && RECOMMENDATION_REASONS.has(reason as DiscoverRecommendationReason)
+    ))
+    || new Set(value.reasons).size !== value.reasons.length
+    || !Array.isArray(value.matchedInterests)
+    || !value.matchedInterests.every((tag) => (
+      typeof tag === 'string' && INTEREST_TAGS.has(tag as DiscoverInterestTag)
+    ))
+    || new Set(value.matchedInterests).size !== value.matchedInterests.length
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return {
+    itemId: value.itemId,
+    reasons: value.reasons as DiscoverRecommendationReason[],
+    matchedInterests: value.matchedInterests as DiscoverInterestTag[],
   }
 }
 
@@ -332,6 +391,25 @@ function parseDeleteResult(value: unknown) {
   return { deleted: value.deleted, savedItemId: value.savedItemId }
 }
 
+function parseInterests(value: unknown): DiscoverInterests {
+  if (
+    !isRecord(value)
+    || !Array.isArray(value.tags)
+    || value.tags.length > 10
+    || !value.tags.every((tag) => (
+      typeof tag === 'string' && INTEREST_TAGS.has(tag as DiscoverInterestTag)
+    ))
+    || new Set(value.tags).size !== value.tags.length
+    || !(value.updatedAt === null || isDate(value.updatedAt))
+  ) {
+    return invalidDiscoverResponse()
+  }
+  return {
+    tags: value.tags as DiscoverInterestTag[],
+    updatedAt: value.updatedAt,
+  }
+}
+
 function parseSourceList(value: unknown): DiscoverSourceList {
   if (!isRecord(value) || !Array.isArray(value.sources)) {
     return invalidDiscoverResponse()
@@ -382,5 +460,20 @@ export function deleteSavedDiscoverItem(savedItemId: string) {
   return requestApi(`/discover/saved-items/${encodeURIComponent(savedItemId)}`, parseDeleteResult, {
     method: 'DELETE',
     headers: createMutationHeaders(),
+  })
+}
+
+export function getDiscoverInterests(signal?: AbortSignal) {
+  return requestApi('/discover/interests', parseInterests, { signal })
+}
+
+export function updateDiscoverInterests(tags: DiscoverInterestTag[]) {
+  return requestApi('/discover/interests', parseInterests, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createMutationHeaders(),
+    },
+    body: JSON.stringify({ tags }),
   })
 }

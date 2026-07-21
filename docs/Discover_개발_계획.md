@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-20
-- 상태: Task 21~27 완료, Discover MVP와 관심 항목 저장 구현 완료
+- 상태: Task 21~28 완료, Discover MVP·저장·명시적 개인화 구현 완료
 - 작업 번호: 21~33
-- 다음 작업: 28. 명시적 관심 기술 설정과 정렬
+- 다음 작업: 29. DEV와 Stack Overflow 연동
 - 1차 구현 범위: 21~26
 
 ---
@@ -295,9 +295,11 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - Browser는 item 전체가 아니라 `itemId`만 보내며, server가 normalized source cache에서 다시 검증한 snapshot을 저장한다.
 - `(user_id, source_item_id)` unique 제약, UUID idempotency key와 ownership SQL로 중복 저장·재전송·타 사용자 삭제를 안전하게 처리한다.
 - `GET /discover/saved-items`는 source cache와 독립된 cursor 목록을 제공하고 `/discover`는 탐색·저장한 항목 보기를 제공한다.
-- 저장 snapshot은 사용자 data export schema version 2와 account delete transaction에 포함된다.
+- 저장 snapshot은 현재 사용자 data export schema version 3와 account delete transaction에 포함된다.
 
 #### 28. 명시적 관심 기술 설정과 정렬
+
+상태: 완료 (2026-07-21)
 
 작업:
 
@@ -310,6 +312,14 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - 관심사가 없으면 기본 최신순으로 동작한다.
 - prompt, 코드, 전체 경로, 원본 명령을 입력으로 사용하지 않는다.
 - 동일 입력은 동일한 정렬 결과를 만든다.
+
+구현 결과:
+
+- 사용자는 20개 고정 allowlist에서 최대 10개 기술을 직접 선택하며, `PUT /discover/interests`가 CSRF와 UUID idempotency key로 전체 set을 교체한다. 빈 선택은 row를 삭제한다.
+- 관심사가 없으면 `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`를 그대로 유지한다. 관심사가 있으면 tag 일치 수, newest item 기준 1·7·30일 최신성 band, source 제공 반응도, 명확한 reward·salary, 기존 시간순으로 정렬한다.
+- Hacker News score는 source engagement로 사용하고 Remotive는 현재 `null`이다. 정제한 외부 title·summary의 고정 keyword는 canonical 기술 tag만 추가하며 LLM을 사용하지 않는다.
+- 화면은 관심 기술 일치·최신 항목·외부 반응 정보·보상 또는 급여 명확성만 추천 이유로 표시한다. 관심사가 바뀌면 기존 cursor는 `400 INVALID_CURSOR`로 거부한다.
+- 관심 기술은 export schema version 3과 account delete transaction에 포함하고 운영 log·metric·analytics에서 제외한다. Prompt, AI response, code, diff, transcript, 명령, tool input/output와 local path는 저장·정렬 입력이 아니다.
 
 ### 3.3 3차 마일스톤: 소스 확장
 

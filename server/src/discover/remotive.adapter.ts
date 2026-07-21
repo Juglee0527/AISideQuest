@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { DiscoverSourceAdapter } from './discover-adapter'
 import { DiscoverFetchError, DiscoverHttpClient } from './discover-http-client'
-import { toDiscoverPlainText } from './discover-normalization'
+import { extractDiscoverInterestTags, toDiscoverPlainText } from './discover-normalization'
 import type { DiscoverItem } from './discover.types'
 
 const REMOTIVE_API_URL = 'https://remotive.com/api/remote-jobs?category=software-dev&limit=30'
@@ -110,11 +110,17 @@ function parseJob(value: unknown, fetchedAt: string): DiscoverItem | null {
     kind: 'PAID_JOB',
     title,
     summary,
-    tags: ['remote', 'software-development', ...(jobTypeTag ? [jobTypeTag] : [])],
+    tags: [
+      'remote',
+      'software-development',
+      ...(jobTypeTag ? [jobTypeTag] : []),
+      ...extractDiscoverInterestTags(title, summary),
+    ],
     reward: null,
     compensation: salary
       ? { provided: true, text: salary }
       : { provided: false, text: null },
+    engagement: null,
     originalUrl,
     attribution: REMOTIVE_ATTRIBUTION,
     publishedAt,

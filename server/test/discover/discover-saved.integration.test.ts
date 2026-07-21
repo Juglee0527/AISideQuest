@@ -43,6 +43,7 @@ function discoverItem(id: string, publishedAt: string): DiscoverItem {
     tags: ['typescript'],
     reward: null,
     compensation: null,
+    engagement: null,
     originalUrl: `https://news.ycombinator.com/item?id=${id}`,
     attribution: 'Hacker News',
     publishedAt,
@@ -140,6 +141,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
   beforeEach(async () => {
     await databaseService.query(`
+      DELETE FROM discover_user_interests;
       DELETE FROM discover_saved_items;
       DELETE FROM api_idempotency_keys;
       DELETE FROM discover_source_cache;
@@ -308,5 +310,117 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       .get('/api/v1/discover/saved-items?cursor=invalid')
       .set('Cookie', cookieHeader(firstIdentity))
       .expect(400)
+  })
+
+  test('interest updates require ownership, CSRF, allowlisted tags and idempotency', async () => {
+    const initial = await request(app.getHttpServer())
+      .get('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(200)
+    assert.deepEqual(initial.body.data, { tags: [], updatedAt: null })
+
+    await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['typescript'] })
+      .expect(401)
+    await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['typescript'] })
+      .expect(403)
+    await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['typescript', 'not-allowed'] })
+      .expect(400)
+
+    const replayKey = randomUUID()
+    const updated = await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', replayKey)
+      .send({ tags: ['python', 'typescript'] })
+      .expect(200)
+    assert.deepEqual(updated.body.data.tags, ['typescript', 'python'])
+    assert.equal(typeof updated.body.data.updatedAt, 'string')
+
+    const replay = await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', replayKey)
+      .send({ tags: ['python', 'typescript'] })
+      .expect(200)
+    assert.deepEqual(replay.body.data, updated.body.data)
+
+    const unchanged = await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['typescript', 'python'] })
+      .expect(200)
+    assert.deepEqual(unchanged.body.data, updated.body.data)
+
+    const otherUser = await request(app.getHttpServer())
+      .get('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(secondIdentity))
+      .expect(200)
+    assert.deepEqual(otherUser.body.data, { tags: [], updatedAt: null })
+  })
+
+  test('personalized ordering is deterministic and old cursors fail after interests change', async () => {
+    const personalizedItems = [
+      { ...items[0], tags: ['python'], engagement: { type: 'SCORE', value: 1 } },
+      { ...items[1], tags: ['typescript'], engagement: { type: 'SCORE', value: 100 } },
+    ]
+    await databaseService.query(`
+      UPDATE discover_source_cache
+      SET items = $1::jsonb, refreshed_at = now()
+      WHERE source = 'HACKER_NEWS'
+    `, [JSON.stringify(personalizedItems)])
+    await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['typescript'] })
+      .expect(200)
+
+    const first = await request(app.getHttpServer())
+      .get('/api/v1/discover?category=NEWS&limit=1')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(200)
+    assert.equal(first.body.data.items[0].id, items[1].id)
+    assert.deepEqual(first.body.data.recommendations[0], {
+      itemId: items[1].id,
+      reasons: ['INTEREST_MATCH', 'RECENT', 'EXTERNAL_ENGAGEMENT'],
+      matchedInterests: ['typescript'],
+    })
+    assert.equal(typeof first.body.data.nextCursor, 'string')
+
+    await request(app.getHttpServer())
+      .put('/api/v1/discover/interests')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ tags: ['python'] })
+      .expect(200)
+    await request(app.getHttpServer())
+      .get('/api/v1/discover')
+      .query({ category: 'NEWS', limit: 1, cursor: first.body.data.nextCursor })
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(400)
+
+    const reranked = await request(app.getHttpServer())
+      .get('/api/v1/discover?category=NEWS&limit=1')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .expect(200)
+    assert.equal(reranked.body.data.items[0].id, items[0].id)
   })
 }

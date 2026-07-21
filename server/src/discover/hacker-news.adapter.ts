@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { DiscoverSourceAdapter } from './discover-adapter'
 import { DiscoverFetchError, DiscoverHttpClient } from './discover-http-client'
-import { toDiscoverPlainText } from './discover-normalization'
+import { extractDiscoverInterestTags, toDiscoverPlainText } from './discover-normalization'
 import type { DiscoverItem } from './discover.types'
 
 const HACKER_NEWS_API_ORIGIN = 'https://hacker-news.firebaseio.com'
@@ -127,23 +127,35 @@ function parseItem(
   if (!title || !publishedAt) return null
 
   const classification = classifyFeed(actualFeed)
+  const summary = toDiscoverPlainText(value.text, 1_000) || null
   return {
     id: `HACKER_NEWS:${candidate.id}`,
     source: 'HACKER_NEWS',
     category: classification.category,
     kind: classification.kind,
     title,
-    summary: toDiscoverPlainText(value.text, 1_000) || null,
-    tags: ['hacker-news', classification.tag],
+    summary,
+    tags: [
+      'hacker-news',
+      classification.tag,
+      ...extractDiscoverInterestTags(title, summary),
+    ],
     reward: null,
     compensation: actualFeed === 'JOBS'
       ? { provided: false, text: null }
       : null,
+    engagement: toEngagement(value.score),
     originalUrl: toDisplayUrl(value.url, candidate.id),
     attribution: HACKER_NEWS_ATTRIBUTION,
     publishedAt,
     fetchedAt,
   }
+}
+
+function toEngagement(value: unknown) {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+    ? { type: 'SCORE' as const, value: value as number }
+    : null
 }
 
 function classifyFeed(feed: HackerNewsFeedKind) {

@@ -24,15 +24,21 @@ import { ApiClientError } from '../api/apiClient'
 import {
   deleteSavedDiscoverItem,
   getDiscoverPage,
+  getDiscoverInterests,
   getSavedDiscoverItems,
   saveDiscoverItem,
+  updateDiscoverInterests,
 } from '../api/discoverApi'
+import DiscoverInterestSettings, { INTEREST_LABELS } from '../components/DiscoverInterestSettings'
 import PageHeader from '../components/PageHeader'
 import { useSession } from '../contexts/SessionContext'
 import type {
   DiscoverCategory,
   DiscoverItem,
   DiscoverKind,
+  DiscoverInterestTag,
+  DiscoverRecommendation,
+  DiscoverRecommendationReason,
   DiscoverSavedItem,
   DiscoverSourceSnapshot,
 } from '../types/discover'
@@ -145,11 +151,13 @@ function DiscoverCard({
   savedItemId,
   isSaving,
   onToggleSaved,
+  recommendation,
 }: {
   item: DiscoverItem
   savedItemId: string | null
   isSaving: boolean
   onToggleSaved: () => void
+  recommendation?: DiscoverRecommendation
 }) {
   const publishedLabel = formatDate(item.publishedAt)
   const itemValue = valueLabel(item)
@@ -174,6 +182,17 @@ function DiscoverCard({
         <p className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/5 px-3 py-2 text-sm font-semibold text-amber-200">
           {itemValue}
         </p>
+      ) : null}
+
+      {recommendation && recommendation.reasons.length > 0 ? (
+        <div className="mt-4 rounded-xl border border-emerald-300/15 bg-emerald-300/5 px-3 py-2.5">
+          <p className="text-xs font-bold text-emerald-200">추천 이유</p>
+          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-emerald-100/70">
+            {recommendation.reasons.map((reason) => (
+              <li key={reason}>{recommendationReasonLabel(reason, recommendation.matchedInterests)}</li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       {item.tags.length > 0 ? (
@@ -226,6 +245,18 @@ function DiscoverCard({
       </div>
     </article>
   )
+}
+
+function recommendationReasonLabel(
+  reason: DiscoverRecommendationReason,
+  matchedInterests: DiscoverInterestTag[],
+) {
+  if (reason === 'INTEREST_MATCH') {
+    return `관심 기술 일치 · ${matchedInterests.map((tag) => INTEREST_LABELS[tag]).join(', ')}`
+  }
+  if (reason === 'RECENT') return '최신 항목'
+  if (reason === 'EXTERNAL_ENGAGEMENT') return '외부 반응 정보 있음'
+  return '보상·급여 정보 명확'
 }
 
 function SourceNotice({
@@ -337,8 +368,32 @@ function DiscoverPage() {
   const [savedReloadKey, setSavedReloadKey] = useState(0)
   const [savingItemIds, setSavingItemIds] = useState<Set<string>>(() => new Set())
   const [mutationError, setMutationError] = useState<string | null>(null)
+  const [recommendations, setRecommendations] = useState<Record<string, DiscoverRecommendation>>({})
+  const [interestTags, setInterestTags] = useState<DiscoverInterestTag[]>([])
+  const [interestStatus, setInterestStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [interestError, setInterestError] = useState<string | null>(null)
+  const [isSavingInterests, setIsSavingInterests] = useState(false)
+  const [interestReloadKey, setInterestReloadKey] = useState(0)
   const requestSequence = useRef(0)
   const savedRequestSequence = useRef(0)
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready') return undefined
+    const controller = new AbortController()
+    setInterestStatus('loading')
+    setInterestError(null)
+    void getDiscoverInterests(controller.signal)
+      .then((result) => {
+        setInterestTags(result.data.tags)
+        setInterestStatus('ready')
+      })
+      .catch((error: unknown) => {
+        if (error instanceof ApiClientError && error.code === 'REQUEST_ABORTED') return
+        setInterestError(errorMessage(error))
+        setInterestStatus('error')
+      })
+    return () => controller.abort()
+  }, [interestReloadKey, sessionStatus])
 
   useEffect(() => {
     if (sessionStatus !== 'ready' || view !== 'EXPLORE') return undefined
@@ -351,6 +406,7 @@ function DiscoverPage() {
     setSources([])
     setNextCursor(null)
     setLoadMoreError(null)
+    setRecommendations({})
 
     void getDiscoverPage({ category, limit: PAGE_SIZE, signal: controller.signal })
       .then((result) => {
@@ -360,6 +416,9 @@ function DiscoverPage() {
         setNextCursor(result.data.nextCursor)
         setSavedReferences(Object.fromEntries(
           result.data.savedItems.map((item) => [item.itemId, item.savedItemId]),
+        ))
+        setRecommendations(Object.fromEntries(
+          result.data.recommendations.map((entry) => [entry.itemId, entry]),
         ))
         setPageStatus('ready')
       })
@@ -429,6 +488,12 @@ function DiscoverPage() {
           result.data.savedItems.map((item) => [item.itemId, item.savedItemId]),
         ),
       }))
+      setRecommendations((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          result.data.recommendations.map((entry) => [entry.itemId, entry]),
+        ),
+      }))
     } catch (error) {
       if (sequence === requestSequence.current) setLoadMoreError(errorMessage(error))
     } finally {
@@ -492,6 +557,22 @@ function DiscoverPage() {
       })
     }
   }, [savedReferences, savingItemIds])
+
+  const saveInterests = useCallback(async (tags: DiscoverInterestTag[]) => {
+    if (isSavingInterests) return
+    setIsSavingInterests(true)
+    setInterestError(null)
+    try {
+      const result = await updateDiscoverInterests(tags)
+      setInterestTags(result.data.tags)
+      setInterestStatus('ready')
+      setReloadKey((current) => current + 1)
+    } catch (error) {
+      setInterestError(errorMessage(error))
+    } finally {
+      setIsSavingInterests(false)
+    }
+  }, [isSavingInterests])
 
   const enabledSources = useMemo(() => sources.filter((source) => source.enabled), [sources])
   const allSourcesUnavailable = enabledSources.length > 0
@@ -573,6 +654,17 @@ function DiscoverPage() {
           )
         })}
       </div> : null}
+
+      {sessionStatus === 'ready' ? (
+        <DiscoverInterestSettings
+          tags={interestTags}
+          status={interestStatus}
+          isSaving={isSavingInterests}
+          error={interestError}
+          onRetry={() => setInterestReloadKey((current) => current + 1)}
+          onSave={saveInterests}
+        />
+      ) : null}
 
       <section
         id="discover-tab-panel"
@@ -719,6 +811,7 @@ function DiscoverPage() {
                     savedItemId={savedReferences[item.id] ?? null}
                     isSaving={savingItemIds.has(item.id)}
                     onToggleSaved={() => void toggleSaved(item)}
+                    recommendation={recommendations[item.id]}
                   />
                 ))}
               </div>

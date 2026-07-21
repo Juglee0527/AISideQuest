@@ -19,6 +19,7 @@ import { AllowConcurrentHookSessions1784260800000 } from './migrations/178426080
 import { AddSanitizedSessionContext1784264400000 } from './migrations/1784264400000-add-sanitized-session-context'
 import { AddDiscoverSourceCache1784268000000 } from './migrations/1784268000000-add-discover-source-cache'
 import { AddDiscoverSavedItems1784271600000 } from './migrations/1784271600000-add-discover-saved-items'
+import { AddDiscoverInterests1784275200000 } from './migrations/1784275200000-add-discover-interests'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -48,6 +49,7 @@ export function createDataSourceOptions(
       AddSanitizedSessionContext1784264400000,
       AddDiscoverSourceCache1784268000000,
       AddDiscoverSavedItems1784271600000,
+      AddDiscoverInterests1784275200000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

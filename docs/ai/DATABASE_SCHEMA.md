@@ -4,7 +4,7 @@
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784271600000-add-discover-saved-items`까지 16개
+- 기준 migration: `1784160000000`부터 `1784275200000-add-discover-interests`까지 17개
 
 ---
 
@@ -42,6 +42,7 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 | `point_ledger` | 변경하지 않는 퀘스트 보상 원장 |
 | `discover_source_cache` | source별 정규화 Discover item과 마지막 성공 갱신 시각 |
 | `discover_saved_items` | 사용자별 정규화 Discover item snapshot과 저장 시각 |
+| `discover_user_interests` | 사용자별 명시적 관심 기술 tag와 수정 시각 |
 
 원래 계획의 5개 핵심 테이블만으로는 GitHub 계정 연결, 기기 인증, event 멱등성, 객관식 답안 저장을 보장할 수 없어 필요한 보조 테이블을 최초 migration에 포함했다.
 
@@ -105,7 +106,14 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `(user_id, source_item_id)` unique 제약으로 중복 저장을 방지한다.
 - JSON의 `id`·`source`가 row identity와 일치해야 하며, API는 browser card 전체가 아니라 cache에서 다시 검증한 normalized item만 저장한다.
 - 목록 cursor index는 `(user_id, saved_at DESC, id DESC)`다. Source cache가 삭제되어도 snapshot 목록은 독립적으로 조회된다.
-- 계정 삭제는 FK cascade에 더해 서비스 transaction에서 명시적으로 삭제하며, 계정 내보내기 schema version 2에 포함한다.
+- 계정 삭제는 FK cascade에 더해 서비스 transaction에서 명시적으로 삭제하며, 계정 내보내기 schema version 3에 포함한다.
+
+## 3.6 Discover 관심 기술
+
+- 사용자당 row는 최대 하나이며 `user_id`가 PK이자 `users`를 참조하는 cascade FK다.
+- `tags`는 1~10개의 고유 text 배열이고 20개 고정 allowlist의 부분집합이어야 한다. 관심사가 없으면 빈 배열 row를 저장하지 않는다.
+- API는 전체 set을 교체하며 canonical allowlist 순서로 저장한다. 동일 의미 update는 `updated_at`을 바꾸지 않고, UUID idempotency response를 재사용한다.
+- 관심 기술은 계정 소유 data로 export schema version 3과 account delete transaction에 포함한다. 운영 log, metric label, 분석 event에는 복제하지 않는다.
 
 # 4. 개발용 퀘스트 seed
 
@@ -196,4 +204,6 @@ npm.cmd run test:database
 - 16번 구현 완료: 미검증 UTC와 IANA time zone 저장, 세션 구간·통과 응시 index, 서버 기간 통계
 - 17번 구현 완료: endpoint 보안 matrix, 공유 Rate Limit과 개인정보 보호
 - 18번 구현 완료: queue 진단 컬럼, advisory-lock migration runner와 readiness 검증
+- Discover Task 27 완료: 사용자별 저장 snapshot과 소유권·cursor 제약
+- Discover Task 28 완료: 고정 allowlist 관심 기술과 idempotent 전체 교체
 - 연결 UX 개선 완료: 브라우저 승인 요청과 OAuth 승인 화면 복귀 경로
