@@ -1,11 +1,11 @@
 # AISideQuest 개발 진행 요약
 
-- 최종 현행화: 2026-07-22
+- 최종 현행화: 2026-07-23
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
 - Task 20: 배포 패키지 구현 완료, 외부 운영 배포·파일럿 증거 대기
-- Discover 확장: Task 21~32 완료, Task 33 대기
+- Discover 확장: Task 21~32 완료, Task 33 repository 실행 도구 완료·실제 7일 증거 대기
 
 ---
 
@@ -649,9 +649,9 @@ event 수신과 퀘스트 제출·보상을 독립적으로 멈추는 kill switc
 
 Docker 리허설에서 11개 migration 적용과 재실행 `applied: []`, API·PostgreSQL health, Caddy 경유 health·CORS·OAuth state/PKCE·cookie·SPA smoke 10개를 통과했다. 세부 실행서는 [DEPLOYMENT_AND_PILOT.md](./DEPLOYMENT_AND_PILOT.md)에 기록했다. 실제 domain·DB·OAuth 자격증명, production 복원·rollback 증거, 초대 사용자 10명과 최소 7일 관찰이 완료되기 전까지 20번 전체는 미완료다.
 
-# 17. Discover Task 21~32 구현 결과
+# 17. Discover Task 21~33 repository 구현 결과
 
-Task 21~32에서 다음 범위를 구현·판정했다.
+Task 21~33에서 다음 범위를 구현·판정했다. Task 33의 실제 7일 관찰 증거는 별도 외부 단계다.
 
 1. Discover 제품·보상 분류·개인정보·release 계약과 공통 `DiscoverItem` API model
 2. HTTPS host allowlist, timeout, 제한된 retry, plain-text 정제, PostgreSQL cache, source별 single-flight와 stale fallback
@@ -664,6 +664,6 @@ Task 21~32에서 다음 범위를 구현·판정했다.
 9. 저장 snapshot·관심 기술·90일 analytics를 포함하는 사용자 export schema version 4와 account delete transaction
 10. Prompt, AI response, code, diff, transcript, raw command, tool input/output와 local path를 개인화·분석·운영 log에서 제외하는 경계
 
-2026-07-22 현재 React 66개, Codex plugin 20개, 운영·local startup 20개, server non-database 66개, PostgreSQL integration 59개로 자동 테스트 총 231개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 18개 migration 전체 revert·reapply와 `git diff --check`도 통과했다. Task 30은 별도 server-only GitHub token과 명시적 organization/repository allowlist가 함께 있을 때만 활성화되는 1 page·30건 Search Issues adapter, PR·assigned·scope 방어 검증, 30분 fresh·24시간 maximum stale, search rate-limit 차단을 추가했다.
+2026-07-23 현재 React 66개, Codex plugin 20개, 운영·local startup 26개, server non-database 67개, PostgreSQL integration 60개로 자동 테스트 총 239개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 18개 migration 전체 revert·reapply와 `git diff --check`도 통과했다. Task 30은 별도 server-only GitHub token과 명시적 organization/repository allowlist가 함께 있을 때만 활성화되는 1 page·30건 Search Issues adapter, PR·assigned·scope 방어 검증, 30분 fresh·24시간 maximum stale, search rate-limit 차단을 추가했다.
 
-Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. Task 30은 별도 server token과 승인 scope가 함께 있을 때만 활성화되는 GitHub Issues adapter를 완료했다. Task 31은 Algora를 `NO-GO`로 완료했다. Task 32는 네 가지 privacy-bounded owned analytics event, 최초 생성 SAVE, 90일 expiry·export·delete, aggregate metrics, 30일 dashboard, source warning/critical alert와 UTC pilot SQL을 완료했다. 다음 작업은 Task 33 파일럿이며 실제 dashboard 전달·ack와 연속 7일 증거 없이는 완료로 판정하지 않는다. Task 20도 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.
+Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. Task 30은 별도 server token과 승인 scope가 함께 있을 때만 활성화되는 GitHub Issues adapter를 완료했다. Task 31은 Algora를 `NO-GO`로 완료했다. Task 32는 네 가지 privacy-bounded owned analytics event, 최초 생성 SAVE, 90일 expiry·export·delete, aggregate metrics, 30일 dashboard, source warning/critical alert와 UTC pilot SQL을 완료했다. Task 33은 명시적 tab 전환 계측, source empty refresh counter, 실행 가능한 7일 aggregate SQL과 실제 PostgreSQL fixture, observation template, 사전 승인 기준 기반 fail-closed 판정기를 완료했다. 실제 dashboard 전달·ack와 연속 7일 증거 없이는 Task 33을 완료로 판정하지 않는다. Task 20도 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.

@@ -1,7 +1,7 @@
 # Discover Product Contract
 
-Status: tasks 21-32 complete; task 33 is not implemented.
-Contract date: 2026-07-22
+Status: tasks 21-32 complete; task 33 execution tooling is implemented, with the real seven-day pilot pending.
+Contract date: 2026-07-23
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
@@ -358,7 +358,22 @@ specific record remains.
   separately documented real staging/production and 10-user, 7-day evidence.
 - Task 33 is the Discover product pilot and cannot be declared complete until
   task 32 analytics, metric definitions, retention, export, and deletion are
-  implemented and verified.
+  implemented and verified. Repository readiness is not pilot evidence.
+- `TAB_VIEW` is emitted only for an explicit change to a different category;
+  initial category display emits `DISCOVER_VIEW` but not `TAB_VIEW`.
+- The executable aggregate query accepts exact UTC-midnight boundaries seven
+  days apart and returns counts, de-duplicated rates, category/source event
+  breakdowns, UTC one-hour aggregate buckets for operational comparison, and no
+  user or item identifier.
+- Source empty-result rate uses successful normalized refreshes as its
+  denominator. Source failure rate uses refresh attempts as its denominator.
+- `npm run discover:pilot:collect` reads the aggregate query with the database
+  URL supplied only through the environment. `npm run discover:pilot:evaluate`
+  requires dashboard/alert/privacy preflight evidence and sample/decision plans
+  approved before the observation starts.
+- The evaluator never emits a success decision. It returns `NOT_READY`,
+  `INVALID_OBSERVATION`, `EXTEND_PILOT`, or `READY_FOR_PRODUCT_DECISION`, then
+  applies the pre-approved thresholds to the four next-scope principles.
 
 ## Explicitly excluded
 

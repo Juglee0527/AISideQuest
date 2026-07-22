@@ -84,7 +84,8 @@ function sessionResponse(url: URL) {
 
 describe('Discover page', () => {
   it('loads category tabs and opens only the validated external original link', async () => {
-    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    document.cookie = 'aisidequest_csrf=analytics-csrf; path=/'
+    const fetchMock = vi.fn(async (input: string | URL | Request, _init?: RequestInit) => {
       const url = new URL(String(input))
       const session = sessionResponse(url)
       if (session) return session
@@ -133,6 +134,10 @@ describe('Discover page', () => {
     })
     expect(originalLink).toHaveAttribute('target', '_blank')
     expect(originalLink).toHaveAttribute('rel', 'noopener noreferrer')
+    const analyticsBodies = () => fetchMock.mock.calls
+      .filter(([input]) => new URL(String(input)).pathname.endsWith('/discover/events'))
+      .map(([, init]) => JSON.parse(String(init?.body))) as Array<{ eventName: string; category?: string }>
+    expect(analyticsBodies().some((body) => body.eventName === 'TAB_VIEW')).toBe(false)
 
     fireEvent.click(screen.getByRole('tab', { name: '개발 소식' }))
     expect(await screen.findByText('A new TypeScript release')).toBeInTheDocument()
@@ -141,6 +146,9 @@ describe('Discover page', () => {
     expect(fetchMock.mock.calls.some(([input]) => (
       new URL(String(input)).searchParams.get('category') === 'NEWS'
     ))).toBe(true)
+    await waitFor(() => expect(analyticsBodies().filter((body) => (
+      body.eventName === 'TAB_VIEW' && body.category === 'NEWS'
+    ))).toHaveLength(1))
   })
 
   it('labels Stack Overflow bounties as reputation instead of cash or points', async () => {

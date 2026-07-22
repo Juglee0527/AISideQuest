@@ -8,7 +8,8 @@
     { "id": 3, "title": "Source fetch p95 latency", "type": "timeseries", "targets": [{ "expr": "histogram_quantile(0.95, sum by (source, le) (rate(aisidequest_discover_source_fetch_duration_seconds_bucket[15m])))", "legendFormat": "{{source}}" }] },
     { "id": 4, "title": "Normalized item count", "type": "timeseries", "targets": [{ "expr": "aisidequest_discover_source_item_count", "legendFormat": "{{source}}" }] },
     { "id": 5, "title": "Cache resolutions", "type": "timeseries", "targets": [{ "expr": "sum by (source, result) (rate(aisidequest_discover_cache_total[15m]))", "legendFormat": "{{source}} {{result}}" }] },
-    { "id": 6, "title": "Discover product events (rolling 30 days)", "type": "bargauge", "targets": [{ "expr": "sum by (event, source, category) (aisidequest_discover_product_events_30d)", "legendFormat": "{{event}} {{source}} {{category}}" }] }
+    { "id": 6, "title": "Discover product events (rolling 30 days)", "type": "bargauge", "targets": [{ "expr": "sum by (event, source, category) (aisidequest_discover_product_events_30d)", "legendFormat": "{{event}} {{source}} {{category}}" }] },
+    { "id": 7, "title": "Source empty refresh rate", "type": "timeseries", "targets": [{ "expr": "sum by (source) (increase(aisidequest_discover_source_refresh_total{result=\"EMPTY\"}[24h])) / clamp_min(sum by (source) (increase(aisidequest_discover_source_refresh_total[24h])), 1)", "legendFormat": "{{source}}" }] }
   ],
   "refresh": "1m",
   "schemaVersion": 39,

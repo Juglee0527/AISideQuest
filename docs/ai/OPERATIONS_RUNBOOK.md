@@ -115,6 +115,16 @@ start and exclusive UTC end spanning seven consecutive dates. Report numerator,
 denominator, unique users, and raw event counts. Insufficient samples cannot be
 reported as success.
 
+For Task 33, approve the sample and decision plans before the UTC start boundary,
+then run `npm run discover:pilot:collect -- <start> <end> <report-timezone>`.
+Copy only aggregates into the observation template; never add user IDs, item
+IDs, URLs, titles, tags, queries, interests, or raw payloads. Add source attempt,
+success, failure, and empty-refresh counts from Prometheus, then run
+`npm run discover:pilot:evaluate -- <observation.json>`. A result of
+`READY_FOR_PRODUCT_DECISION` still requires a human next-scope decision and is
+not a success label. Preserve alert delivery and ack timestamps in the external
+evidence store, not application logs or the repository.
+
 ## Secret rotation
 
 - GitHub OAuth secret: 새 secret을 secret manager에 등록 → staging callback → production rolling restart → 이전 secret 폐기.

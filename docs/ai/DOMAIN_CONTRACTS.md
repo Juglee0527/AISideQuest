@@ -139,6 +139,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Only the server fetches fixed source API hosts. Display links are never used as server fetch targets, and raw upstream payloads or HTML are never persisted or logged.
 - The shared cache stores normalized items only, applies source-specific fresh and maximum stale ages, and purges normalized cache rows within 7 days of their last successful refresh.
 - Product analytics are not implicit in tasks 22-28. Before a Discover pilot, only fixed low-cardinality view/click/save events may be added; item details and selected interests remain forbidden, owned rows expire after 90 days, and export/deletion must include them.
+- Task 33 repository tooling accepts exact seven-day UTC boundaries, returns aggregates only, separates empty successful refreshes from failures, and fails closed when dashboard/alert/privacy evidence or pre-approved sample targets are missing. Real seven-day evidence is still required for completion.
 - Task 31 completed with an Algora NO-GO decision: there is no approved organization allowlist or supported global-discovery contract, so no Algora adapter, storage, or UI behavior exists.
 - Completing tasks 22-26 produces a Discover release candidate. Real source smoke, attribution, failure, accessibility, and privacy evidence are still required for release, and none of this completes task 20.
 - The full contract is [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md).

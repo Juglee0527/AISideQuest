@@ -36,6 +36,8 @@
     "deploy:validate": "node scripts/validate-deployment-env.mjs",
     "deploy:smoke": "node scripts/smoke-deployment.mjs",
     "pilot:evaluate": "node scripts/evaluate-pilot.mjs",
+    "discover:pilot:collect": "node scripts/collect-discover-pilot.mjs",
+    "discover:pilot:evaluate": "node scripts/evaluate-discover-pilot.mjs",
     "docs:check": "node scripts/check-doc-links.mjs",
     "test:watch": "vitest",
     "preview": "vite preview"

@@ -390,12 +390,6 @@ function DiscoverPage() {
       .catch(() => undefined)
   }, [sessionStatus])
 
-  useEffect(() => {
-    if (sessionStatus !== 'ready' || view !== 'EXPLORE') return
-    void recordDiscoverAnalyticsEvent({ eventName: 'TAB_VIEW', category })
-      .catch(() => undefined)
-  }, [category, sessionStatus, view])
-
   const recordOutboundClick = useCallback((item: DiscoverItem) => {
     void recordDiscoverAnalyticsEvent({
       eventName: 'OUTBOUND_CLICK',
@@ -606,6 +600,17 @@ function DiscoverPage() {
     && enabledSources.every((source) => source.status === 'UNAVAILABLE')
   const activeTab = TABS.find((tab) => tab.category === category) ?? TABS[0]
 
+  const selectCategory = (nextCategory: DiscoverCategory) => {
+    if (nextCategory === category) return
+    setCategory(nextCategory)
+    if (sessionStatus === 'ready' && view === 'EXPLORE') {
+      void recordDiscoverAnalyticsEvent({
+        eventName: 'TAB_VIEW',
+        category: nextCategory,
+      }).catch(() => undefined)
+    }
+  }
+
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
@@ -616,7 +621,7 @@ function DiscoverPage() {
         : (index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length
     const nextTab = TABS[nextIndex]
     if (!nextTab) return
-    setCategory(nextTab.category)
+    selectCategory(nextTab.category)
     window.requestAnimationFrame(() => {
       document.getElementById(`discover-tab-${nextTab.category.toLowerCase()}`)?.focus()
     })
@@ -667,7 +672,7 @@ function DiscoverPage() {
               aria-selected={selected}
               aria-controls="discover-tab-panel"
               tabIndex={selected ? 0 : -1}
-              onClick={() => setCategory(tab.category)}
+              onClick={() => selectCategory(tab.category)}
               onKeyDown={(event) => handleTabKeyDown(event, index)}
               className={`flex min-w-0 items-center justify-center gap-2 rounded-xl px-2 py-3 text-sm font-bold transition sm:px-4 ${
                 selected

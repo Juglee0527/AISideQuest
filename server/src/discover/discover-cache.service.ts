@@ -19,6 +19,7 @@ export interface DiscoverCacheEntry {
 
 export interface DiscoverRefreshResult {
   lockAcquired: boolean
+  refreshed: boolean
   entry: DiscoverCacheEntry | null
 }
 
@@ -63,14 +64,14 @@ export class DiscoverCacheService implements OnModuleInit, OnModuleDestroy {
       const [lock] = await manager.query(`
         SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0)) AS acquired
       `, [`aisidequest:discover:${source}`]) as Array<{ acquired: boolean }>
-      if (!lock?.acquired) return { lockAcquired: false, entry: null }
+      if (!lock?.acquired) return { lockAcquired: false, refreshed: false, entry: null }
 
       const current = await this.readWithManager(manager, source)
       if (
         current
         && Date.now() - Date.parse(current.refreshedAt) < freshForMs
       ) {
-        return { lockAcquired: true, entry: current }
+        return { lockAcquired: true, refreshed: false, entry: current }
       }
 
       const items = (await fetchItems()).map((item) => normalizeDiscoverItem(item, source))
@@ -86,6 +87,7 @@ export class DiscoverCacheService implements OnModuleInit, OnModuleDestroy {
       await manager.query(this.purgeQuery())
       return {
         lockAcquired: true,
+        refreshed: true,
         entry: { source, items, refreshedAt },
       }
     })

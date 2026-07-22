@@ -34,7 +34,7 @@ class FakeCacheService {
     const items = await fetchItems()
     const entry = { source, items, refreshedAt: now.toISOString() }
     this.entries.set(source, entry)
-    return { lockAcquired: true, entry }
+    return { lockAcquired: true, refreshed: true, entry }
   }
 }
 
@@ -49,6 +49,7 @@ function createService(
     recordDiscoverFetch: (source: string, result: string, reason?: string) => metricEvents.push(`fetch:${source}:${result}:${reason ?? ''}`),
     configureDiscoverSources: () => undefined,
     recordDiscoverFetchDuration: () => undefined,
+    recordDiscoverRefreshItems: (source: string, count: number) => metricEvents.push(`refresh:${source}:${count}`),
   } as unknown as OperationalMetricsService
   const logger = { error: () => undefined } as unknown as OperationalLoggerService
   const savedService = {
@@ -170,6 +171,18 @@ test('returns bounded stale data when refresh fails and isolates other sources',
   assert.equal(result.sources.find((source) => source.source === 'HACKER_NEWS')?.status, 'STALE')
   assert.equal(result.sources.find((source) => source.source === 'REMOTIVE')?.status, 'FRESH')
   assert.ok(metricEvents.includes('fetch:HACKER_NEWS:FAILURE:TIMEOUT'))
+  assert.ok(metricEvents.includes('refresh:REMOTIVE:1'))
+})
+
+test('records a successful zero-item refresh separately from source failure', async () => {
+  const { service, metricEvents } = createService([
+    adapter('HACKER_NEWS', async () => []),
+  ])
+
+  const result = await service.listDiscover(userId, { limit: 20 })
+  assert.deepEqual(result.items, [])
+  assert.ok(metricEvents.includes('fetch:HACKER_NEWS:SUCCESS:'))
+  assert.ok(metricEvents.includes('refresh:HACKER_NEWS:0'))
 })
 
 test('deduplicates, sorts and paginates with a stable cursor', async () => {

@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~32 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~32와 Task 33 실행 도구 완료·실제 7일 증거 대기
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-22
 
@@ -251,15 +251,15 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-22 기준 자동 test 231개가 통과했다.
+2026-07-23 기준 자동 test 239개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
 | React | 66 |
 | Codex plugin | 20 |
-| 운영·local startup script | 20 |
-| Server non-database | 66 |
-| PostgreSQL integration | 59 |
+| 운영·local startup script | 26 |
+| Server non-database | 67 |
+| PostgreSQL integration | 60 |
 
 Lint, client·server typecheck와 production build, migration 18개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
 
@@ -295,7 +295,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 33의 dashboard·alert 전달 검증 후 연속 7일 Discover 파일럿이다.
+다음 작업은 staging dashboard·alert 전달·ack 증거를 남기고 사전 표본·판정 기준을 승인한 뒤 Task 33의 실제 연속 7일 Discover 파일럿을 수행하는 것이다.
 
 ---
 
@@ -321,6 +321,6 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Task 30: 별도 server token과 승인 organization/repository scope가 함께 있을 때만 활성화되는 GitHub Issues source 완료
 - Task 31: Algora 공식 전역 탐색·organization 열거·rate-limit 계약과 승인 allowlist 부재로 NO-GO 조사 완료; adapter·schema·UI 변경 없음
 - Task 32: privacy-bounded analytics, source/cache/fetch metrics, dashboard, warning/critical alert와 UTC pilot SQL 완료
-- Task 33: Discover product pilot 미진행
+- Task 33: 실행 가능한 UTC 집계·fixture·observation template·판정기 완료, 실제 staging preflight와 연속 7일 관찰 미진행
 
 최종 목표는 AI가 일하는 동안 개발자가 안전하게 학습하거나 외부 기회를 발견하도록 돕는 것이다. AISideQuest는 사용자의 작업 content를 수집하거나 외부 보상을 보장하는 방식으로 이 목표를 달성하지 않는다.

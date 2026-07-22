@@ -134,3 +134,24 @@ queue 복구율, 수동 fallback 사용률, 퀴즈 재응시, 이탈 지점과 �
 - [ ] 최소 7일·자동 세션 100건 관찰과 최종 판정
 
 마지막 네 항목이 완료되기 전에는 20번 전체를 완료로 표시하지 않는다.
+
+## 9. Discover Task 33 파일럿
+
+Task 33은 위 Task 20 파일럿과 별도 제품 판정이다. 먼저
+[`deploy/discover-pilot-observation.example.json`](../../deploy/discover-pilot-observation.example.json)을 복사하고, 실제 관찰 전에 sample plan과 decision plan을 승인한다. 기본 숫자는 예시이며 사후에 결과에 맞춰 바꾸지 않는다.
+
+staging dashboard provisioning, alert 전달·ack, analytics retention, export/delete, 금지 필드 검증을 observation의 preflight에 기록한다. 하나라도 확인되지 않으면 판정기는 `NOT_READY`를 반환한다.
+
+정확히 7일인 UTC 자정 경계의 aggregate를 수집한다. database URL은 명령 인자가 아니라 환경 변수로만 전달한다.
+
+```powershell
+npm.cmd run discover:pilot:collect -- 2026-08-01T00:00:00.000Z 2026-08-08T00:00:00.000Z Asia/Seoul
+```
+
+수집 결과와 Prometheus에서 확인한 source별 attempt·success·failure·empty 집계를 observation에 넣고 판정한다.
+
+```powershell
+npm.cmd run discover:pilot:evaluate -- C:\secure\evidence\discover-pilot-observation.json
+```
+
+`READY_FOR_PRODUCT_DECISION`은 성공 선언이 아니라 충분한 표본으로 다음 범위를 검토할 수 있다는 뜻이다. `EXTEND_PILOT`은 사전 표본 미달, `NOT_READY`는 외부 preflight 누락, `INVALID_OBSERVATION`은 기간이나 집계 모순이다. 실제 observation과 dashboard·alert 증적이 없으면 Task 33을 완료로 표시하지 않는다.

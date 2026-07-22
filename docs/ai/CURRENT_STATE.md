@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-32 are implemented, including privacy-bounded owned analytics, source/cache/fetch metrics, a code-managed dashboard, source alerts, and pilot aggregation SQL. Task 33 is not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-32 are implemented. Task 33 now has executable seven-day aggregation, fixture verification, source empty-result metrics, a privacy-safe observation template, and a fail-closed evaluator; actual dashboard delivery/ack and the real seven-day observation remain externally incomplete.
 
 Implemented:
 
@@ -46,10 +46,10 @@ Optional external deployment remains unverified:
 |---|---:|
 | React | 66 |
 | Codex plugin | 20 |
-| operations and local startup scripts | 20 |
-| server non-database | 66 |
-| PostgreSQL integration | 59 |
-| total | 231 |
+| operations and local startup scripts | 26 |
+| server non-database | 67 |
+| PostgreSQL integration | 60 |
+| total | 239 |
 
 Also passed: lint, client/server typecheck, client/server production build, 18 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
@@ -86,4 +86,4 @@ Also passed: lint, client/server typecheck, client/server production build, 18 m
 
 ## Immediate next action
 
-Begin task 33 only after validating dashboard delivery/ack, the UTC metric SQL fixture, analytics expiry, export/deletion, and forbidden-field checks. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Provision the Discover dashboard and alerts in staging, record real delivery and ack evidence, approve the sample and decision plans before the start boundary, then collect seven consecutive UTC dates with the Task 33 tools. The SQL fixture, analytics expiry, export/deletion, and forbidden-field repository checks pass; external evidence does not. Keep Task 20 separate and never mark either pilot complete without its own real evidence.

@@ -2,10 +2,10 @@
 
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
-- 작성일: 2026-07-22
-- 상태: Task 21~32 완료, Discover 관측성·개인정보 제한 analytics·dashboard·alert 구현 완료
+- 작성일: 2026-07-23
+- 상태: Task 21~32 완료, Task 33 실행·집계·판정 도구 완료, 실제 연속 7일 관찰 대기
 - 작업 번호: 21~33
-- 다음 작업: 33. Dashboard·alert·집계 SQL 검증 후 연속 7일 Discover 파일럿
+- 다음 작업: staging dashboard·alert 전달·ack 확인과 사전 표본·판정 기준 승인 후 실제 연속 7일 Discover 파일럿
 - 1차 구현 범위: 21~26
 
 ---
@@ -488,6 +488,17 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 - Source 빈 결과율은 정상 refresh 중 item 0개인 횟수, 장애율은 refresh attempt 중 failure 횟수를 각각 분자로 삼는다. 사용자 행동과의 비교는 1시간 source·category time bucket에서 aggregate로만 결합하고 분석 row에 장애 상세를 복제하지 않는다.
 - Task 32에서 위 지표의 분자·분모·중복 제거·경계 시각을 구현한 SQL과 test fixture를 확정한 후에만 파일럿을 시작한다.
 
+구현 결과:
+
+- `ops/discover-pilot-metrics.sql`은 UTC 자정 기준 정확히 7일인 inclusive start·exclusive end를 받아 사용자 중복 제거, event 수, category·source breakdown과 source 운영 지표 비교용 UTC 1시간 aggregate를 한 row로 반환하며 사용자·item 식별자를 반환하지 않는다.
+- 실제 PostgreSQL fixture에서 AI session 사용자 3명, Discover 방문자 2명, 서로 다른 UTC 날짜 반복 방문자 1명을 넣어 진입률 `2/3`, 원문 이동·저장·반복 방문률 `1/2`를 검증했다.
+- `TAB_VIEW`는 최초 category 표시나 같은 tab 재선택이 아니라 다른 category로 명시적으로 전환할 때만 기록한다.
+- 정상 source refresh의 `EMPTY`·`NON_EMPTY` counter를 추가해 empty 결과율과 failure율을 분리한다.
+- `npm run discover:pilot:collect -- <start-utc> <end-utc> <report-timezone>`는 DB credential을 환경 변수에서만 읽어 aggregate JSON을 출력한다.
+- `deploy/discover-pilot-observation.example.json`에서 표본과 판정 기준을 파일럿 시작 전에 승인한 뒤 `npm run discover:pilot:evaluate -- <observation.json>`로 판정한다.
+- 판정기는 성공 문자열을 출력하지 않는다. preflight 누락은 `NOT_READY`, 모순된 집계는 `INVALID_OBSERVATION`, 사전 표본 미달은 `EXTEND_PILOT`, 충분한 관찰은 `READY_FOR_PRODUCT_DECISION`으로 반환하고 다음 범위 권고를 별도 생성한다.
+- 2026-07-23 repository readiness 검증 결과와 아직 없는 외부 증거는 [`Discover 파일럿 준비 기록`](./ai/operations/2026-07-23-discover-pilot-readiness.md)에 분리해 기록한다.
+
 판정 원칙:
 
 - 사용량이 낮으면 source 확대를 중단한다.
@@ -496,6 +507,8 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 - 자체 커뮤니티는 반복 사용자가 확보된 뒤에만 재검토한다.
 
 기존 Task 20의 staging·production 증거와 10명·7일 파일럿 완료 조건은 별도로 유지하며 Discover 구현만으로 완료 처리하지 않는다.
+
+실제 staging dashboard provisioning, alert 전달·ack, 사전 표본·판정 계획 승인과 연속 7일 관찰이 모두 기록되기 전에는 Task 33도 완료로 표시하지 않는다.
 
 ---
 

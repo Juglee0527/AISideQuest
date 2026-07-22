@@ -153,6 +153,12 @@ retention. Prompt, AI response, code, diff, transcript, command, tool content,
 workspace/path, item ID, title, URL, tag, search text, interest, and raw source
 response collection remains forbidden.
 
+Task 33 aggregation returns grouped counts only. The collector accepts the
+database credential from the environment, never from an observation file or
+command argument. Initial category display does not create `TAB_VIEW`; only an
+explicit transition to a different fixed category does. Pilot evidence files
+must contain no user or item identifiers.
+
 ## 7. Verification and release-blocking criteria
 
 - CORS allow/deny preflight, CSRF, OAuth state 1회 소비, 만료·폐기 token을 자동 검사한다.

@@ -160,6 +160,9 @@ export class DiscoverService {
       )
       if (result.entry) {
         this.metrics.recordDiscoverFetch(adapter.source, 'SUCCESS')
+        if (result.refreshed) {
+          this.metrics.recordDiscoverRefreshItems(adapter.source, result.entry.items.length)
+        }
         terminalResult = 'SUCCESS'
         return this.fromCache(adapter, result.entry, 'FRESH')
       }

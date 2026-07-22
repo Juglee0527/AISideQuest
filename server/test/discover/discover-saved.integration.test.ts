@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { after, before, beforeEach, test } from 'node:test'
 
 import type { INestApplication } from '@nestjs/common'
@@ -293,6 +294,58 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       category: 'NEWS',
       retention_days: 90,
     }])
+  })
+
+  test('pilot SQL de-duplicates users and repeat visits across exact UTC dates', async () => {
+    const [thirdUser] = await databaseService.query<Array<{ id: string }>>(`
+      INSERT INTO users (display_name) VALUES ('Discover pilot fixture user') RETURNING id
+    `)
+    const sessions = await databaseService.query<Array<{ id: string }>>(`
+      INSERT INTO ai_sessions (
+        user_id, status, origin, started_at, last_activity_at, ended_at, terminal_reason
+      ) VALUES
+        ($1, 'COMPLETED', 'MANUAL', '2026-08-01T01:00:00Z', '2026-08-01T01:05:00Z', '2026-08-01T01:05:00Z', 'MANUAL_COMPLETED'),
+        ($2, 'COMPLETED', 'MANUAL', '2026-08-02T01:00:00Z', '2026-08-02T01:05:00Z', '2026-08-02T01:05:00Z', 'MANUAL_COMPLETED'),
+        ($3, 'COMPLETED', 'MANUAL', '2026-08-03T01:00:00Z', '2026-08-03T01:05:00Z', '2026-08-03T01:05:00Z', 'MANUAL_COMPLETED')
+      RETURNING id
+    `, [firstIdentity.userId, secondIdentity.userId, thirdUser.id])
+
+    try {
+      await databaseService.query(`
+        INSERT INTO discover_analytics_events (
+          user_id, event_name, source, category, occurred_at, expires_at
+        ) VALUES
+          ($1, 'DISCOVER_VIEW', NULL, NULL, '2026-08-01T02:00:00Z', '2026-10-01T00:00:00Z'),
+          ($1, 'DISCOVER_VIEW', NULL, NULL, '2026-08-02T02:00:00Z', '2026-10-01T00:00:00Z'),
+          ($1, 'TAB_VIEW', NULL, 'NEWS', '2026-08-02T02:01:00Z', '2026-10-01T00:00:00Z'),
+          ($1, 'TAB_VIEW', NULL, 'COMMUNITY', '2026-08-02T02:02:00Z', '2026-10-01T00:00:00Z'),
+          ($1, 'OUTBOUND_CLICK', 'HACKER_NEWS', 'NEWS', '2026-08-02T02:03:00Z', '2026-10-01T00:00:00Z'),
+          ($1, 'SAVE', 'HACKER_NEWS', 'NEWS', '2026-08-02T02:04:00Z', '2026-10-01T00:00:00Z'),
+          ($2, 'DISCOVER_VIEW', NULL, NULL, '2026-08-03T02:00:00Z', '2026-10-01T00:00:00Z'),
+          ($2, 'TAB_VIEW', NULL, 'EARNING', '2026-08-03T02:01:00Z', '2026-10-01T00:00:00Z')
+      `, [firstIdentity.userId, secondIdentity.userId])
+
+      const sql = await readFile('ops/discover-pilot-metrics.sql', 'utf8')
+      const [result] = await databaseService.query<Array<Record<string, unknown>>>(sql, [
+        '2026-08-01T00:00:00.000Z',
+        '2026-08-08T00:00:00.000Z',
+      ])
+      assert.equal(result.ai_session_users, 3)
+      assert.equal(result.discover_users, 2)
+      assert.equal(result.outbound_users, 1)
+      assert.equal(result.save_users, 1)
+      assert.equal(result.repeat_users, 1)
+      assert.equal(result.event_count, 8)
+      assert.equal(Number(result.discover_entry_rate), 2 / 3)
+      assert.equal(Number(result.outbound_rate), 0.5)
+      assert.equal(Number(result.save_rate), 0.5)
+      assert.equal(Number(result.repeat_visit_rate), 0.5)
+      assert.ok(Array.isArray(result.event_breakdown))
+      assert.ok(Array.isArray(result.hourly_event_breakdown))
+    } finally {
+      await databaseService.query('DELETE FROM ai_sessions WHERE id = ANY($1::uuid[])', [sessions.map((row) => row.id)])
+      await databaseService.query('DELETE FROM users WHERE id = $1', [thirdUser.id])
+    }
   })
 
   test('delete is ownership-scoped and safe to repeat', async () => {

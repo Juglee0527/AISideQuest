@@ -46,6 +46,7 @@ export class OperationalMetricsService {
   private serverErrors = 0
   private readonly discoverCacheCounters = new Map<string, DiscoverCounter>()
   private readonly discoverFetchCounters = new Map<string, DiscoverCounter>()
+  private readonly discoverRefreshCounters = new Map<string, DiscoverCounter>()
   private readonly discoverEnabledSources = new Set<DiscoverSource>()
   private readonly discoverFetchLatency = new Map<string, DiscoverLatencyHistogram>()
 
@@ -76,6 +77,14 @@ export class OperationalMetricsService {
     reason?: DiscoverFetchFailure,
   ) {
     this.incrementDiscoverCounter(this.discoverFetchCounters, source, result, reason)
+  }
+
+  recordDiscoverRefreshItems(source: DiscoverSource, itemCount: number) {
+    this.incrementDiscoverCounter(
+      this.discoverRefreshCounters,
+      source,
+      itemCount === 0 ? 'EMPTY' : 'NON_EMPTY',
+    )
   }
 
   configureDiscoverSources(sources: readonly DiscoverSource[]) {
@@ -142,6 +151,10 @@ export class OperationalMetricsService {
       '# TYPE aisidequest_discover_source_fetch_total counter',
       ...[...this.discoverFetchCounters.values()].map((counter) =>
         `aisidequest_discover_source_fetch_total{source="${counter.source}",result="${counter.result}",reason="${counter.reason ?? 'NONE'}"} ${counter.count}`),
+      '# HELP aisidequest_discover_source_refresh_total Successful normalized source refreshes by empty result.',
+      '# TYPE aisidequest_discover_source_refresh_total counter',
+      ...[...this.discoverRefreshCounters.values()].map((counter) =>
+        `aisidequest_discover_source_refresh_total{source="${counter.source}",result="${counter.result}"} ${counter.count}`),
       '# HELP aisidequest_discover_source_enabled Whether a Discover source adapter is enabled.',
       '# TYPE aisidequest_discover_source_enabled gauge',
       ...DISCOVER_SOURCES.map((source) =>

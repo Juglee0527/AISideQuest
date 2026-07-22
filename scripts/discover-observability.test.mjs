@@ -13,6 +13,7 @@ test('Discover dashboard contains freshness, failure, latency, item, cache, and 
     'aisidequest_discover_source_fetch_total',
     'aisidequest_discover_source_fetch_duration_seconds_bucket',
     'aisidequest_discover_source_item_count',
+    'aisidequest_discover_source_refresh_total',
     'aisidequest_discover_cache_total',
     'aisidequest_discover_product_events_30d',
   ]) assert.match(expressions, new RegExp(metric))

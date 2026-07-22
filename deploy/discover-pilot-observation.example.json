@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "observationStartedAt": "2026-08-01T00:00:00.000Z",
+  "observationEndedAt": "2026-08-08T00:00:00.000Z",
+  "reportTimeZone": "Asia/Seoul",
+  "preflight": {
+    "dashboardProvisioned": false,
+    "alertDeliveryVerified": false,
+    "alertAckVerified": false,
+    "aggregationFixturePassed": true,
+    "analyticsRetentionVerified": true,
+    "exportDeleteVerified": true,
+    "forbiddenFieldsVerified": true
+  },
+  "samplePlan": {
+    "approvedBeforeStart": false,
+    "minimumAiSessionUsers": 10,
+    "minimumDiscoverUsers": 10,
+    "minimumDiscoverViewEvents": 30
+  },
+  "decisionPlan": {
+    "approvedBeforeStart": false,
+    "minimumDiscoverEntryRate": 0.2,
+    "minimumSaveRate": 0.1,
+    "minimumRepeatVisitRate": 0.2,
+    "minimumCashBountyItems": 1
+  },
+  "metrics": {
+    "aiSessionUsers": 0,
+    "discoverUsers": 0,
+    "outboundUsers": 0,
+    "saveUsers": 0,
+    "repeatUsers": 0,
+    "eventCount": 0,
+    "discoverViewEvents": 0,
+    "tabViewEvents": 0,
+    "outboundEvents": 0,
+    "saveEvents": 0,
+    "cashBountyItemsObserved": 0
+  },
+  "sourceMetrics": [
+    {
+      "source": "HACKER_NEWS",
+      "refreshAttempts": 0,
+      "successfulRefreshes": 0,
+      "failedRefreshes": 0,
+      "zeroItemRefreshes": 0
+    }
+  ]
+}

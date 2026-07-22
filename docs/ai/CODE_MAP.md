@@ -49,7 +49,7 @@ API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts
 
 Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, `src/pages/DiscoverPage.tsx`, and `src/components/DiscoverInterestSettings.tsx`. The page owns explore/saved views, save and interest mutations, recommendation reasons, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/discover-saved.service.ts` owns snapshot persistence and saved-list ownership; `discover-interest.service.ts` owns fixed-allowlist preferences and idempotent replacement; `discover-personalization.ts` owns the pure ranking tuple and reasons. `hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs, `remotive.adapter.ts` owns Software Development remote jobs, `dev.adapter.ts` owns the public Forem V1 DEV article feed, and `stack-overflow.adapter.ts` plus `stack-exchange-request-gate.ts` own fixed Stack Exchange question fetches and shared throttle state.
 
-`discover-analytics.service.ts` owns the four fixed events, 90-day expiry, and client-event dimension checks. `ops/grafana-discover-dashboard.json`, `ops/prometheus-alerts.yml`, and `ops/discover-pilot-metrics.sql` own Task 32 operational and pilot definitions.
+`discover-analytics.service.ts` owns the four fixed events, 90-day expiry, and client-event dimension checks. `ops/grafana-discover-dashboard.json`, `ops/prometheus-alerts.yml`, and `ops/discover-pilot-metrics.sql` own operational and pilot definitions. `scripts/collect-discover-pilot.mjs`, `scripts/evaluate-discover-pilot.mjs`, and `deploy/discover-pilot-observation.example.json` own Task 33 aggregate collection, fail-closed evaluation, and the evidence shape.
 
 ## Change routing
 
