@@ -27,9 +27,9 @@
 | `server/src/quests/` | catalog, attempts, answers, grading, retry, reward transaction |
 | `server/src/points/` | balance and immutable ledger reads |
 | `server/src/statistics/` | time-zone-aware summary and activity |
-| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, Hacker News/Remotive/DEV/Stack Overflow/conditional GitHub adapters and request gates, source aggregation, saved-item and explicit-interest services, deterministic ranking, and API |
+| `server/src/discover/` | common Discover types, adapters/cache, saved-item and explicit-interest services, privacy-bounded analytics, deterministic ranking, and API |
 | `server/src/security/` | shared PostgreSQL rate limits |
-| `server/src/observability/` | structured logging, metrics, sanitization |
+| `server/src/observability/` | structured logging, sanitization, aggregate Discover/source/cache/fetch metrics |
 | `server/src/health/` | liveness, readiness, protected metrics endpoint |
 | `server/src/config/` | application environment parsing and production fail-fast rules |
 | `server/src/database/` | connection, transactions, migrations, seed, readiness |
@@ -48,6 +48,8 @@
 API calls belong in `src/api/`. Cross-page server state belongs in `src/contexts/`. Page-specific rendering remains in `src/pages/`; reusable UI stays in `src/components/`.
 
 Discover uses `src/types/discover.ts`, `src/api/discoverApi.ts`, `src/pages/DiscoverPage.tsx`, and `src/components/DiscoverInterestSettings.tsx`. The page owns explore/saved views, save and interest mutations, recommendation reasons, pagination, empty, stale, partial-failure, and total-failure UI state. `server/src/discover/discover-saved.service.ts` owns snapshot persistence and saved-list ownership; `discover-interest.service.ts` owns fixed-allowlist preferences and idempotent replacement; `discover-personalization.ts` owns the pure ranking tuple and reasons. `hacker-news.adapter.ts` owns HN Top·Ask·Show·Jobs, `remotive.adapter.ts` owns Software Development remote jobs, `dev.adapter.ts` owns the public Forem V1 DEV article feed, and `stack-overflow.adapter.ts` plus `stack-exchange-request-gate.ts` own fixed Stack Exchange question fetches and shared throttle state.
+
+`discover-analytics.service.ts` owns the four fixed events, 90-day expiry, and client-event dimension checks. `ops/grafana-discover-dashboard.json`, `ops/prometheus-alerts.yml`, and `ops/discover-pilot-metrics.sql` own Task 32 operational and pilot definitions.
 
 ## Change routing
 

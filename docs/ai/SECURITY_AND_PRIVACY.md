@@ -84,7 +84,7 @@ Rate Limit bucket은 PostgreSQL에 저장되므로 API 인스턴스를 늘려도
 
 ## 5. 데이터 내보내기와 계정 삭제
 
-`POST /auth/me/export`는 schema version 3으로 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, 정제된 workspace·operation label을 포함한 AI 세션과 allowlist 이벤트 metadata, 응시·답안, point 원장, Discover 저장 snapshot과 명시적 관심 기술을 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
+`POST /auth/me/export`는 schema version 4로 profile, 연결 계정의 provider/login, 안전한 기기 metadata와 queue 진단 수치, 정제된 workspace·operation label을 포함한 AI 세션과 allowlist 이벤트 metadata, 응시·답안, point 원장, Discover 저장 snapshot·명시적 관심 기술·만료 전 analytics를 반환한다. token/hash, 외부 session·turn key, idempotency 응답 snapshot은 내보내지 않는다.
 
 `DELETE /auth/me`는 확인 문자열, CSRF, 15분 이내 인증을 요구하며 다음 순서로 한 transaction에서 삭제한다.
 
@@ -131,12 +131,29 @@ Task 22에서 공통 model과 인증된 Discover read endpoint를, Task 23에서
 - 운영 로그와 metric label에는 외부 응답, 전체 원문 URL, item ID·제목·tag, 사용자 관심 기술을 남기지 않는다.
 - Task 32에서 제품 분석을 구현하기 전에는 Discover 방문·클릭을 수집하지 않는다. 이후에도 고정 event 이름과 source·category만 허용하며 item 정보는 수집하지 않는다.
 - 반복 방문 계산용 사용자 ID는 소유권이 있는 분석 row에만 저장할 수 있고 로그·metric label에는 금지한다. 이 row는 90일 후 만료하고 계정 내보내기와 primary 삭제에 포함한다.
-- Task 27 저장 snapshot과 Task 28 관심 기술은 계정 소유 데이터로 내보내기 schema version 3과 account delete transaction에 포함한다. 관심 기술은 사용자가 비우면 row를 삭제한다.
+- Task 27 저장 snapshot, Task 28 관심 기술과 Task 32 analytics는 계정 소유 데이터로 내보내기 schema version 4와 account delete transaction에 포함한다. 관심 기술은 사용자가 비우면 row를 삭제한다.
 - 개인화는 명시적 관심 tag와 normalized external item만 사용한다. Prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path는 요청 schema에도 정렬 입력에도 없다.
 
 보상·출시·source 이용 조건까지 포함한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md)를 따른다.
 
-## 7. 검증과 배포 차단 기준
+## 6.2 Discover analytics privacy boundary
+
+Task 32 accepts client analytics only through authenticated, CSRF-protected,
+idempotent `POST /discover/events`. The DTO accepts the fixed event name plus
+fixed source/category dimensions and rejects every unknown field. The client
+cannot submit `SAVE`; the saved-item transaction creates it only when the
+unique insert returns `created: true`.
+
+The owned row may contain the authenticated user ID for unique/repeat counts,
+but logs and Prometheus labels may not contain user or item identifiers.
+Prometheus reads only grouped counts. Analytics expire after 90 days, export
+schema version 4 includes unexpired rows, and primary account deletion removes
+them. Operational logs and Prometheus data for the pilot have a 30-day maximum
+retention. Prompt, AI response, code, diff, transcript, command, tool content,
+workspace/path, item ID, title, URL, tag, search text, interest, and raw source
+response collection remains forbidden.
+
+## 7. Verification and release-blocking criteria
 
 - CORS allow/deny preflight, CSRF, OAuth state 1회 소비, 만료·폐기 token을 자동 검사한다.
 - 다른 사용자의 device/session/attempt 접근은 사용자 조건과 통합 테스트로 차단한다.

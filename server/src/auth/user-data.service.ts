@@ -89,9 +89,15 @@ export class UserDataService {
             FROM discover_user_interests
             WHERE user_id = $1
           `, userId)
+      const discoverAnalyticsEvents = await this.rows(manager, `
+            SELECT event_name, source, category, occurred_at, expires_at
+            FROM discover_analytics_events
+            WHERE user_id = $1 AND expires_at > clock_timestamp()
+            ORDER BY occurred_at, id
+          `, userId)
 
       return {
-        schemaVersion: 3,
+        schemaVersion: 4,
         exportedAt: new Date().toISOString(),
         profile: this.camelize(profile),
         connectedAccounts: accounts.map((row) => this.camelize(row)),
@@ -105,6 +111,7 @@ export class UserDataService {
         discoverInterests: discoverInterests
           ? this.camelize(discoverInterests)
           : { tags: [], updatedAt: null },
+        discoverAnalyticsEvents: discoverAnalyticsEvents.map((row) => this.camelize(row)),
       }
     })
   }
@@ -129,6 +136,7 @@ export class UserDataService {
       await manager.query('DELETE FROM devices WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM discover_saved_items WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM discover_user_interests WHERE user_id = $1', [userId])
+      await manager.query('DELETE FROM discover_analytics_events WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM api_idempotency_keys WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId])
       await manager.query('DELETE FROM user_auth_accounts WHERE user_id = $1', [userId])

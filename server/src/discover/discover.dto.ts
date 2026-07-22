@@ -15,10 +15,12 @@ import {
 
 import {
   DISCOVER_CATEGORIES,
+  DISCOVER_CLIENT_ANALYTICS_EVENTS,
   DISCOVER_ITEM_ID_PATTERN,
   DISCOVER_INTEREST_TAGS,
   DISCOVER_SOURCES,
   type DiscoverCategory,
+  type DiscoverClientAnalyticsEvent,
   type DiscoverSource,
   type DiscoverInterestTag,
 } from './discover.types'
@@ -71,4 +73,17 @@ export class UpdateDiscoverInterestsDto {
   @ArrayUnique()
   @IsEnum(DISCOVER_INTEREST_TAGS, { each: true })
   tags!: DiscoverInterestTag[]
+}
+
+export class RecordDiscoverAnalyticsEventDto {
+  @IsEnum(DISCOVER_CLIENT_ANALYTICS_EVENTS)
+  eventName!: DiscoverClientAnalyticsEvent
+
+  @IsOptional()
+  @IsEnum(DISCOVER_SOURCES)
+  source?: DiscoverSource
+
+  @IsOptional()
+  @IsEnum(DISCOVER_CATEGORIES)
+  category?: DiscoverCategory
 }

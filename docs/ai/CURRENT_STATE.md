@@ -1,12 +1,12 @@
 # Current State
 
-Last verified: 2026-07-21
+Last verified: 2026-07-22
 Application version: `0.1.0`  
 Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-31 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, the Discover screen, user-owned saved items, explicit-interest personalization, and the documented Algora NO-GO investigation complete. Tasks 32-33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-32 are implemented, including privacy-bounded owned analytics, source/cache/fetch metrics, a code-managed dashboard, source alerts, and pilot aggregation SQL. Task 33 is not implemented.
 
 Implemented:
 
@@ -27,9 +27,10 @@ Implemented:
 - Enabled public Forem V1 DEV adapter with one shared 30-article request, exact DEV HTTPS links and attribution, bounded description and tags, nullable reading time and reaction engagement, 30-minute fresh TTL, and 24-hour maximum stale fallback.
 - Enabled Stack Exchange API v2.3 Stack Overflow adapter with fixed featured and unanswered requests, one 30-question page per method, reputation-only bounties, method backoff, shared one-minute request spacing, quota exhaustion handling, a 15-minute fresh TTL, and 24-hour maximum stale fallback.
 - Conditional GitHub Search Issues adapter using a server-only fine-grained token and explicit organization/repository allowlists. It performs one 30-item, issue-only, open, unassigned search per shared 30-minute refresh, excludes pull requests and out-of-scope results defensively, honors the separate search rate-limit headers, and falls back to cache for at most 24 hours. Without the token and a scope, GitHub remains disabled.
-- Authenticated `/discover` desktop/mobile screen with earning, news, and community tabs, safe external cards, cursor load-more, and distinct loading, empty, stale, partial-failure, total-failure, and paging-error states. It remains independent of active AI sessions and collects no implicit analytics.
+- Authenticated `/discover` desktop/mobile screen with earning, news, and community tabs, safe external cards, cursor load-more, and distinct loading, empty, stale, partial-failure, total-failure, and paging-error states. It remains independent of active AI sessions and records only the explicit Task 32 analytics contract.
 - User-owned Discover saved snapshots with CSRF/idempotent save and delete, unique duplicate protection, stable cursor listing independent of source availability, explore/saved UI, and export/account-deletion handling.
 - Explicit Discover interests with a fixed 20-tag allowlist, maximum 10 selections, CSRF/idempotent full replacement, exact chronological empty default, deterministic match/recency/engagement/value ordering, visible reason codes, cursor invalidation, and export/account-deletion handling. Prompts, AI responses, code, paths, transcripts, and tool content are not inputs.
+- Discover analytics limited to `DISCOVER_VIEW`, `TAB_VIEW`, `OUTBOUND_CLICK`, and first-created `SAVE`, with fixed source/category dimensions, 90-day expiry, export/delete ownership, aggregate-only Prometheus output, rolling 30-day dashboard panels, and warning/critical source alerts. User and item identifiers never appear in logs or metric labels.
 
 Optional external deployment remains unverified:
 
@@ -43,14 +44,14 @@ Optional external deployment remains unverified:
 
 | Suite | Passed |
 |---|---:|
-| React | 65 |
+| React | 66 |
 | Codex plugin | 20 |
-| operations and local startup scripts | 18 |
+| operations and local startup scripts | 20 |
 | server non-database | 66 |
-| PostgreSQL integration | 58 |
-| total | 227 |
+| PostgreSQL integration | 59 |
+| total | 231 |
 
-Also passed: lint, client/server typecheck, client/server production build, 17 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
+Also passed: lint, client/server typecheck, client/server production build, 18 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
 ## Operational defaults
 
@@ -85,4 +86,4 @@ Also passed: lint, client/server typecheck, client/server production build, 17 m
 
 ## Immediate next action
 
-Begin task 32 in the ordered [`Discover development plan`](../Discover_개발_계획.md): add privacy-bounded product analytics, source/cache/fetch observability, dashboards, and alerts before the Discover pilot. Task 31 is complete with the [`Algora NO-GO decision`](./operations/2026-07-22-algora-research.md), and Algora remains disabled. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 33 only after validating dashboard delivery/ack, the UTC metric SQL fixture, analytics expiry, export/deletion, and forbidden-field checks. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

@@ -47,6 +47,8 @@ function createService(
   const metrics = {
     recordDiscoverCache: (source: string, result: string) => metricEvents.push(`cache:${source}:${result}`),
     recordDiscoverFetch: (source: string, result: string, reason?: string) => metricEvents.push(`fetch:${source}:${result}:${reason ?? ''}`),
+    configureDiscoverSources: () => undefined,
+    recordDiscoverFetchDuration: () => undefined,
   } as unknown as OperationalMetricsService
   const logger = { error: () => undefined } as unknown as OperationalLoggerService
   const savedService = {

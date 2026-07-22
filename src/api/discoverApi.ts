@@ -1,5 +1,6 @@
 import type {
   DiscoverCategory,
+  DiscoverClientAnalyticsEvent,
   DiscoverCompensation,
   DiscoverEngagement,
   DiscoverInterests,
@@ -484,5 +485,23 @@ export function updateDiscoverInterests(tags: DiscoverInterestTag[]) {
       ...createMutationHeaders(),
     },
     body: JSON.stringify({ tags }),
+  })
+}
+
+export async function recordDiscoverAnalyticsEvent(input: {
+  eventName: DiscoverClientAnalyticsEvent
+  source?: DiscoverSource
+  category?: DiscoverCategory
+}) {
+  return requestApi('/discover/events', (value) => {
+    if (!isRecord(value) || value.recorded !== true) return invalidDiscoverResponse()
+    return { recorded: true as const }
+  }, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createMutationHeaders(),
+    },
+    body: JSON.stringify(input),
   })
 }

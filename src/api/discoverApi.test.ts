@@ -8,6 +8,7 @@ import {
   getDiscoverSources,
   getSavedDiscoverItems,
   saveDiscoverItem,
+  recordDiscoverAnalyticsEvent,
   updateDiscoverInterests,
 } from './discoverApi'
 
@@ -237,5 +238,32 @@ describe('Discover API', () => {
       'x-csrf-token': 'interest-csrf',
     })
     expect(updateCall?.[1]?.headers).toHaveProperty('Idempotency-Key')
+  })
+
+  it('sends analytics without an item identifier or URL', async () => {
+    document.cookie = 'aisidequest_csrf=analytics-csrf; path=/'
+    const fetchMock = vi.fn(async (
+      _input: string | URL | Request,
+      _init?: RequestInit,
+    ) => response({ recorded: true }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await recordDiscoverAnalyticsEvent({
+      eventName: 'OUTBOUND_CLICK',
+      source: 'REMOTIVE',
+      category: 'EARNING',
+    })
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init?.body).toBe(JSON.stringify({
+      eventName: 'OUTBOUND_CLICK',
+      source: 'REMOTIVE',
+      category: 'EARNING',
+    }))
+    expect(String(init?.body)).not.toMatch(/item|url|title|tag/i)
+    expect(init?.headers).toMatchObject({
+      'x-csrf-token': 'analytics-csrf',
+      'Content-Type': 'application/json',
+    })
+    expect(init?.headers).toHaveProperty('Idempotency-Key')
   })
 })

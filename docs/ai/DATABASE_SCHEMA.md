@@ -1,10 +1,10 @@
 # AISideQuest PostgreSQL 데이터베이스 구성
 
-- 작성일: 2026-07-20
+- 작성일: 2026-07-22
 - PostgreSQL: 16
 - ORM 및 migration: TypeORM 1.1
 - 드라이버: `pg` 8.22
-- 기준 migration: `1784160000000`부터 `1784275200000-add-discover-interests`까지 17개
+- 기준 migration: `1784160000000`부터 `1784278800000-add-discover-analytics`까지 18개
 
 ---
 
@@ -107,14 +107,14 @@ NestJS가 공식 통합 모듈을 제공하고 현재 서버의 데코레이터�
 - `(user_id, source_item_id)` unique 제약으로 중복 저장을 방지한다.
 - JSON의 `id`·`source`가 row identity와 일치해야 하며, API는 browser card 전체가 아니라 cache에서 다시 검증한 normalized item만 저장한다.
 - 목록 cursor index는 `(user_id, saved_at DESC, id DESC)`다. Source cache가 삭제되어도 snapshot 목록은 독립적으로 조회된다.
-- 계정 삭제는 FK cascade에 더해 서비스 transaction에서 명시적으로 삭제하며, 계정 내보내기 schema version 3에 포함한다.
+- 계정 삭제는 FK cascade에 더해 서비스 transaction에서 명시적으로 삭제하며, 계정 내보내기 schema version 4에 포함한다.
 
 ## 3.6 Discover 관심 기술
 
 - 사용자당 row는 최대 하나이며 `user_id`가 PK이자 `users`를 참조하는 cascade FK다.
 - `tags`는 1~10개의 고유 text 배열이고 20개 고정 allowlist의 부분집합이어야 한다. 관심사가 없으면 빈 배열 row를 저장하지 않는다.
 - API는 전체 set을 교체하며 canonical allowlist 순서로 저장한다. 동일 의미 update는 `updated_at`을 바꾸지 않고, UUID idempotency response를 재사용한다.
-- 관심 기술은 계정 소유 data로 export schema version 3과 account delete transaction에 포함한다. 운영 log, metric label, 분석 event에는 복제하지 않는다.
+- 관심 기술은 계정 소유 data로 export schema version 4과 account delete transaction에 포함한다. 운영 log, metric label, 분석 event에는 복제하지 않는다.
 
 # 4. 개발용 퀘스트 seed
 
@@ -192,6 +192,23 @@ npm.cmd run test:database
 - 사용자와 퀘스트 버전당 포인트 보상 1회
 
 # 8. 다음 작업 경계
+
+## Discover analytics (Task 32)
+
+Migration `1784278800000-add-discover-analytics` adds
+`discover_analytics_events`. Each row is owned by one user and contains only
+`event_name`, nullable fixed `source`, nullable fixed `category`,
+`occurred_at`, and `expires_at`. Database checks enforce the four event names,
+the source/category allowlists, and these exact dimension shapes:
+
+- `DISCOVER_VIEW`: no source or category;
+- `TAB_VIEW`: category only;
+- `OUTBOUND_CLICK` and `SAVE`: source and category.
+
+Rows expire after 90 days and are indexed for user export, expiry cleanup, and
+UTC pilot aggregation. No item identifier, title, URL, tag, search term,
+interest, or upstream payload column exists. Account deletion uses the user FK
+cascade and an explicit transaction delete. Export returns only unexpired rows.
 
 5번에서 기본 DB 구조를 구성하고 6번에서 인증, 7번에서 세션 API 멱등성 migration과 런타임 연결을 추가했다. 다음 기능은 해당 번호에서 구현한다.
 

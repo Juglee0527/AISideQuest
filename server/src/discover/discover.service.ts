@@ -64,6 +64,7 @@ export class DiscoverService {
       }
       this.adapters.set(adapter.source, adapter)
     }
+    this.metrics.configureDiscoverSources([...this.adapters.keys()])
   }
 
   async listDiscover(
@@ -147,6 +148,8 @@ export class DiscoverService {
     adapter: DiscoverSourceAdapter,
     cached: DiscoverCacheEntry | null,
   ): Promise<LoadedSource> {
+    const startedAt = performance.now()
+    let terminalResult: 'SUCCESS' | 'FAILURE' | 'SKIPPED_LOCKED' = 'FAILURE'
     this.metrics.recordDiscoverCache(adapter.source, cached ? 'STALE' : 'MISS')
     this.metrics.recordDiscoverFetch(adapter.source, 'ATTEMPT')
     try {
@@ -157,10 +160,12 @@ export class DiscoverService {
       )
       if (result.entry) {
         this.metrics.recordDiscoverFetch(adapter.source, 'SUCCESS')
+        terminalResult = 'SUCCESS'
         return this.fromCache(adapter, result.entry, 'FRESH')
       }
 
       this.metrics.recordDiscoverFetch(adapter.source, 'SKIPPED_LOCKED')
+      terminalResult = 'SKIPPED_LOCKED'
       const latest = await this.cacheService.read(adapter.source).catch(() => cached)
       return this.fallback(adapter, latest)
     } catch (error) {
@@ -172,6 +177,12 @@ export class DiscoverService {
         failureReason: reason,
       })
       return this.fallback(adapter, cached)
+    } finally {
+      this.metrics.recordDiscoverFetchDuration(
+        adapter.source,
+        terminalResult,
+        (performance.now() - startedAt) / 1_000,
+      )
     }
   }
 

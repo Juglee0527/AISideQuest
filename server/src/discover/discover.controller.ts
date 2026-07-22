@@ -20,6 +20,7 @@ import type { AuthenticatedRequest } from '../auth/auth.types'
 import { assertEmptyBody, parseIdempotencyKey, parseUuid } from '../sessions/session-input'
 import {
   DiscoverListQueryDto,
+  RecordDiscoverAnalyticsEventDto,
   DiscoverSavedItemListQueryDto,
   SaveDiscoverItemDto,
   UpdateDiscoverInterestsDto,
@@ -27,6 +28,7 @@ import {
 import { DiscoverInterestService } from './discover-interest.service'
 import { DiscoverSavedService } from './discover-saved.service'
 import { DiscoverService } from './discover.service'
+import { DiscoverAnalyticsService } from './discover-analytics.service'
 
 @Controller('discover')
 @UseGuards(SessionAuthGuard)
@@ -35,6 +37,7 @@ export class DiscoverController {
     private readonly discoverService: DiscoverService,
     private readonly savedService: DiscoverSavedService,
     private readonly interestService: DiscoverInterestService,
+    private readonly analyticsService: DiscoverAnalyticsService,
   ) {}
 
   @Get()
@@ -43,6 +46,23 @@ export class DiscoverController {
     @Query() query: DiscoverListQueryDto,
   ) {
     return this.discoverService.listDiscover(request.auth.user.id, query)
+  }
+
+  @Post('events')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(CsrfGuard)
+  recordAnalyticsEvent(
+    @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() body: RecordDiscoverAnalyticsEventDto,
+  ) {
+    return this.analyticsService.recordClientEvent(
+      request.auth.user.id,
+      body.eventName,
+      body.source,
+      body.category,
+      parseIdempotencyKey(idempotencyKey),
+    )
   }
 
   @Get('sources')

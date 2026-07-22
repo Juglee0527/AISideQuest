@@ -16,6 +16,7 @@ import { StackExchangeRequestGate } from './stack-exchange-request-gate'
 import { StackOverflowAdapter } from './stack-overflow.adapter'
 import { DiscoverSavedService } from './discover-saved.service'
 import { DiscoverInterestService } from './discover-interest.service'
+import { DiscoverAnalyticsService } from './discover-analytics.service'
 
 @Module({
   imports: [AuthModule, ApiIdempotencyModule],
@@ -33,6 +34,7 @@ import { DiscoverInterestService } from './discover-interest.service'
     DiscoverService,
     DiscoverSavedService,
     DiscoverInterestService,
+    DiscoverAnalyticsService,
     {
       provide: DISCOVER_SOURCE_ADAPTERS,
       inject: [HackerNewsAdapter, RemotiveAdapter, DevAdapter, StackOverflowAdapter, GithubIssuesAdapter],

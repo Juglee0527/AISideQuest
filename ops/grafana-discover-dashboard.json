@@ -1,0 +1,22 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    { "id": 1, "title": "Source freshness", "type": "timeseries", "targets": [{ "expr": "aisidequest_discover_source_freshness_seconds", "legendFormat": "{{source}}" }] },
+    { "id": 2, "title": "Source failures", "type": "timeseries", "targets": [{ "expr": "sum by (source, reason) (rate(aisidequest_discover_source_fetch_total{result=\"FAILURE\"}[5m]))", "legendFormat": "{{source}} {{reason}}" }] },
+    { "id": 3, "title": "Source fetch p95 latency", "type": "timeseries", "targets": [{ "expr": "histogram_quantile(0.95, sum by (source, le) (rate(aisidequest_discover_source_fetch_duration_seconds_bucket[15m])))", "legendFormat": "{{source}}" }] },
+    { "id": 4, "title": "Normalized item count", "type": "timeseries", "targets": [{ "expr": "aisidequest_discover_source_item_count", "legendFormat": "{{source}}" }] },
+    { "id": 5, "title": "Cache resolutions", "type": "timeseries", "targets": [{ "expr": "sum by (source, result) (rate(aisidequest_discover_cache_total[15m]))", "legendFormat": "{{source}} {{result}}" }] },
+    { "id": 6, "title": "Discover product events (rolling 30 days)", "type": "bargauge", "targets": [{ "expr": "sum by (event, source, category) (aisidequest_discover_product_events_30d)", "legendFormat": "{{event}} {{source}} {{category}}" }] }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["aisidequest", "discover", "privacy-bounded"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timezone": "utc",
+  "title": "AISideQuest Discover Operations",
+  "uid": "aisidequest-discover",
+  "version": 1
+}

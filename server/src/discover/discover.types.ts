@@ -17,6 +17,22 @@ export const DISCOVER_CATEGORIES = [
 
 export type DiscoverCategory = (typeof DISCOVER_CATEGORIES)[number]
 
+export const DISCOVER_ANALYTICS_EVENTS = [
+  'DISCOVER_VIEW',
+  'TAB_VIEW',
+  'OUTBOUND_CLICK',
+  'SAVE',
+] as const
+export type DiscoverAnalyticsEvent = (typeof DISCOVER_ANALYTICS_EVENTS)[number]
+
+export const DISCOVER_CLIENT_ANALYTICS_EVENTS = [
+  'DISCOVER_VIEW',
+  'TAB_VIEW',
+  'OUTBOUND_CLICK',
+] as const
+export type DiscoverClientAnalyticsEvent =
+  (typeof DISCOVER_CLIENT_ANALYTICS_EVENTS)[number]
+
 export const DISCOVER_KINDS = [
   'PAID_JOB',
   'CASH_BOUNTY',

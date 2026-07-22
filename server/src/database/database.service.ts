@@ -23,6 +23,20 @@ export interface OperationalDatabaseSnapshot {
   databasePool: { total: number; idle: number; waiting: number }
 }
 
+export interface DiscoverOperationalSnapshot {
+  sources: Array<{
+    source: string
+    freshnessSeconds: number
+    itemCount: number
+  }>
+  productEvents30d: Array<{
+    eventName: string
+    source: string
+    category: string
+    count: number
+  }>
+}
+
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private dataSource?: DataSource
@@ -90,6 +104,49 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       pluginQueueOldestAgeSeconds: row?.plugin_queue_oldest_age_seconds ?? 0,
       pluginDeadLetters: row?.plugin_dead_letters ?? 0,
       databasePool: this.readPoolMetrics(),
+    }
+  }
+
+  async getDiscoverOperationalSnapshot(): Promise<DiscoverOperationalSnapshot> {
+    const sources = await this.query<Array<{
+      source: string
+      freshness_seconds: number
+      item_count: number
+    }>>(`
+      SELECT source,
+             greatest(0, extract(epoch FROM clock_timestamp() - refreshed_at))::double precision AS freshness_seconds,
+             jsonb_array_length(items)::integer AS item_count
+      FROM discover_source_cache
+      ORDER BY source
+    `)
+    const productEvents30d = await this.query<Array<{
+      event_name: string
+      source: string
+      category: string
+      count: number
+    }>>(`
+      SELECT event_name,
+             coalesce(source, 'NONE') AS source,
+             coalesce(category, 'NONE') AS category,
+             count(*)::integer AS count
+      FROM discover_analytics_events
+      WHERE occurred_at >= clock_timestamp() - interval '30 days'
+        AND expires_at > clock_timestamp()
+      GROUP BY event_name, source, category
+      ORDER BY event_name, source, category
+    `)
+    return {
+      sources: sources.map((row) => ({
+        source: row.source,
+        freshnessSeconds: row.freshness_seconds,
+        itemCount: row.item_count,
+      })),
+      productEvents30d: productEvents30d.map((row) => ({
+        eventName: row.event_name,
+        source: row.source,
+        category: row.category,
+        count: row.count,
+      })),
     }
   }
 

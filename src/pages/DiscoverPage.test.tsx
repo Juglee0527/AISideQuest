@@ -76,6 +76,9 @@ function sessionResponse(url: URL) {
   if (url.pathname.endsWith('/discover/interests')) {
     return response({ tags: [], updatedAt: null })
   }
+  if (url.pathname.endsWith('/discover/events')) {
+    return response({ recorded: true })
+  }
   return null
 }
 
@@ -373,7 +376,10 @@ describe('Discover page', () => {
       name: 'Remote TypeScript Engineer 저장 취소',
     })).toBeInTheDocument()
 
-    const saveCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')
+    const saveCall = fetchMock.mock.calls.find(([input, init]) => (
+      init?.method === 'POST'
+      && new URL(String(input)).pathname.endsWith('/discover/saved-items')
+    ))
     expect(saveCall?.[1]?.headers).toMatchObject({
       'x-csrf-token': 'test-csrf',
       'Content-Type': 'application/json',

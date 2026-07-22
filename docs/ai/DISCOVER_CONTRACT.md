@@ -1,6 +1,6 @@
 # Discover Product Contract
 
-Status: tasks 21-30 complete; tasks 31-33 are not implemented.
+Status: tasks 21-32 complete; task 33 is not implemented.
 Contract date: 2026-07-22
 
 This document is the canonical product, privacy, and release contract for the
@@ -56,8 +56,9 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
 - PostgreSQL cache refreshes use a per-source transaction advisory lock and an
   in-process single-flight. A losing instance serves bounded stale data or an
   unavailable status instead of multiplying upstream calls.
-- Basic cache and fetch counters use only fixed source, result, and failure
-  reason labels. Task 32 still owns dashboards, alerts, and pilot analytics.
+- Cache/fetch counters, source freshness and item-count gauges, bounded fetch
+  latency histograms, the code-managed dashboard, and warning/critical source
+  alerts use only fixed source, result, and failure-reason labels.
 
 ## Source expansion contract
 
@@ -263,9 +264,9 @@ not a verified cash bounty.
   the already loaded items.
 - Disabled future sources are not reported as failures. `STALE` and enabled
   `UNAVAILABLE` sources are explained without exposing upstream error details.
-- The screen does not collect view, tab, or outbound-click analytics. It does not
-  infer compensation or claim that an opportunity, reward, or availability is
-  guaranteed.
+- The screen records only the Task 32 privacy-bounded view, tab, and outbound
+  click events. It does not infer compensation or claim that an opportunity,
+  reward, or availability is guaranteed.
 
 ## Saved-item contract
 
@@ -282,7 +283,7 @@ not a verified cash bounty.
   row with `created: false`, and an exact idempotent replay returns the original
   response.
 - Saved snapshots remain readable when the external source and shared source
-  cache are unavailable. They are included in current user export schema version 3 and
+  cache are unavailable. They are included in current user export schema version 4 and
   deleted in the account-deletion transaction.
 - The `/discover` screen provides separate explore and saved views. Save and
   remove failures remain local to the action and do not hide already loaded
@@ -315,9 +316,8 @@ not a verified cash bounty.
 
 ## Product analytics and privacy
 
-Discover remains functional without behavioral analytics. Tasks 22-28 do not
-implicitly authorize collecting visits or clicks. Before the task 33 pilot,
-task 32 may add the following minimal events under the rules below:
+Discover remains functional if analytics recording fails. Task 32 implements
+the following minimal events under the rules below:
 
 - allowed event names: `DISCOVER_VIEW`, `TAB_VIEW`, `OUTBOUND_CLICK`, `SAVE`;
 - allowed dimensions: source and product category from fixed allowlists;
@@ -329,6 +329,12 @@ task 32 may add the following minimal events under the rules below:
 - owned analytics rows expire after 90 days and must be included in account
   export and primary account deletion;
 - Prometheus metrics expose aggregates only and never a user or item identifier.
+- Client event writes require browser authentication, CSRF, and an idempotency
+  key. `SAVE` cannot be submitted through the analytics endpoint; it is written
+  by the saved-item transaction only for the first `created: true` result.
+- The operational dashboard and aggregate metrics use a rolling 30-day window;
+  owned rows expire after 90 days. Pilot definitions and UTC de-duplication SQL
+  are code-managed in `ops/discover-pilot-metrics.sql`.
 
 Task 27 saved-item snapshots and task 28 explicitly selected interests are owned
 user data. They are included in export and deletion, excluded from operational

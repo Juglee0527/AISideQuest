@@ -8,6 +8,11 @@ export type DiscoverSource =
 
 export type DiscoverCategory = 'EARNING' | 'NEWS' | 'COMMUNITY'
 
+export type DiscoverClientAnalyticsEvent =
+  | 'DISCOVER_VIEW'
+  | 'TAB_VIEW'
+  | 'OUTBOUND_CLICK'
+
 export type DiscoverKind =
   | 'PAID_JOB'
   | 'CASH_BOUNTY'

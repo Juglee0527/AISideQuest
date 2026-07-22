@@ -20,6 +20,7 @@ import { AddSanitizedSessionContext1784264400000 } from './migrations/1784264400
 import { AddDiscoverSourceCache1784268000000 } from './migrations/1784268000000-add-discover-source-cache'
 import { AddDiscoverSavedItems1784271600000 } from './migrations/1784271600000-add-discover-saved-items'
 import { AddDiscoverInterests1784275200000 } from './migrations/1784275200000-add-discover-interests'
+import { AddDiscoverAnalytics1784278800000 } from './migrations/1784278800000-add-discover-analytics'
 
 export function createDataSourceOptions(
   configuration: Record<string, unknown> = process.env,
@@ -50,6 +51,7 @@ export function createDataSourceOptions(
       AddDiscoverSourceCache1784268000000,
       AddDiscoverSavedItems1784271600000,
       AddDiscoverInterests1784275200000,
+      AddDiscoverAnalytics1784278800000,
     ],
     migrationsTableName: 'schema_migrations',
     migrationsTransactionMode: 'all',

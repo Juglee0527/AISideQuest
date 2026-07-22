@@ -142,6 +142,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
 
   beforeEach(async () => {
     await databaseService.query(`
+      DELETE FROM discover_analytics_events;
       DELETE FROM discover_user_interests;
       DELETE FROM discover_saved_items;
       DELETE FROM api_idempotency_keys;
@@ -215,6 +216,13 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(duplicate.body.data.created, false)
     assert.equal(duplicate.body.data.savedItem.id, saved.body.data.savedItem.id)
 
+    const [analyticsCount] = await databaseService.query<Array<{ count: number }>>(`
+      SELECT count(*)::integer AS count
+      FROM discover_analytics_events
+      WHERE user_id = $1 AND event_name = 'SAVE'
+    `, [firstIdentity.userId])
+    assert.equal(analyticsCount.count, 1)
+
     const discover = await request(app.getHttpServer())
       .get('/api/v1/discover')
       .set('Cookie', cookieHeader(firstIdentity))
@@ -222,6 +230,68 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.deepEqual(discover.body.data.savedItems, [{
       itemId: items[0].id,
       savedItemId: saved.body.data.savedItem.id,
+    }])
+  })
+
+  test('analytics accepts only privacy-bounded event dimensions and idempotent replay', async () => {
+    const replayKey = randomUUID()
+    await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .send({ eventName: 'DISCOVER_VIEW' })
+      .expect(401)
+    await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('Idempotency-Key', randomUUID())
+      .send({ eventName: 'DISCOVER_VIEW' })
+      .expect(403)
+    await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ eventName: 'SAVE', source: 'REMOTIVE', category: 'EARNING' })
+      .expect(400)
+    await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', randomUUID())
+      .send({ eventName: 'OUTBOUND_CLICK', source: 'REMOTIVE', category: 'EARNING', itemId: 'REMOTIVE:101' })
+      .expect(400)
+
+    const recorded = await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', replayKey)
+      .send({ eventName: 'TAB_VIEW', category: 'NEWS' })
+      .expect(200)
+    assert.deepEqual(recorded.body.data, { recorded: true })
+    await request(app.getHttpServer())
+      .post('/api/v1/discover/events')
+      .set('Cookie', cookieHeader(firstIdentity))
+      .set('x-csrf-token', firstIdentity.csrfToken)
+      .set('Idempotency-Key', replayKey)
+      .send({ eventName: 'TAB_VIEW', category: 'NEWS' })
+      .expect(200)
+
+    const rows = await databaseService.query<Array<{
+      event_name: string
+      source: string | null
+      category: string | null
+      retention_days: number
+    }>>(`
+      SELECT event_name, source, category,
+             round(extract(epoch FROM expires_at - occurred_at) / 86400)::integer AS retention_days
+      FROM discover_analytics_events
+      WHERE user_id = $1
+    `, [firstIdentity.userId])
+    assert.deepEqual(rows, [{
+      event_name: 'TAB_VIEW',
+      source: null,
+      category: 'NEWS',
+      retention_days: 90,
     }])
   })
 

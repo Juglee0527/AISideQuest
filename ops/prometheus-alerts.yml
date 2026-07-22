@@ -57,6 +57,27 @@ groups:
         annotations:
           summary: "인증 실패가 초당 1건 초과"
           runbook: "docs/ai/OPERATIONS_RUNBOOK.md#인증rate-limit-이상"
+      - alert: AISideQuestDiscoverSourceFailure
+        expr: sum by (source) (increase(aisidequest_discover_source_fetch_total{result="FAILURE"}[15m])) > 0
+        for: 5m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "Discover source refresh failures detected"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#discover-source-incident"
+      - alert: AISideQuestDiscoverSourceUnavailable
+        expr: ((aisidequest_discover_source_enabled == 1) unless on(source) aisidequest_discover_source_freshness_seconds) or (aisidequest_discover_source_freshness_seconds{source!="REMOTIVE"} > 86400) or (aisidequest_discover_source_freshness_seconds{source="REMOTIVE"} > 259200)
+        for: 15m
+        labels: { severity: critical, owner: beta-oncall }
+        annotations:
+          summary: "Discover source has no cache within its maximum stale window"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#discover-source-incident"
+      - alert: AISideQuestDiscoverSourceLatencyHigh
+        expr: histogram_quantile(0.95, sum by (source, le) (rate(aisidequest_discover_source_fetch_duration_seconds_bucket[15m]))) > 5
+        for: 15m
+        labels: { severity: warning, owner: beta-oncall }
+        annotations:
+          summary: "Discover source refresh p95 latency exceeds 5 seconds"
+          runbook: "docs/ai/OPERATIONS_RUNBOOK.md#discover-source-incident"
       - alert: AISideQuestRateLimitBurst
         expr: sum(rate(aisidequest_rate_limited_total[5m])) > 2
         for: 5m

@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-22
-- 상태: Task 21~31 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow·조건부 GitHub Issues 연동과 Algora NO-GO 조사 완료
+- 상태: Task 21~32 완료, Discover 관측성·개인정보 제한 analytics·dashboard·alert 구현 완료
 - 작업 번호: 21~33
-- 다음 작업: 32. 관측성과 운영 안전장치
+- 다음 작업: 33. Dashboard·alert·집계 SQL 검증 후 연속 7일 Discover 파일럿
 - 1차 구현 범위: 21~26
 
 ---
@@ -128,7 +128,7 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 - AISideQuest point, source가 제공한 채용 급여, 검증된 cash bounty와 reputation bounty를 별도 개념으로 분류한다.
 - 외부 item 조회·원문 이동·저장에는 AISideQuest point를 지급하지 않는다.
 - Raw upstream payload와 HTML은 저장하지 않는다. Shared PostgreSQL cache에는 normalized item만 저장하고 초기 fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간으로 한다. Cache row는 마지막 성공 refresh 후 최대 7일 안에 교체·삭제한다.
-- Task 32 전에는 Discover 방문·click analytics를 수집하지 않는다. Pilot용 분석을 구현하면 item 정보 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
+- Task 32 analytics는 item 정보 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
 - Tasks 22~26 완료는 `Discover MVP 구현 완료`인 release candidate다. Real source smoke, attribution, 부분 장애, 접근성·mobile과 개인정보 gate를 통과해야 release로 판정한다.
 - Discover 진행과 기존 Task 20의 external staging·production·pilot 완료는 별도 track이다.
 
@@ -295,7 +295,7 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - Browser는 item 전체가 아니라 `itemId`만 보내며, server가 normalized source cache에서 다시 검증한 snapshot을 저장한다.
 - `(user_id, source_item_id)` unique 제약, UUID idempotency key와 ownership SQL로 중복 저장·재전송·타 사용자 삭제를 안전하게 처리한다.
 - `GET /discover/saved-items`는 source cache와 독립된 cursor 목록을 제공하고 `/discover`는 탐색·저장한 항목 보기를 제공한다.
-- 저장 snapshot은 현재 사용자 data export schema version 3와 account delete transaction에 포함된다.
+- 저장 snapshot은 현재 사용자 data export schema version 4와 account delete transaction에 포함된다.
 
 #### 28. 명시적 관심 기술 설정과 정렬
 
@@ -319,7 +319,7 @@ Task 26까지 완료하면 Discover MVP 구현 범위가 완성되어 release ca
 - 관심사가 없으면 `(publishedAt ?? fetchedAt) DESC, source ASC, id ASC`를 그대로 유지한다. 관심사가 있으면 tag 일치 수, newest item 기준 1·7·30일 최신성 band, source 제공 반응도, 명확한 reward·salary, 기존 시간순으로 정렬한다.
 - Hacker News score는 source engagement로 사용하고 Remotive는 현재 `null`이다. 정제한 외부 title·summary의 고정 keyword는 canonical 기술 tag만 추가하며 LLM을 사용하지 않는다.
 - 화면은 관심 기술 일치·최신 항목·외부 반응 정보·보상 또는 급여 명확성만 추천 이유로 표시한다. 관심사가 바뀌면 기존 cursor는 `400 INVALID_CURSOR`로 거부한다.
-- 관심 기술은 export schema version 3과 account delete transaction에 포함하고 운영 log·metric·analytics에서 제외한다. Prompt, AI response, code, diff, transcript, 명령, tool input/output와 local path는 저장·정렬 입력이 아니다.
+- 관심 기술은 export schema version 4와 account delete transaction에 포함하고 운영 log·metric·analytics에서 제외한다. Prompt, AI response, code, diff, transcript, 명령, tool input/output와 local path는 저장·정렬 입력이 아니다.
 
 ### 3.3 3차 마일스톤: 소스 확장
 
@@ -445,6 +445,16 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 ### 3.4 4차 마일스톤: 안정화와 파일럿
 
 #### 32. 관측성과 운영 안전장치
+
+상태: **완료 (2026-07-22)**
+
+구현 결과:
+
+- `DISCOVER_VIEW`, `TAB_VIEW`, `OUTBOUND_CLICK`은 인증·CSRF·idempotency를 요구하는 전용 endpoint로 기록하며, `SAVE`는 최초 저장 `created: true` transaction 안에서만 기록한다.
+- analytics row는 user ID와 고정 source·category만 소유하고 90일 후 만료되며 account export schema version 4와 primary deletion에 포함된다. item ID·제목·URL·tag·검색어·관심 기술·원본 응답은 schema와 DTO에 없다.
+- Prometheus에는 aggregate만 노출하고 source freshness·failure·latency·item count·cache와 30일 product event gauge를 제공한다. user·item 식별자는 label에 없다.
+- [`Grafana dashboard`](../ops/grafana-discover-dashboard.json), warning/critical [`Prometheus alert`](../ops/prometheus-alerts.yml), UTC 기준 [`pilot metric SQL`](../ops/discover-pilot-metrics.sql)을 코드로 관리한다.
+- 외부 source 장애는 계속 core liveness/readiness에 포함하지 않는다.
 
 작업:
 

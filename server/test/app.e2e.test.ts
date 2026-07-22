@@ -68,6 +68,12 @@ before(async () => {
         pluginDeadLetters: 7,
         databasePool: { total: 8, idle: 7, waiting: 1 },
       }),
+      getDiscoverOperationalSnapshot: () => ({
+        sources: [{ source: 'HACKER_NEWS', freshnessSeconds: 60, itemCount: 12 }],
+        productEvents30d: [{
+          eventName: 'DISCOVER_VIEW', source: 'NONE', category: 'NONE', count: 3,
+        }],
+      }),
     })
     .compile()
 
@@ -146,6 +152,8 @@ test('metrics require a bearer secret and contain operational gauges only', asyn
     .expect(200)
   assert.match(response.text, /aisidequest_active_sessions 2/)
   assert.match(response.text, /aisidequest_plugin_dead_letters 7/)
+  assert.match(response.text, /aisidequest_discover_source_item_count\{source="HACKER_NEWS"\} 12/)
+  assert.match(response.text, /aisidequest_discover_product_events_30d\{event="DISCOVER_VIEW",source="NONE",category="NONE"\} 3/)
   assert.doesNotMatch(response.text, /token|cookie|authorization/i)
 })
 

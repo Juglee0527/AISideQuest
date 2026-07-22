@@ -14,6 +14,7 @@ export type ApiIdempotencyOperation =
   | 'DISCOVER_ITEM_SAVE'
   | 'DISCOVER_ITEM_DELETE'
   | 'DISCOVER_INTERESTS_UPDATE'
+  | 'DISCOVER_ANALYTICS_EVENT'
 
 interface StoredIdempotencyRow {
   request_hash: string

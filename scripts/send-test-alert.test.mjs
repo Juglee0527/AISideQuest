@@ -53,9 +53,12 @@ test('alert rules contain every required operational signal and runbook link', a
     'AISideQuestDatabasePoolWaiting',
     'AISideQuestAuthFailureBurst',
     'AISideQuestRateLimitBurst',
+    'AISideQuestDiscoverSourceFailure',
+    'AISideQuestDiscoverSourceUnavailable',
+    'AISideQuestDiscoverSourceLatencyHigh',
   ]) {
     assert.match(rules, new RegExp(`alert: ${alert}`))
   }
   assert.doesNotMatch(rules, /\t/)
-  assert.equal((rules.match(/runbook:/g) ?? []).length, 9)
+  assert.equal((rules.match(/runbook:/g) ?? []).length, 12)
 })

@@ -26,6 +26,7 @@ import {
   getDiscoverPage,
   getDiscoverInterests,
   getSavedDiscoverItems,
+  recordDiscoverAnalyticsEvent,
   saveDiscoverItem,
   updateDiscoverInterests,
 } from '../api/discoverApi'
@@ -151,12 +152,14 @@ function DiscoverCard({
   savedItemId,
   isSaving,
   onToggleSaved,
+  onOutboundClick,
   recommendation,
 }: {
   item: DiscoverItem
   savedItemId: string | null
   isSaving: boolean
   onToggleSaved: () => void
+  onOutboundClick: () => void
   recommendation?: DiscoverRecommendation
 }) {
   const publishedLabel = formatDate(item.publishedAt)
@@ -236,6 +239,7 @@ function DiscoverCard({
           </button>
           <a
             href={item.originalUrl}
+            onClick={onOutboundClick}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-3.5 py-2 text-sm font-bold text-slate-200 transition hover:border-emerald-300/50 hover:text-emerald-200"
@@ -379,6 +383,26 @@ function DiscoverPage() {
   const [interestReloadKey, setInterestReloadKey] = useState(0)
   const requestSequence = useRef(0)
   const savedRequestSequence = useRef(0)
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready') return
+    void recordDiscoverAnalyticsEvent({ eventName: 'DISCOVER_VIEW' })
+      .catch(() => undefined)
+  }, [sessionStatus])
+
+  useEffect(() => {
+    if (sessionStatus !== 'ready' || view !== 'EXPLORE') return
+    void recordDiscoverAnalyticsEvent({ eventName: 'TAB_VIEW', category })
+      .catch(() => undefined)
+  }, [category, sessionStatus, view])
+
+  const recordOutboundClick = useCallback((item: DiscoverItem) => {
+    void recordDiscoverAnalyticsEvent({
+      eventName: 'OUTBOUND_CLICK',
+      source: item.source,
+      category: item.category,
+    }).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     if (sessionStatus !== 'ready') return undefined
@@ -741,6 +765,7 @@ function DiscoverPage() {
                       savedItemId={saved.id}
                       isSaving={savingItemIds.has(saved.item.id)}
                       onToggleSaved={() => void toggleSaved(saved.item)}
+                      onOutboundClick={() => recordOutboundClick(saved.item)}
                     />
                   ))}
                 </div>
@@ -814,6 +839,7 @@ function DiscoverPage() {
                     savedItemId={savedReferences[item.id] ?? null}
                     isSaving={savingItemIds.has(item.id)}
                     onToggleSaved={() => void toggleSaved(item)}
+                    onOutboundClick={() => recordOutboundClick(item)}
                     recommendation={recommendations[item.id]}
                   />
                 ))}

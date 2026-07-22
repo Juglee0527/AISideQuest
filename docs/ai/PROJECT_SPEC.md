@@ -2,7 +2,7 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~31 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~32 완료
 - 애플리케이션 버전: `0.1.0`
 - 최종 현행화: 2026-07-22
 
@@ -251,17 +251,17 @@ git diff --check
 
 ## 9.3 마지막 검증 상태
 
-2026-07-21 기준 자동 test 218개가 통과했다.
+2026-07-22 기준 자동 test 231개가 통과했다.
 
 | Suite | 통과 |
 |---|---:|
-| React | 65 |
+| React | 66 |
 | Codex plugin | 20 |
-| 운영·local startup script | 17 |
-| Server non-database | 58 |
-| PostgreSQL integration | 58 |
+| 운영·local startup script | 20 |
+| Server non-database | 66 |
+| PostgreSQL integration | 59 |
 
-Lint, client·server typecheck와 production build, migration 17개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
+Lint, client·server typecheck와 production build, migration 18개 revert·reapply, Docker API·web build와 deployment smoke 10개도 통과했다.
 
 ---
 
@@ -288,14 +288,14 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Server만 고정 source API host를 fetch하고 raw response·HTML은 저장하거나 log하지 않는다.
 - Shared PostgreSQL cache에는 normalized item만 저장한다. Fresh·maximum stale은 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간이며 cache row는 마지막 성공 refresh 후 7일 안에 교체·삭제한다.
 - 관심 기술은 20개 고정 allowlist에서 최대 10개만 직접 선택한다. 관심사가 없으면 기존 최신순이며, 있으면 tag 일치 수·newest item 기준 최신성 구간·source 반응도·명확한 reward/compensation·기존 시간순으로 결정적으로 정렬한다.
-- 개인화에는 prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path를 사용하지 않는다. 관심 기술은 export schema version 3과 account delete에 포함하고 log·metric·analytics에서 제외한다.
-- Task 32 전에는 visit·click analytics를 암묵적으로 수집하지 않는다. Pilot용 owned analytics를 구현하면 item detail 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다.
+- 개인화에는 prompt, AI response, code, diff, transcript, 원본 명령, tool input/output와 local path를 사용하지 않는다. 관심 기술은 export schema version 4와 account delete에 포함하고 log·metric·analytics에서 제외한다.
+- Task 32 analytics는 item detail 없이 fixed event·source·category만 저장하고 90일 expiry, export와 delete를 적용한다. user·item 식별자는 log와 metric label에 포함하지 않는다.
 - Tasks 22~26 완료는 `Discover MVP implementation complete`인 release candidate다. Real source smoke, attribution, failure, accessibility와 privacy evidence가 있어야 release할 수 있다.
 - Discover 완료는 별도 track인 Task 20 완료 증거가 아니다.
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 32의 개인정보 제한 product analytics, source·cache·fetch 관측성, dashboard와 alert다.
+다음 작업은 Task 33의 dashboard·alert 전달 검증 후 연속 7일 Discover 파일럿이다.
 
 ---
 
@@ -320,6 +320,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Task 29B: Stack Exchange API v2.3 featured·unanswered, reputation bounty, backoff·quota·1분 request gate 완료
 - Task 30: 별도 server token과 승인 organization/repository scope가 함께 있을 때만 활성화되는 GitHub Issues source 완료
 - Task 31: Algora 공식 전역 탐색·organization 열거·rate-limit 계약과 승인 allowlist 부재로 NO-GO 조사 완료; adapter·schema·UI 변경 없음
-- Task 32~33: Discover observability와 product pilot 미구현
+- Task 32: privacy-bounded analytics, source/cache/fetch metrics, dashboard, warning/critical alert와 UTC pilot SQL 완료
+- Task 33: Discover product pilot 미진행
 
 최종 목표는 AI가 일하는 동안 개발자가 안전하게 학습하거나 외부 기회를 발견하도록 돕는 것이다. AISideQuest는 사용자의 작업 content를 수집하거나 외부 보상을 보장하는 방식으로 이 목표를 달성하지 않는다.

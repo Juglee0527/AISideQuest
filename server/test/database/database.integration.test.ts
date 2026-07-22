@@ -64,6 +64,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       'device_link_codes',
       'device_link_requests',
       'devices',
+      'discover_analytics_events',
       'discover_saved_items',
       'discover_source_cache',
       'discover_user_interests',
@@ -94,6 +95,12 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
       expectedTables,
     )
     assert.deepEqual(await dataSource.runMigrations(), [])
+
+    await dataSource.undoLastMigration()
+    const [discoverAnalyticsReverted] = (await dataSource.query(`
+      SELECT to_regclass('public.discover_analytics_events') AS analytics_table
+    `)) as Array<{ analytics_table: string | null }>
+    assert.equal(discoverAnalyticsReverted.analytics_table, null)
 
     await dataSource.undoLastMigration()
     const [discoverInterestsReverted] = (await dataSource.query(`
@@ -216,7 +223,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `, [migrationUser.id, migrationQuest.id, migrationSession.id])) as Array<{ id: string }>
 
     const pointMigrations = await dataSource.runMigrations()
-    assert.equal(pointMigrations.length, 10)
+    assert.equal(pointMigrations.length, 11)
     const [backfill] = (await dataSource.query(`
       SELECT points, quest_attempt_id
       FROM point_ledger
@@ -231,6 +238,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     `)) as Array<{ indexdef: string }>
     assert.match(ledgerIndex.indexdef, /user_id, created_at DESC, id DESC/)
 
+    await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
     await dataSource.undoLastMigration()
@@ -322,7 +330,7 @@ if (!testDatabaseUrl || !databaseResetAllowed) {
     assert.equal(schemaReverted.users_table, null)
 
     const reappliedMigrations = await dataSource.runMigrations()
-    assert.equal(reappliedMigrations.length, 17)
+    assert.equal(reappliedMigrations.length, 18)
   })
 
   test('discover cache stores only allowlisted normalized item arrays', async () => {

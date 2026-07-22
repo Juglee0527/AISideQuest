@@ -99,6 +99,8 @@ Successful `GET /discover` data:
 
 `GET /discover/sources` returns `{ "sources": [...] }` for `HACKER_NEWS`, `REMOTIVE`, `DEV`, `STACK_EXCHANGE`, `GITHUB`, and `ALGORA`. `enabled` means an adapter is active. `status` is `FRESH`, `STALE`, or `UNAVAILABLE`; `FRESH` and `STALE` require a successful ISO8601 `fetchedAt`. No raw upstream error is exposed.
 
+`POST /discover/events` requires the authenticated browser session, CSRF, and a UUID idempotency key. It accepts only `DISCOVER_VIEW`, `TAB_VIEW`, or `OUTBOUND_CLICK` plus their exact fixed source/category dimensions. Unknown fields, item identifiers, titles, URLs, tags, search text, and interests are rejected. `SAVE` is not client-writable and is recorded only by the first successful saved-item insert.
+
 Every `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, nullable source-provided `engagement`, nullable positive `readingTimeMinutes`, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`. A recommendation is a separate `{ itemId, reasons, matchedInterests }` record and is returned only for items in the current page.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.

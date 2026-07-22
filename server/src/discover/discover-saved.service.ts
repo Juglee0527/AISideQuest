@@ -6,6 +6,7 @@ import { ApiIdempotencyService } from '../common/idempotency/api-idempotency.ser
 import { DatabaseService } from '../database/database.service'
 import { validationError } from '../sessions/session-input'
 import { DiscoverCacheService } from './discover-cache.service'
+import { DiscoverAnalyticsService } from './discover-analytics.service'
 import { normalizeDiscoverItem } from './discover-normalization'
 import {
   DISCOVER_ITEM_ID_PATTERN,
@@ -39,6 +40,7 @@ export class DiscoverSavedService {
     private readonly databaseService: DatabaseService,
     private readonly cacheService: DiscoverCacheService,
     private readonly idempotencyService: ApiIdempotencyService,
+    private readonly analyticsService: DiscoverAnalyticsService,
   ) {}
 
   async listSavedItems(userId: string, limit: number, cursorValue?: string) {
@@ -102,6 +104,14 @@ export class DiscoverSavedService {
       const row = rows[0]
       if (!row) throw new Error('Failed to save Discover item')
       const response = { created: inserted.length > 0, savedItem: this.toSnapshot(row) }
+      if (response.created) {
+        await this.analyticsService.recordSave(
+          manager,
+          userId,
+          normalizedItem.source,
+          normalizedItem.category,
+        )
+      }
       await this.idempotencyService.storeResponse(
         manager,
         userId,
