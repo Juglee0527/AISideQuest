@@ -2,10 +2,10 @@
 
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
-- 작성일: 2026-07-21
-- 상태: Task 21~30 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow·조건부 GitHub Issues 연동 완료
+- 작성일: 2026-07-22
+- 상태: Task 21~31 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow·조건부 GitHub Issues 연동과 Algora NO-GO 조사 완료
 - 작업 번호: 21~33
-- 다음 작업: 31. Algora 공개 탐색 가능성 조사와 GO·NO-GO 판정
+- 다음 작업: 32. 관측성과 운영 안전장치
 - 1차 구현 범위: 21~26
 
 ---
@@ -95,7 +95,7 @@ GitHub label이나 제목에 `bounty`가 있다는 이유만으로 현금 보상
 | 2 | [Forem API](https://developers.forem.com/api/) | DEV 개발 글과 반응 정보 | API 버전을 Adapter 내부에 격리 |
 | 2 | [Stack Exchange API](https://api.stackexchange.com/docs) | 질문, 미답변, reputation bounty | 현금이 아닌 평판 보상으로 표시 |
 | 3 | [GitHub REST API](https://docs.github.com/en/rest) | 오픈소스 기여 이슈 | 별도 인증 방식과 rate limit 설계 필요 |
-| 3 | [Algora Bounties API](https://api.docs.algora.io/bounties) | USD 현금 바운티 | 전역 공개 탐색 방법과 이용 조건 선확인 |
+| 3 | [Algora API](https://api.docs.algora.io/) | USD 현금 바운티 | 전역 공개 탐색 방법과 이용 조건 선확인 |
 
 ---
 
@@ -414,6 +414,17 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 - 환경설정, HTTP metadata·header 보안, adapter 정규화·scope·PR/assigned 방어, incomplete 결과, rate-limit gate를 서버 테스트로 검증했다. 실제 credential과 승인 scope를 사용하는 live smoke는 secret과 issue 상세를 출력하지 않는 별도 운영 증거로 남긴다.
 
 #### 31. Algora 조사 및 조건부 연동
+
+상태: **완료 (2026-07-22, NO-GO)**
+
+조사 결과:
+
+- 공식 SDK의 bounty list는 `https://console.algora.io/api/trpc`를 사용하지만 사전에 알고 있는 organization handle이 필수다.
+- 공식 전역 bounty 탐색 API, organization 열거 API, provider rate-limit 계약은 확인되지 않았다.
+- AISideQuest가 승인한 organization allowlist와 갱신 책임자도 없다.
+- Community 화면은 공식 API가 아니며, 서비스 약관상 사전 서면 동의 없는 자동 접근·복사를 fallback으로 사용할 수 없다.
+- 현금 reward는 USD이며 120개국 지급을 홍보하지만, 제품 계약에 사용할 안정적인 국가별 eligibility 목록은 확인되지 않았다.
+- 따라서 adapter·schema·UI를 변경하지 않는 `NO-GO`로 완료했다. API host·인증·조직 선정·attribution·국가·통화·page/request·rate limit·TTL 판단 근거는 [`Algora 조사 기록`](./ai/operations/2026-07-22-algora-research.md)에 보존한다.
 
 선행 조사:
 

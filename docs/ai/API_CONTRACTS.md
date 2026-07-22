@@ -63,7 +63,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Task 29 adds DEV Community and Stack Overflow. These four sources are always `enabled: true`. Task 30 adds GitHub only when `GITHUB_DISCOVER_TOKEN` and at least one approved organization or repository are configured together; otherwise GitHub remains disabled. An uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. Algora remains disabled.
+Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Task 29 adds DEV Community and Stack Overflow. These four sources are always `enabled: true`. Task 30 adds GitHub only when `GITHUB_DISCOVER_TOKEN` and at least one approved organization or repository are configured together; otherwise GitHub remains disabled. An uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. Task 31 made no API change: Algora remains disabled under the documented [`NO-GO decision`](./operations/2026-07-22-algora-research.md).
 
 `GET /discover` query:
 

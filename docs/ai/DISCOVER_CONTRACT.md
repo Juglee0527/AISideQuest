@@ -36,7 +36,8 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   `UNAVAILABLE`. Hacker News, Remotive, DEV, and Stack Exchange are registered
   unconditionally. GitHub is registered only when its separate server token and
   at least one approved organization or repository scope are configured
-  together. Algora stays disabled until a documented GO decision is reached.
+  together. Task 31 reached a documented Algora NO-GO decision, so Algora stays
+  disabled and no Algora adapter is registered.
 
 ## Adapter infrastructure baseline
 
@@ -102,11 +103,12 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   Requests use GitHub REST API version `2026-03-10`, the separate search bucket,
   no source retry, and block after `403`/`429` according to `Retry-After`, then
   `X-RateLimit-Remaining`/`X-RateLimit-Reset`, with a one-minute fallback.
-- Task 31 is `Algora research and conditional integration`. The public API
-  lists bounties by a known organization, while authenticated `/api/bounties`
-  lists the caller's organization. Without an approved organization allowlist
-  or another documented public global-discovery route, a written NO-GO result
-  completes the task and no adapter is registered.
+- Task 31 completed on 2026-07-22 with the documented
+  [`Algora NO-GO decision`](./operations/2026-07-22-algora-research.md). The
+  official SDK lists bounties only for a previously known organization, no
+  supported public global-discovery or organization-enumeration route and no
+  provider rate-limit contract were found, and the service terms do not permit
+  scraping as a fallback. No adapter, schema, or UI change is authorized.
 
 ## Hacker News adapter
 

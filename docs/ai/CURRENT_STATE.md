@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-30 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, the Discover screen, user-owned saved items, and explicit-interest personalization complete. Tasks 31-33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-31 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, the Discover screen, user-owned saved items, explicit-interest personalization, and the documented Algora NO-GO investigation complete. Tasks 32-33 are not implemented.
 
 Implemented:
 
@@ -85,4 +85,4 @@ Also passed: lint, client/server typecheck, client/server production build, 17 m
 
 ## Immediate next action
 
-Begin task 31 in the ordered [`Discover development plan`](../Discover_개발_계획.md): investigate Algora and register no adapter unless a supported public global-discovery route or approved organization allowlist produces a documented GO decision. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 32 in the ordered [`Discover development plan`](../Discover_개발_계획.md): add privacy-bounded product analytics, source/cache/fetch observability, dashboards, and alerts before the Discover pilot. Task 31 is complete with the [`Algora NO-GO decision`](./operations/2026-07-22-algora-research.md), and Algora remains disabled. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

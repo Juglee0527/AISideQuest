@@ -5,7 +5,7 @@
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
 - Task 20: 배포 패키지 구현 완료, 외부 운영 배포·파일럿 증거 대기
-- Discover 확장: Task 21~30 완료, Task 31~33 대기
+- Discover 확장: Task 21~31 완료, Task 32~33 대기
 
 ---
 
@@ -649,9 +649,9 @@ event 수신과 퀘스트 제출·보상을 독립적으로 멈추는 kill switc
 
 Docker 리허설에서 11개 migration 적용과 재실행 `applied: []`, API·PostgreSQL health, Caddy 경유 health·CORS·OAuth state/PKCE·cookie·SPA smoke 10개를 통과했다. 세부 실행서는 [DEPLOYMENT_AND_PILOT.md](./DEPLOYMENT_AND_PILOT.md)에 기록했다. 실제 domain·DB·OAuth 자격증명, production 복원·rollback 증거, 초대 사용자 10명과 최소 7일 관찰이 완료되기 전까지 20번 전체는 미완료다.
 
-# 17. Discover Task 21~28 구현 결과
+# 17. Discover Task 21~31 구현 결과
 
-Task 21~28에서 다음 범위를 구현했다.
+Task 21~31에서 다음 범위를 구현·판정했다.
 
 1. Discover 제품·보상 분류·개인정보·release 계약과 공통 `DiscoverItem` API model
 2. HTTPS host allowlist, timeout, 제한된 retry, plain-text 정제, PostgreSQL cache, source별 single-flight와 stale fallback
@@ -666,4 +666,4 @@ Task 21~28에서 다음 범위를 구현했다.
 
 2026-07-22 현재 React 65개, Codex plugin 20개, 운영·local startup 18개, server non-database 66개, PostgreSQL integration 58개로 자동 테스트 총 227개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다. Task 30은 별도 server-only GitHub token과 명시적 organization/repository allowlist가 함께 있을 때만 활성화되는 1 page·30건 Search Issues adapter, PR·assigned·scope 방어 검증, 30분 fresh·24시간 maximum stale, search rate-limit 차단을 추가했다.
 
-Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. 다음 구현 작업은 Task 30의 GitHub credential·탐색 범위 확정이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.
+Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. Task 30은 별도 server token과 승인 scope가 함께 있을 때만 활성화되는 GitHub Issues adapter를 완료했다. Task 31은 공식 SDK·API 문서·약관을 조사했으나 지원되는 전역 discovery, organization enumeration, provider rate-limit 계약과 승인 allowlist를 확보하지 못해 `NO-GO`로 완료했고 adapter·schema·UI는 변경하지 않았다. 다음 구현 작업은 Task 32 관측성이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.

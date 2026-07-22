@@ -2,9 +2,9 @@
 
 > AI가 작업하는 동안 발생하는 대기 시간을 가치 있는 시간으로 전환하는 로컬 우선 개발자 도구
 
-- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~28 완료
+- 현재 상태: 실사용 베타 Task 1~19 구현 완료, Task 20 외부 증거 대기, Discover Task 21~31 완료
 - 애플리케이션 버전: `0.1.0`
-- 최종 현행화: 2026-07-21
+- 최종 현행화: 2026-07-22
 
 ---
 
@@ -114,7 +114,7 @@ Home에는 수동 시작·종료 button이 없다. 수동 session endpoint는 �
 - Loading·empty·stale·부분 장애·전체 source 장애·pagination error 구분
 - Desktop·mobile navigation, keyboard tab 이동과 `noopener noreferrer` 외부 원문 link
 
-Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 item을 가져온다. Remotive adapter는 `category=software-dev&limit=30`을 6시간에 최대 한 번 공유 호출하고 source-provided salary text만 compensation으로 표시한다. DEV adapter는 Forem V1 Accept header로 `dev.to` public article 30개를 30분에 최대 한 번 공유 호출하고 읽기 시간과 반응 수를 별도 필드로 정규화한다. 삭제·누락·중복 item은 개별 격리하며 Stack Exchange·GitHub·Algora는 아직 외부 network를 호출하지 않는다.
+Hacker News adapter는 exact HTTPS host에서 feed 4개와 feed별 최대 12개 item을 가져온다. Remotive adapter는 `category=software-dev&limit=30`을 6시간에 최대 한 번 공유 호출하고 source-provided salary text만 compensation으로 표시한다. DEV adapter는 Forem V1 Accept header로 `dev.to` public article 30개를 30분에 최대 한 번 공유 호출하고 읽기 시간과 반응 수를 별도 필드로 정규화한다. Stack Overflow adapter는 공개 API의 featured·unanswered 질문을 bounded request gate로 가져오고, GitHub Issues adapter는 별도 server token과 승인 organization/repository scope가 함께 있을 때만 활성화한다. 삭제·누락·중복 item은 개별 격리한다. Algora는 Task 31 NO-GO 판정에 따라 외부 network를 호출하지 않는다.
 
 ## 4.6 현재 제외 범위
 
@@ -279,7 +279,7 @@ Lint, client·server typecheck와 production build, migration 17개 revert·reap
 
 # 11. Discover 제품 계약과 다음 단계
 
-Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을, Task 28에서 명시적 관심 기술과 결정적 정렬을, Task 29에서 DEV Community 개발 글과 Stack Overflow 미답변·평판 bounty를 제공한다.
+Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증된 read API를, Task 23에서 safe adapter·HTTP·normalization·cache·stale 기반을 구현했다. Task 24~25에서 Hacker News와 Remotive item을 활성화했고 Task 26에서 `/discover` 화면을, Task 27에서 사용자별 저장 snapshot을, Task 28에서 명시적 관심 기술과 결정적 정렬을, Task 29에서 DEV Community 개발 글과 Stack Overflow 미답변·평판 bounty를 제공한다. Task 30은 조건부 GitHub Issues source를 구현했고 Task 31은 지원되는 전역 탐색 경로와 승인 organization allowlist가 없어 Algora를 NO-GO로 확정했다.
 
 - `/discover`와 browser API는 GitHub login을 요구하지만 active AI session은 요구하지 않는다.
 - AISideQuest는 외부 item을 정제·분류하고 원문으로 연결할 뿐 채용, 수익, 자격, 지급을 보장하지 않는다.
@@ -295,7 +295,7 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 
 정확한 기준은 [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md), 순서는 [`../Discover_개발_계획.md`](../Discover_개발_계획.md)를 따른다.
 
-다음 작업은 Task 30의 GitHub server credential·탐색 범위 확정과 Issues 연동이다.
+다음 작업은 Task 32의 개인정보 제한 product analytics, source·cache·fetch 관측성, dashboard와 alert다.
 
 ---
 
@@ -318,7 +318,8 @@ Task 21에서 제품 규칙을 확정했고 Task 22에서 common model과 인증
 - Task 28: explicit interest allowlist, CSRF·idempotency, deterministic ranking, reason UI, export·delete 완료
 - Task 29A: public Forem V1 DEV article, reading time·reaction, bounded cache/stale 완료
 - Task 29B: Stack Exchange API v2.3 featured·unanswered, reputation bounty, backoff·quota·1분 request gate 완료
-- Task 30~31: GitHub·조건부 Algora source 미구현
+- Task 30: 별도 server token과 승인 organization/repository scope가 함께 있을 때만 활성화되는 GitHub Issues source 완료
+- Task 31: Algora 공식 전역 탐색·organization 열거·rate-limit 계약과 승인 allowlist 부재로 NO-GO 조사 완료; adapter·schema·UI 변경 없음
 - Task 32~33: Discover observability와 product pilot 미구현
 
 최종 목표는 AI가 일하는 동안 개발자가 안전하게 학습하거나 외부 기회를 발견하도록 돕는 것이다. AISideQuest는 사용자의 작업 content를 수집하거나 외부 보상을 보장하는 방식으로 이 목표를 달성하지 않는다.

@@ -124,7 +124,7 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Final pilot gate: at least 10 full-flow users, 7 days, 100 eligible automatic sessions, detection ≥95%, reflection p95 ≤5s, zero unrecoverable loss, zero duplicate sessions/points, API 5xx <1%.
 - Retaining optional deployment tooling does not satisfy the pilot gate; task 20 remains incomplete without real external evidence.
 
-## Discover expansion (Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, screen, saved items, and explicit interests)
+## Discover expansion (Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, Algora NO-GO, screen, saved items, and explicit interests)
 
 - Discover requires the existing GitHub-authenticated browser session but never an active AI session.
 - `GET /discover` and `GET /discover/sources` are implemented with validated filters, an opaque versioned cursor contract, safe source status, and strict client parsing. Hacker News Top·Ask·Show·Jobs, Remotive Software Development jobs, public Forem V1 DEV articles, and fixed Stack Exchange API v2.3 Stack Overflow featured·unanswered questions are enabled through bounded HTTP, normalized cache, single-flight and stale fallback. GitHub open issues are enabled only with a separate server-only token and explicit organization/repository allowlist; the adapter performs one 30-result search page, excludes pull requests and assigned or out-of-scope results, and honors the separate search rate-limit reset. DEV may expose nullable positive reading time and source reaction engagement. Stack Overflow exposes only reputation bounties or discussions and enforces wrapper backoff, quota exhaustion, and one-minute identical-request spacing.
@@ -139,5 +139,6 @@ Origins: `HOOK` or `MANUAL`. Timing quality: `EXACT` or `DEGRADED`.
 - Only the server fetches fixed source API hosts. Display links are never used as server fetch targets, and raw upstream payloads or HTML are never persisted or logged.
 - The shared cache stores normalized items only, applies source-specific fresh and maximum stale ages, and purges normalized cache rows within 7 days of their last successful refresh.
 - Product analytics are not implicit in tasks 22-28. Before a Discover pilot, only fixed low-cardinality view/click/save events may be added; item details and selected interests remain forbidden, owned rows expire after 90 days, and export/deletion must include them.
+- Task 31 completed with an Algora NO-GO decision: there is no approved organization allowlist or supported global-discovery contract, so no Algora adapter, storage, or UI behavior exists.
 - Completing tasks 22-26 produces a Discover release candidate. Real source smoke, attribution, failure, accessibility, and privacy evidence are still required for release, and none of this completes task 20.
 - The full contract is [`DISCOVER_CONTRACT.md`](./DISCOVER_CONTRACT.md).
