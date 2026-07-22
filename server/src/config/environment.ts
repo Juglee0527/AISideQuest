@@ -6,10 +6,14 @@ import {
   readAuthEnvironment,
   type AuthEnvironment,
 } from '../auth/auth-environment'
+import {
+  readDiscoverEnvironment,
+  type DiscoverEnvironment,
+} from '../discover/discover-environment'
 
 export type NodeEnvironment = 'development' | 'test' | 'production'
 
-export interface AppEnvironment extends DatabaseEnvironment, AuthEnvironment {
+export interface AppEnvironment extends DatabaseEnvironment, AuthEnvironment, DiscoverEnvironment {
   NODE_ENV: NodeEnvironment
   API_HOST: string
   API_PORT: number
@@ -132,6 +136,7 @@ export function validateEnvironment(
 ): Record<string, unknown> & AppEnvironment {
   const nodeEnvironment = parseNodeEnvironment(configuration.NODE_ENV)
   const authEnvironment = readAuthEnvironment(configuration, nodeEnvironment)
+  const discoverEnvironment = readDiscoverEnvironment(configuration)
   const corsOrigin = parseCorsOrigin(configuration.CORS_ORIGIN, nodeEnvironment)
   const databaseEnvironment = readDatabaseEnvironment(configuration)
   const deploymentEnvironment = parseDeploymentEnvironment(
@@ -171,6 +176,7 @@ export function validateEnvironment(
     ...configuration,
     ...databaseEnvironment,
     ...authEnvironment,
+    ...discoverEnvironment,
     NODE_ENV: nodeEnvironment,
     API_HOST: readNonEmptyString(
       configuration.API_HOST,

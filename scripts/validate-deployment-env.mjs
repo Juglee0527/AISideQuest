@@ -77,6 +77,22 @@ export function validateDeploymentEnvironment(values, expectedEnvironment) {
   check((values.METRICS_BEARER_TOKEN?.length ?? 0) >= 32 && !PLACEHOLDER.test(values.METRICS_BEARER_TOKEN ?? ''), 'METRICS_BEARER_TOKEN must be a non-placeholder secret of at least 32 characters')
   check((values.GITHUB_CLIENT_ID?.length ?? 0) >= 8 && !PLACEHOLDER.test(values.GITHUB_CLIENT_ID ?? ''), 'GITHUB_CLIENT_ID must not be a placeholder')
   check((values.GITHUB_CLIENT_SECRET?.length ?? 0) >= 20 && !PLACEHOLDER.test(values.GITHUB_CLIENT_SECRET ?? ''), 'GITHUB_CLIENT_SECRET must not be a placeholder')
+  const discoverToken = values.GITHUB_DISCOVER_TOKEN ?? ''
+  const discoverOrganizations = values.GITHUB_DISCOVER_ORGANIZATIONS ?? ''
+  const discoverRepositories = values.GITHUB_DISCOVER_REPOSITORIES ?? ''
+  const hasDiscoverScopes = Boolean(discoverOrganizations || discoverRepositories)
+  check(Boolean(discoverToken) === hasDiscoverScopes, 'GitHub Discover token and approved scopes must be configured together')
+  if (discoverToken) {
+    check(discoverToken.length >= 20 && !PLACEHOLDER.test(discoverToken), 'GITHUB_DISCOVER_TOKEN must be a non-placeholder server-only secret')
+    check(
+      discoverOrganizations.split(',').filter(Boolean).every((value) => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(value.trim())),
+      'GITHUB_DISCOVER_ORGANIZATIONS must contain valid comma-separated organizations',
+    )
+    check(
+      discoverRepositories.split(',').filter(Boolean).every((value) => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\/[A-Za-z0-9_.-]{1,100}$/.test(value.trim())),
+      'GITHUB_DISCOVER_REPOSITORIES must contain valid owner/repository values',
+    )
+  }
   check(DIGEST_IMAGE.test(values.AISIDEQUEST_API_IMAGE ?? ''), 'AISIDEQUEST_API_IMAGE must be pinned by sha256 digest')
   check(DIGEST_IMAGE.test(values.AISIDEQUEST_WEB_IMAGE ?? ''), 'AISIDEQUEST_WEB_IMAGE must be pinned by sha256 digest')
 
@@ -111,6 +127,9 @@ export function validateEnvironmentSeparation(staging, production) {
   for (const key of ['CORS_ORIGIN', 'DATABASE_URL', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'METRICS_BEARER_TOKEN', 'SITE_ADDRESS']) {
     if (staging[key] === production[key]) errors.push(`${key} must differ between staging and production`)
   }
+  if (staging.GITHUB_DISCOVER_TOKEN && staging.GITHUB_DISCOVER_TOKEN === production.GITHUB_DISCOVER_TOKEN) {
+    errors.push('GITHUB_DISCOVER_TOKEN must differ between staging and production')
+  }
   for (const key of ['SERVICE_VERSION', 'AISIDEQUEST_API_IMAGE', 'AISIDEQUEST_WEB_IMAGE']) {
     if (staging[key] !== production[key]) errors.push(`${key} must be identical when promoting a release`)
   }
@@ -139,4 +158,3 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     process.exitCode = 1
   })
 }
-

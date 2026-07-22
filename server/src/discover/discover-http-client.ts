@@ -7,7 +7,10 @@ export type DiscoverFetchFailure =
   | 'INVALID_RESPONSE'
 
 export class DiscoverFetchError extends Error {
-  constructor(readonly reason: DiscoverFetchFailure) {
+  constructor(
+    readonly reason: DiscoverFetchFailure,
+    readonly retryAt: number | null = null,
+  ) {
     super(`Discover source request failed: ${reason}`)
     this.name = 'DiscoverFetchError'
   }
@@ -17,9 +20,16 @@ export interface DiscoverJsonRequest {
   url: string
   allowedHosts: readonly string[]
   accept?: string
+  headers?: Readonly<Record<string, string>>
+  rateLimitStatusCodes?: readonly number[]
   timeoutMs?: number
   maxAttempts?: number
   maxResponseBytes?: number
+}
+
+export interface DiscoverJsonResponse {
+  body: unknown
+  headers: Headers
 }
 
 interface DiscoverHttpClientDependencies {
@@ -43,8 +53,16 @@ export class DiscoverHttpClient {
   }
 
   async getJson(request: DiscoverJsonRequest): Promise<unknown> {
+    return (await this.getJsonResponse(request)).body
+  }
+
+  async getJsonResponse(request: DiscoverJsonRequest): Promise<DiscoverJsonResponse> {
     const url = this.validateUrl(request.url, request.allowedHosts)
     const accept = this.validateHeaderValue(request.accept ?? 'application/json')
+    const headers = this.validateHeaders(request.headers ?? {})
+    const rateLimitStatusCodes = this.validateRateLimitStatusCodes(
+      request.rateLimitStatusCodes ?? [429],
+    )
     const timeoutMs = this.validatePositiveInteger(request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     const maxAttempts = this.validatePositiveInteger(request.maxAttempts ?? DEFAULT_MAX_ATTEMPTS)
     const maxResponseBytes = this.validatePositiveInteger(
@@ -58,7 +76,14 @@ export class DiscoverHttpClient {
     let lastFailure: DiscoverFetchError | undefined
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        return await this.fetchOnce(url, accept, timeoutMs, maxResponseBytes)
+        return await this.fetchOnce(
+          url,
+          accept,
+          headers,
+          rateLimitStatusCodes,
+          timeoutMs,
+          maxResponseBytes,
+        )
       } catch (error) {
         const failure = this.toFetchError(error)
         lastFailure = failure
@@ -75,6 +100,8 @@ export class DiscoverHttpClient {
   private async fetchOnce(
     url: URL,
     accept: string,
+    requestHeaders: Readonly<Record<string, string>>,
+    rateLimitStatusCodes: ReadonlySet<number>,
     timeoutMs: number,
     maxResponseBytes: number,
   ) {
@@ -88,14 +115,15 @@ export class DiscoverHttpClient {
         headers: {
           accept,
           'user-agent': 'AISideQuest-Discover/1.0',
+          ...requestHeaders,
         },
       })
 
       if (response.status >= 300 && response.status < 400) {
         throw new DiscoverFetchError('INVALID_RESPONSE')
       }
-      if (response.status === 429) {
-        throw new DiscoverFetchError('RATE_LIMITED')
+      if (rateLimitStatusCodes.has(response.status)) {
+        throw new DiscoverFetchError('RATE_LIMITED', this.parseRetryAt(response.headers))
       }
       if (response.status === 408 || response.status === 425) {
         throw new DiscoverFetchError('UPSTREAM')
@@ -118,7 +146,10 @@ export class DiscoverHttpClient {
 
       const bytes = await this.readBoundedBody(response, maxResponseBytes)
       try {
-        return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown
+        return {
+          body: JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as unknown,
+          headers: response.headers,
+        }
       } catch {
         throw new DiscoverFetchError('INVALID_RESPONSE')
       }
@@ -200,6 +231,57 @@ export class DiscoverHttpClient {
       throw new DiscoverFetchError('INVALID_REQUEST')
     }
     return value
+  }
+
+  private validateHeaders(headers: Readonly<Record<string, string>>) {
+    const validated: Record<string, string> = {}
+    for (const [name, value] of Object.entries(headers)) {
+      const normalizedName = name.toLowerCase()
+      if (!/^[a-z0-9-]{1,50}$/.test(normalizedName) || normalizedName === 'accept') {
+        throw new DiscoverFetchError('INVALID_REQUEST')
+      }
+      validated[normalizedName] = this.validateHeaderValue(value)
+    }
+    return validated
+  }
+
+  private validateRateLimitStatusCodes(values: readonly number[]) {
+    if (
+      values.length === 0
+      || values.some((value) => value !== 403 && value !== 429)
+    ) {
+      throw new DiscoverFetchError('INVALID_REQUEST')
+    }
+    return new Set(values)
+  }
+
+  private parseRetryAt(headers: Headers) {
+    const now = Date.now()
+    const retryAfterValue = headers.get('retry-after')
+    const retryAfter = Number(retryAfterValue)
+    if (
+      retryAfterValue !== null
+      && /^\d+$/.test(retryAfterValue)
+      && Number.isSafeInteger(retryAfter)
+      && retryAfter >= 0
+      && retryAfter <= 86_400
+    ) {
+      return now + retryAfter * 1_000
+    }
+
+    if (headers.get('x-ratelimit-remaining') === '0') {
+      const resetValue = headers.get('x-ratelimit-reset')
+      const resetSeconds = Number(resetValue)
+      if (
+        resetValue !== null
+        && /^\d+$/.test(resetValue)
+        && Number.isSafeInteger(resetSeconds)
+        && resetSeconds > 0
+      ) {
+        return Math.max(now, resetSeconds * 1_000)
+      }
+    }
+    return now + 60_000
   }
 
   private toFetchError(error: unknown) {

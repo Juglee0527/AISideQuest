@@ -60,6 +60,77 @@ test('sends an explicitly validated versioned Accept header', async () => {
   )
 })
 
+test('sends validated server headers and exposes rate-limit response metadata', async () => {
+  let receivedHeaders = new Headers()
+  const client = new DiscoverHttpClient({
+    fetch: (async (_url: URL, init?: RequestInit) => {
+      receivedHeaders = new Headers(init?.headers)
+      return jsonResponse({ items: [] }, {
+        headers: {
+          'content-type': 'application/json',
+          'x-ratelimit-resource': 'search',
+          'x-ratelimit-remaining': '29',
+        },
+      })
+    }) as typeof fetch,
+  })
+
+  const response = await client.getJsonResponse({
+    url: 'https://api.example.com/items',
+    allowedHosts: ['api.example.com'],
+    headers: {
+      authorization: 'Bearer server-only-token',
+      'x-github-api-version': '2026-03-10',
+    },
+  })
+  assert.equal(receivedHeaders.get('authorization'), 'Bearer server-only-token')
+  assert.equal(receivedHeaders.get('x-github-api-version'), '2026-03-10')
+  assert.equal(response.headers.get('x-ratelimit-resource'), 'search')
+
+  await assert.rejects(
+    client.getJson({
+      url: 'https://api.example.com/items',
+      allowedHosts: ['api.example.com'],
+      headers: { authorization: 'Bearer token\r\nx-leak: true' },
+    }),
+    (error) => error instanceof DiscoverFetchError && error.reason === 'INVALID_REQUEST',
+  )
+})
+
+test('classifies configured 403 and 429 responses as rate limited with retry timing', async () => {
+  const now = Date.now()
+  const responses = [
+    jsonResponse({}, { status: 403, headers: { 'retry-after': '60' } }),
+    jsonResponse({}, {
+      status: 429,
+      headers: {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(Math.ceil((now + 120_000) / 1_000)),
+      },
+    }),
+    jsonResponse({}, { status: 403 }),
+  ]
+  const client = new DiscoverHttpClient({
+    fetch: (async () => responses.shift() as Response) as typeof fetch,
+  })
+
+  for (const status of [403, 429, 403]) {
+    await assert.rejects(
+      client.getJson({
+        url: 'https://api.example.com/items',
+        allowedHosts: ['api.example.com'],
+        rateLimitStatusCodes: [403, 429],
+        maxAttempts: 1,
+      }),
+      (error) => error instanceof DiscoverFetchError
+        && error.reason === 'RATE_LIMITED'
+        && error.retryAt !== null
+        && error.retryAt > now,
+      `status ${status}`,
+    )
+  }
+})
+
 test('rejects redirects, non-JSON and oversized response bodies', async () => {
   const responses = [
     new Response(null, { status: 302, headers: { location: 'https://api.example.com/next' } }),

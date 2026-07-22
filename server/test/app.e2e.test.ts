@@ -274,6 +274,9 @@ test('environment validation applies defaults and rejects invalid ports', () => 
   assert.equal(environment.DATABASE_SSL, false)
   assert.equal(environment.GITHUB_CLIENT_ID, '')
   assert.equal(environment.GITHUB_CLIENT_SECRET, '')
+  assert.equal(environment.GITHUB_DISCOVER_TOKEN, '')
+  assert.deepEqual(environment.GITHUB_DISCOVER_ORGANIZATIONS, [])
+  assert.deepEqual(environment.GITHUB_DISCOVER_REPOSITORIES, [])
   assert.equal(
     environment.GITHUB_CALLBACK_URL,
     'http://localhost:3000/api/v1/auth/github/callback',
@@ -300,6 +303,24 @@ test('environment validation applies defaults and rejects invalid ports', () => 
     () => validateEnvironment({ AUTH_SESSION_TTL_HOURS: '0' }),
     /AUTH_SESSION_TTL_HOURS must be an integer from 1 to 720/,
   )
+  assert.throws(
+    () => validateEnvironment({ GITHUB_DISCOVER_TOKEN: 'github_pat_server_only_test_token' }),
+    /must be configured together/,
+  )
+  assert.throws(
+    () => validateEnvironment({
+      GITHUB_DISCOVER_TOKEN: 'github_pat_server_only_test_token',
+      GITHUB_DISCOVER_REPOSITORIES: 'invalid-repository',
+    }),
+    /owner\/repository/,
+  )
+  const githubDiscover = validateEnvironment({
+    GITHUB_DISCOVER_TOKEN: 'github_pat_server_only_test_token',
+    GITHUB_DISCOVER_ORGANIZATIONS: 'OpenAI,Example-Org',
+    GITHUB_DISCOVER_REPOSITORIES: 'OpenAI/Codex',
+  })
+  assert.deepEqual(githubDiscover.GITHUB_DISCOVER_ORGANIZATIONS, ['openai', 'example-org'])
+  assert.deepEqual(githubDiscover.GITHUB_DISCOVER_REPOSITORIES, ['openai/codex'])
   assert.throws(
     () =>
       validateEnvironment({

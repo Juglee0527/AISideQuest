@@ -16,6 +16,7 @@ function valid(environment, host) {
     DATABASE_URL: `postgresql://user_${environment}:secret_${environment}@db-${environment}.internal:5432/aisidequest`,
     DATABASE_SSL: 'true', GITHUB_CLIENT_ID: `github-id-${environment}`,
     GITHUB_CLIENT_SECRET: `github-secret-${environment}-123456789`,
+    GITHUB_DISCOVER_TOKEN: '', GITHUB_DISCOVER_ORGANIZATIONS: '', GITHUB_DISCOVER_REPOSITORIES: '',
     GITHUB_CALLBACK_URL: `https://${host}/api/v1/auth/github/callback`,
     AUTH_SUCCESS_REDIRECT_URL: `https://${host}/`,
     AUTH_FAILURE_REDIRECT_URL: `https://${host}/?authError=github_oauth_failed`,
@@ -33,6 +34,24 @@ test('parses comments, quoted values, and embedded equals signs', () => {
 
 test('accepts a complete digest-pinned production environment', () => {
   assert.deepEqual(validateDeploymentEnvironment(valid('production', 'app.company.test'), 'production'), [])
+})
+
+test('accepts only paired GitHub Discover credentials and approved scopes', () => {
+  const configured = valid('production', 'app.company.test')
+  configured.GITHUB_DISCOVER_TOKEN = 'github_pat_production_secret_123456789'
+  configured.GITHUB_DISCOVER_ORGANIZATIONS = 'OpenAI,example-org'
+  configured.GITHUB_DISCOVER_REPOSITORIES = 'owner/repository'
+  assert.deepEqual(validateDeploymentEnvironment(configured, 'production'), [])
+
+  configured.GITHUB_DISCOVER_REPOSITORIES = 'invalid'
+  assert.ok(validateDeploymentEnvironment(configured, 'production').some((error) => (
+    error.includes('owner/repository')
+  )))
+
+  configured.GITHUB_DISCOVER_TOKEN = ''
+  assert.ok(validateDeploymentEnvironment(configured, 'production').some((error) => (
+    error.includes('configured together')
+  )))
 })
 
 test('rejects plaintext origins, placeholders, mutable tags, and implicit switches', () => {
@@ -53,9 +72,11 @@ test('requires isolated credentials and identical promoted artifacts', () => {
   const staging = valid('staging', 'staging.company.test')
   const production = valid('production', 'app.company.test')
   production.GITHUB_CLIENT_ID = staging.GITHUB_CLIENT_ID
+  staging.GITHUB_DISCOVER_TOKEN = 'github_pat_shared_secret_123456789'
+  production.GITHUB_DISCOVER_TOKEN = staging.GITHUB_DISCOVER_TOKEN
   production.AISIDEQUEST_WEB_IMAGE = production.AISIDEQUEST_WEB_IMAGE.replace(/a{64}/, 'b'.repeat(64))
   const errors = validateEnvironmentSeparation(staging, production)
   assert.ok(errors.includes('GITHUB_CLIENT_ID must differ between staging and production'))
+  assert.ok(errors.includes('GITHUB_DISCOVER_TOKEN must differ between staging and production'))
   assert.ok(errors.includes('AISIDEQUEST_WEB_IMAGE must be identical when promoting a release'))
 })
-

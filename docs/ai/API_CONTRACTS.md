@@ -63,7 +63,7 @@ For exact DTO bounds, rate limits, and ownership rules, use [`SECURITY_AND_PRIVA
 
 ## Discover read contract
 
-Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Task 29 adds DEV Community and Stack Overflow. These four sources are `enabled: true`; an uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. GitHub and Algora remain disabled.
+Tasks 22-26 ship the authenticated read contract, common model, safe adapter/cache boundary, Hacker News, Remotive, and the `/discover` browser screen. Task 29 adds DEV Community and Stack Overflow. These four sources are always `enabled: true`. Task 30 adds GitHub only when `GITHUB_DISCOVER_TOKEN` and at least one approved organization or repository are configured together; otherwise GitHub remains disabled. An uncached list request performs a bounded refresh and then returns `FRESH`, bounded fallback may return `STALE`, and an unavailable source returns no items. Algora remains disabled.
 
 `GET /discover` query:
 
@@ -102,6 +102,8 @@ Successful `GET /discover` data:
 Every `DiscoverItem` has a stable namespaced ID (`SOURCE:base64url-safe-external-key`), source, category, kind, bounded plain-text title/nullable summary/tags, nullable reward, nullable compensation, nullable source-provided `engagement`, nullable positive `readingTimeMinutes`, validated HTTPS original URL, attribution, nullable `publishedAt`, and required `fetchedAt`. A recommendation is a separate `{ itemId, reasons, matchedInterests }` record and is returned only for items in the current page.
 
 Registered adapters resolve independently. A fresh cache is returned without an upstream call; a stale or missing cache may trigger one per-source locked refresh. Refresh failure returns cache data only within that adapter's maximum stale age, otherwise `UNAVAILABLE`. One source failure does not change the HTTP success of another source, and raw upstream error details are never returned.
+
+The GitHub adapter calls one `GET https://api.github.com/search/issues` page with `per_page=30`, `is:issue is:open no:assignee`, the fixed contribution labels, and only configured `org:`/`repo:` qualifiers. It uses a server-only credential that is separate from login OAuth, rejects pull requests, assigned/closed issues and out-of-allowlist links again after parsing, and emits `COMMUNITY/OSS_TASK` with no inferred reward. `403` and `429` use `Retry-After` first, then search-bucket remaining/reset headers; normal fresh TTL is 30 minutes and maximum stale is 24 hours.
 
 ## Discover saved-item contract
 

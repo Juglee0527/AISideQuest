@@ -1,11 +1,11 @@
 # AISideQuest 개발 진행 요약
 
-- 최종 현행화: 2026-07-21
+- 최종 현행화: 2026-07-22
 - 애플리케이션 버전: `0.1.0`
 - 전체 실사용 베타 작업: 20개
 - 완료: 1~19번, 총 19개
 - Task 20: 배포 패키지 구현 완료, 외부 운영 배포·파일럿 증거 대기
-- Discover 확장: Task 21~29 완료, Task 30~33 대기
+- Discover 확장: Task 21~30 완료, Task 31~33 대기
 
 ---
 
@@ -664,6 +664,6 @@ Task 21~28에서 다음 범위를 구현했다.
 9. 저장 snapshot과 관심 기술을 포함하는 사용자 export schema version 3과 account delete transaction
 10. Prompt, AI response, code, diff, transcript, raw command, tool input/output와 local path를 개인화·분석·운영 log에서 제외하는 경계
 
-2026-07-21 현재 React 65개, Codex plugin 20개, 운영·local startup 17개, server non-database 58개, PostgreSQL integration 58개로 자동 테스트 총 218개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다.
+2026-07-22 현재 React 65개, Codex plugin 20개, 운영·local startup 18개, server non-database 66개, PostgreSQL integration 58개로 자동 테스트 총 227개를 통과했다. Lint, client·server typecheck, production build, 문서 link 검사, 17개 migration 전체 revert·reapply와 `git diff --check`도 통과했다. Task 30은 별도 server-only GitHub token과 명시적 organization/repository allowlist가 함께 있을 때만 활성화되는 1 page·30건 Search Issues adapter, PR·assigned·scope 방어 검증, 30분 fresh·24시간 maximum stale, search rate-limit 차단을 추가했다.
 
 Task 29B는 Stack Overflow featured·unanswered 고정 요청, reputation bounty 분류, wrapper backoff·quota와 shared one-minute request gate를 완료했다. 다음 구현 작업은 Task 30의 GitHub credential·탐색 범위 확정이다. Task 20은 repository package와 local rehearsal만 완료된 상태이며 실제 staging·production·pilot 증거 없이는 완료로 판정하지 않는다.

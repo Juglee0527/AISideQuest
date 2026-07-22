@@ -27,7 +27,7 @@
 | `server/src/quests/` | catalog, attempts, answers, grading, retry, reward transaction |
 | `server/src/points/` | balance and immutable ledger reads |
 | `server/src/statistics/` | time-zone-aware summary and activity |
-| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, source aggregation, saved-item and explicit-interest services, deterministic ranking, and API |
+| `server/src/discover/` | common Discover types, adapter contract, bounded HTTP/normalization boundary, PostgreSQL cache, Hacker News/Remotive/DEV/Stack Overflow/conditional GitHub adapters and request gates, source aggregation, saved-item and explicit-interest services, deterministic ranking, and API |
 | `server/src/security/` | shared PostgreSQL rate limits |
 | `server/src/observability/` | structured logging, metrics, sanitization |
 | `server/src/health/` | liveness, readiness, protected metrics endpoint |

@@ -3,9 +3,9 @@
 > AI가 작업하는 동안 개발자가 수익 기회, 개발 정보, 커뮤니티 주제를 안전하게 발견할 수 있도록 기존 베타 이후의 확장 작업을 정의한다.
 
 - 작성일: 2026-07-21
-- 상태: Task 21~29 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow 연동 완료
+- 상태: Task 21~30 완료, Discover MVP·저장·명시적 개인화·DEV·Stack Overflow·조건부 GitHub Issues 연동 완료
 - 작업 번호: 21~33
-- 다음 작업: 30. GitHub credential·탐색 범위 확정과 Issues 연동
+- 다음 작업: 31. Algora 공개 탐색 가능성 조사와 GO·NO-GO 판정
 - 1차 구현 범위: 21~26
 
 ---
@@ -388,6 +388,8 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 
 #### 30. GitHub 오픈소스 기회 연동
 
+상태: 완료(2026-07-22)
+
 작업:
 
 - API host는 `api.github.com`으로 고정하고 Search Issues endpoint의 고정 query로 `good first issue`, `help wanted`, `documentation` issue를 탐색한다.
@@ -401,6 +403,15 @@ Task 29는 번호를 유지하되 source 계약과 검증을 `29A DEV`, `29B Sta
 - Search API의 별도 rate-limit bucket을 인식하고 `Retry-After`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `403`, `429`를 처리한다.
 - label만 보고 현금 보상을 추정하지 않는다.
 - credential이 브라우저, 응답, 로그에 노출되지 않는다.
+
+구현 결과:
+
+- 로그인 OAuth token을 재사용하지 않고 별도 server-only fine-grained token인 `GITHUB_DISCOVER_TOKEN`을 선택했다. `GITHUB_DISCOVER_ORGANIZATIONS` 또는 `GITHUB_DISCOVER_REPOSITORIES` 중 하나 이상의 명시적 allowlist와 token을 함께 설정한 경우에만 adapter를 등록하며, 미설정 기본값은 disabled다.
+- `api.github.com/search/issues`에 `is:issue is:open no:assignee`와 `good first issue`·`help wanted`·`documentation`, 승인된 `org:`·`repo:` qualifier를 넣어 updated 내림차순 1 page·30건만 요청한다. GitHub REST API version은 `2026-03-10`, fresh TTL은 30분, maximum stale은 24시간, source retry는 0회로 확정했다.
+- 응답에서도 `pull_request` 필드 부재, open 상태, assignee·assignees 없음, 목표 label, 승인 scope, issue 번호와 일치하는 직접 `https://github.com/<owner>/<repo>/issues/<number>` link를 다시 검증한다. 불완전 검색 결과나 광범위한 invalid item은 refresh를 실패시켜 stale cache를 보존한다.
+- GitHub issue는 `COMMUNITY/OSS_TASK`로만 정규화하고 label이나 제목의 `bounty`를 cash·급여·평판·AISideQuest point로 추정하지 않는다. Body, user, assignee, repository payload와 API URL은 저장하거나 로그로 남기지 않는다.
+- Search 전용 bucket을 확인하며 `403`·`429`에서 `Retry-After`를 우선하고, remaining 0이면 `X-RateLimit-Reset`까지 차단하며 header가 불충분한 secondary limit은 1분간 차단한다. 정상 응답에서 remaining 0인 경우도 reset까지 차단한다.
+- 환경설정, HTTP metadata·header 보안, adapter 정규화·scope·PR/assigned 방어, incomplete 결과, rate-limit gate를 서버 테스트로 검증했다. 실제 credential과 승인 scope를 사용하는 live smoke는 secret과 issue 상세를 출력하지 않는 별도 운영 증거로 남긴다.
 
 #### 31. Algora 조사 및 조건부 연동
 

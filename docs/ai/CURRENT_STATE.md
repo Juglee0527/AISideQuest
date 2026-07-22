@@ -6,7 +6,7 @@ Runtime: Node.js 22, React 19, NestJS 11, PostgreSQL 16
 
 ## Delivery status
 
-Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-29 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, DEV, Stack Overflow, the Discover screen, user-owned saved items, and explicit-interest personalization complete. Tasks 30-33 are not implemented.
+Tasks 1–19 are implemented. Task 20 has repository implementation and a local deployment rehearsal, but remains externally incomplete. Discover tasks 21-30 have the product contract, common model, authenticated read API, safe adapter/cache infrastructure, Hacker News, Remotive, DEV, Stack Overflow, conditional GitHub Issues, the Discover screen, user-owned saved items, and explicit-interest personalization complete. Tasks 31-33 are not implemented.
 
 Implemented:
 
@@ -26,6 +26,7 @@ Implemented:
 - Enabled Remotive Software Development adapter with one shared bounded request, direct source URL and attribution, explicit compensation availability, employment-type tags, 6-hour fresh TTL, and 72-hour maximum stale fallback.
 - Enabled public Forem V1 DEV adapter with one shared 30-article request, exact DEV HTTPS links and attribution, bounded description and tags, nullable reading time and reaction engagement, 30-minute fresh TTL, and 24-hour maximum stale fallback.
 - Enabled Stack Exchange API v2.3 Stack Overflow adapter with fixed featured and unanswered requests, one 30-question page per method, reputation-only bounties, method backoff, shared one-minute request spacing, quota exhaustion handling, a 15-minute fresh TTL, and 24-hour maximum stale fallback.
+- Conditional GitHub Search Issues adapter using a server-only fine-grained token and explicit organization/repository allowlists. It performs one 30-item, issue-only, open, unassigned search per shared 30-minute refresh, excludes pull requests and out-of-scope results defensively, honors the separate search rate-limit headers, and falls back to cache for at most 24 hours. Without the token and a scope, GitHub remains disabled.
 - Authenticated `/discover` desktop/mobile screen with earning, news, and community tabs, safe external cards, cursor load-more, and distinct loading, empty, stale, partial-failure, total-failure, and paging-error states. It remains independent of active AI sessions and collects no implicit analytics.
 - User-owned Discover saved snapshots with CSRF/idempotent save and delete, unique duplicate protection, stable cursor listing independent of source availability, explore/saved UI, and export/account-deletion handling.
 - Explicit Discover interests with a fixed 20-tag allowlist, maximum 10 selections, CSRF/idempotent full replacement, exact chronological empty default, deterministic match/recency/engagement/value ordering, visible reason codes, cursor invalidation, and export/account-deletion handling. Prompts, AI responses, code, paths, transcripts, and tool content are not inputs.
@@ -44,10 +45,10 @@ Optional external deployment remains unverified:
 |---|---:|
 | React | 65 |
 | Codex plugin | 20 |
-| operations and local startup scripts | 17 |
-| server non-database | 58 |
+| operations and local startup scripts | 18 |
+| server non-database | 66 |
 | PostgreSQL integration | 58 |
-| total | 218 |
+| total | 227 |
 
 Also passed: lint, client/server typecheck, client/server production build, 17 migrations with full revert/reapply coverage, Docker API/web builds, and 10 deployment smoke checks.
 
@@ -74,6 +75,7 @@ Also passed: lint, client/server typecheck, client/server production build, 17 m
 | Discover interests | fixed allowlist; maximum 10; empty means chronological order |
 | DEV article source | one public Forem V1 page; 30-minute fresh and 24-hour maximum stale |
 | Stack Overflow source | two fixed v2.3 methods, one 30-item page each; 15-minute fresh and 24-hour maximum stale |
+| GitHub source | optional server-only token plus approved org/repo scopes; one 30-item Search Issues page; 30-minute fresh and 24-hour maximum stale |
 
 ## Kill switches
 
@@ -83,4 +85,4 @@ Also passed: lint, client/server typecheck, client/server production build, 17 m
 
 ## Immediate next action
 
-Begin task 30 in the ordered [`Discover development plan`](../Discover_개발_계획.md): settle the GitHub server credential and repository or organization discovery scope before registering an Issues adapter. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.
+Begin task 31 in the ordered [`Discover development plan`](../Discover_개발_계획.md): investigate Algora and register no adapter unless a supported public global-discovery route or approved organization allowlist produces a documented GO decision. Keep the default product path free and local-first. External deployment and the pilot in [`DEPLOYMENT_AND_PILOT.md`](./DEPLOYMENT_AND_PILOT.md) remain a separate optional track; never mark task 20 complete without its real evidence.

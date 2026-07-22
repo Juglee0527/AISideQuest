@@ -90,11 +90,12 @@ OAuth 설정 변경, proxy hop 설정과 공격성 traffic을 확인한다. Rate
 
 `aisidequest_discover_source_fetch_total`의 source·result·고정 failure reason과 `aisidequest_discover_cache_total`의 `FRESH`·`STALE`·`MISS`만 확인한다. URL, item ID, 응답 body, HTML 또는 사용자 식별자를 로그나 metric label에 추가하지 않는다. 한 source 실패는 core readiness 장애가 아니며, maximum stale 이내 cache는 `STALE`, 그 이후는 `UNAVAILABLE`로 처리한다. Task 32 전에는 이 기본 counter에 운영 경보나 제품 분석을 연결하지 않는다.
 
-현재 활성 source의 정상 fresh·maximum stale는 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간, Stack Overflow 15분·24시간이다. DEV `429`나 schema 변경은 source-level retry 없이 기존 stale cache로 격리한다. Stack Overflow는 동일 method 요청 1분 간격과 wrapper `backoff`를 우선하며 `quota_remaining`이 0이면 UTC 다음 날까지 새 요청을 차단한다. 장애 진단 중에도 Forem·Stack Exchange response body, article·question URL, item ID·title·tag를 로그에 추가하거나 사용자에게 요청하지 않는다.
+현재 활성 source의 정상 fresh·maximum stale는 Hacker News 10분·24시간, Remotive 6시간·72시간, DEV 30분·24시간, Stack Overflow 15분·24시간이며, 설정된 경우 GitHub 30분·24시간이다. DEV `429`나 schema 변경은 source-level retry 없이 기존 stale cache로 격리한다. Stack Overflow는 동일 method 요청 1분 간격과 wrapper `backoff`를 우선하며 `quota_remaining`이 0이면 UTC 다음 날까지 새 요청을 차단한다. GitHub `403`·`429`는 `Retry-After`를 우선하고 search bucket remaining이 0이면 reset까지 요청을 차단한다. 장애 진단 중에도 Forem·Stack Exchange·GitHub response body, article·question·issue URL, item ID·title·tag를 로그에 추가하거나 사용자에게 요청하지 않는다.
 
 ## Secret 회전
 
 - GitHub OAuth secret: 새 secret을 secret manager에 등록 → staging callback → production rolling restart → 이전 secret 폐기.
+- GitHub Discover token: OAuth secret과 별도로 회전한다. 새 server-only fine-grained token이 승인된 organization/repository scope를 검색하는지 staging에서 집계값만 확인 → production rolling restart → 이전 token 폐기. token 또는 allowlist가 없으면 source는 disabled이며, token 값과 검색 결과 상세는 증거에 남기지 않는다.
 - 웹 세션: cookie는 서명 key가 아니라 DB의 hash-only opaque token을 쓴다. 유출 시 해당 또는 전체 `auth_sessions.revoked_at`을 설정하고 재로그인을 요구한다.
 - 기기 token: rotation link로 새 token 확인 후 이전 token을 교체한다. 유출 기기는 즉시 revoke한다.
 - metrics token: 새 token으로 scraper와 API를 함께 전환하고 짧은 scrape 실패를 감시한 뒤 이전 값을 폐기한다.

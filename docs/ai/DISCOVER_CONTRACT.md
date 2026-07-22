@@ -1,7 +1,7 @@
 # Discover Product Contract
 
-Status: tasks 21-29 complete; tasks 30-33 are not implemented.
-Contract date: 2026-07-21
+Status: tasks 21-30 complete; tasks 31-33 are not implemented.
+Contract date: 2026-07-22
 
 This document is the canonical product, privacy, and release contract for the
 Discover expansion. It defines decisions that later database, adapter, UI, and
@@ -33,9 +33,10 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   then the chronological tuple. The versioned cursor binds the current interest
   hash and ranking tuple and remains opaque to clients.
 - A source without a registered adapter remains `enabled: false` and
-  `UNAVAILABLE`. Hacker News, Remotive, DEV, and Stack Exchange are registered;
-  GitHub and Algora stay disabled until their own tasks are
-  implemented or, for Algora, a documented GO decision is reached.
+  `UNAVAILABLE`. Hacker News, Remotive, DEV, and Stack Exchange are registered
+  unconditionally. GitHub is registered only when its separate server token and
+  at least one approved organization or repository scope are configured
+  together. Algora stays disabled until a documented GO decision is reached.
 
 ## Adapter infrastructure baseline
 
@@ -85,11 +86,22 @@ items, and task 28 adds explicit-interest ordering without behavioral analytics.
   is reputation only; unanswered questions without a bounty are discussions.
   The adapter caches no owner, body, HTML, Markdown, or raw wrapper data and
   accepts only matching `https://stackoverflow.com/questions/...` links.
-- Task 30 must settle the server credential and discovery scope before a GitHub
-  adapter is registered. Search results use both an `is:issue` query and a
-  defensive absence-of-`pull_request` check. Search rate limits are separate
-  from core REST limits; `Retry-After`, remaining/reset headers, and 403/429
-  responses are part of the source contract.
+- Task 30 uses `GITHUB_DISCOVER_TOKEN`, a server-only fine-grained token kept
+  separate from login OAuth, plus explicit `GITHUB_DISCOVER_ORGANIZATIONS`
+  and/or `GITHUB_DISCOVER_REPOSITORIES` allowlists. All three settings remain
+  optional as a group; without a token and at least one scope, GitHub is
+  disabled. A configured refresh performs one lexical Search Issues request,
+  page 1 with 30 results, sorted by latest update, and a fixed
+  `is:issue is:open no:assignee` query for `good first issue`, `help wanted`, or
+  `documentation` labels. Results must also have no `pull_request`, be open and
+  unassigned, use a direct matching `github.com/<owner>/<repo>/issues/<number>`
+  URL, and remain inside the configured allowlist. They normalize to
+  `COMMUNITY/OSS_TASK`; labels never imply cash, salary, reputation, or
+  AISideQuest points. Raw body, user, assignee, repository payload, and API URLs
+  are discarded. The fresh TTL is 30 minutes and maximum stale age is 24 hours.
+  Requests use GitHub REST API version `2026-03-10`, the separate search bucket,
+  no source retry, and block after `403`/`429` according to `Retry-After`, then
+  `X-RateLimit-Remaining`/`X-RateLimit-Reset`, with a one-minute fallback.
 - Task 31 is `Algora research and conditional integration`. The public API
   lists bounties by a known organization, while authenticated `/api/bounties`
   lists the caller's organization. Without an approved organization allowlist

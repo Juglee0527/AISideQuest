@@ -8,6 +8,8 @@ import { DiscoverController } from './discover.controller'
 import { DiscoverHttpClient } from './discover-http-client'
 import { DiscoverService } from './discover.service'
 import { DevAdapter } from './dev.adapter'
+import { GithubIssuesAdapter } from './github-issues.adapter'
+import { GithubSearchRequestGate } from './github-search-request-gate'
 import { HackerNewsAdapter } from './hacker-news.adapter'
 import { RemotiveAdapter } from './remotive.adapter'
 import { StackExchangeRequestGate } from './stack-exchange-request-gate'
@@ -22,6 +24,8 @@ import { DiscoverInterestService } from './discover-interest.service'
     { provide: DiscoverHttpClient, useFactory: () => new DiscoverHttpClient() },
     DiscoverCacheService,
     DevAdapter,
+    GithubIssuesAdapter,
+    { provide: GithubSearchRequestGate, useFactory: () => new GithubSearchRequestGate() },
     HackerNewsAdapter,
     RemotiveAdapter,
     { provide: StackExchangeRequestGate, useFactory: () => new StackExchangeRequestGate() },
@@ -31,13 +35,20 @@ import { DiscoverInterestService } from './discover-interest.service'
     DiscoverInterestService,
     {
       provide: DISCOVER_SOURCE_ADAPTERS,
-      inject: [HackerNewsAdapter, RemotiveAdapter, DevAdapter, StackOverflowAdapter],
+      inject: [HackerNewsAdapter, RemotiveAdapter, DevAdapter, StackOverflowAdapter, GithubIssuesAdapter],
       useFactory: (
         hackerNewsAdapter: HackerNewsAdapter,
         remotiveAdapter: RemotiveAdapter,
         devAdapter: DevAdapter,
         stackOverflowAdapter: StackOverflowAdapter,
-      ) => [hackerNewsAdapter, remotiveAdapter, devAdapter, stackOverflowAdapter],
+        githubIssuesAdapter: GithubIssuesAdapter,
+      ) => [
+        hackerNewsAdapter,
+        remotiveAdapter,
+        devAdapter,
+        stackOverflowAdapter,
+        ...(githubIssuesAdapter.isConfigured() ? [githubIssuesAdapter] : []),
+      ],
     },
   ],
 })
